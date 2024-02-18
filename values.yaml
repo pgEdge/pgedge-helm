@@ -1,0 +1,59 @@
+annotations: {}
+labels: {}
+service:
+  name: pgedge
+  annotations: {}
+  type: ClusterIP
+  externalTrafficPolicy: Cluster
+  loadBalancerSourceRanges: []
+  loadBalancerIP: ""
+  clusterIP: ""
+  sessionAffinity: None
+  sessionAffinityConfig: {}
+pgEdge:
+  appName: pgedge
+  imageTag: kube-testing
+  existingUsersSecret: ""
+  nodeCount: 2
+  terminationGracePeriodSeconds: 10
+  resources: {}
+  port: 5432
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  dbSpec:
+    dbName: defaultdb
+    nodes: []
+    users:
+    - username: app
+      superuser: false
+      service: postgres
+      type: application
+    - username: admin
+      superuser: true
+      service: postgres
+      type: admin
+global:
+  clusterDomain: cluster.local
+storage:
+  accessModes: [ "ReadWriteOnce" ]
+  className: standard
+  selector: {}
+  labels: {}
+  annotations: {}
+  size: 8Gi
+  retentionPolicy:
+    enabled: false
+    whenDeleted: Retain
+    whenScaled: Retain

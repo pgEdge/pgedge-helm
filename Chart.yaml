@@ -1,0 +1,13 @@
+annotations:
+  category: Database
+  images: |
+    - name: postgres
+      image: docker.io/pgedge/pgedge:367d6e0
+apiVersion: v2
+name: pgedge
+description: TODO
+# icon: TODO
+home: https://pgedge.com
+sources:
+- https://github.com/pgEdge/pgedge-helm
+version: 0.0.1

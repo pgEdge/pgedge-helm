@@ -1,0 +1,22 @@
+service:
+  annotations:
+    service.cilium.io/global: "true"
+    service.cilium.io/affinity: local
+pgEdge:
+  appName: pgedge-iad
+  terminationGracePeriodSeconds: 0
+  dbSpec:
+    nodes:
+    - name: pgedge-iad-0
+      hostname: pgedge-iad-0.iad.pgedge-hl.default.svc.clusterset.local
+    - name: pgedge-iad-1
+      hostname: pgedge-iad-1.iad.pgedge-hl.default.svc.clusterset.local
+    - name: pgedge-sfo-0
+      hostname: pgedge-sfo-0.sfo.pgedge-hl.default.svc.clusterset.local
+    - name: pgedge-sfo-1
+      hostname: pgedge-sfo-1.sfo.pgedge-hl.default.svc.clusterset.local
+storage:
+  size: 1Gi
+  retentionPolicy:
+    enabled: true
+    whenDeleted: Delete

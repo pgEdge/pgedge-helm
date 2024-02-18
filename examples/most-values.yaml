@@ -1,0 +1,48 @@
+annotations:
+  some: annotation
+labels:
+  some: label
+service:
+  name: pgedge-foo
+  annotations:
+    some/service: annotation
+  type: LoadBalancer
+  loadBalancerSourceRanges: ["10.10.10.0/24"]
+  loadBalancerIP: "192.168.1.1"
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300
+pgEdge:
+  appName: pgedge-bar
+  imageTag: some-tag
+  existingUsersSecret: some-secret
+  nodeCount: 3
+  port: 6543
+  resources:
+    requests:
+      cpu: 2
+      memory: 512Mi
+    limits:
+      cpu: 3
+      memory: 1024Mi
+  dbSpec:
+    dbName: northwind
+global:
+  clusterDomain: cluster.remote
+storage:
+  accessModes:
+  - ReadWriteOncePod
+  - ReadWriteOnce
+  className: custom
+  selector:
+    speed: fast
+  labels:
+    storage-label: foo
+  annotations:
+    storage-annotation: bar
+  size: 100Gi
+  retentionPolicy:
+    enabled: true
+    whenDeleted: Delete
+    whenScaled: Delete
