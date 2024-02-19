@@ -6,8 +6,8 @@ set -o pipefail
 scripts_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 configs_dir=${scripts_dir}/../configs
 
-# Make sure cwd is repository root for relative paths in cluster configs
-cd ${scripts_dir}/../..
+# Set cwd to examples dir
+cd ${scripts_dir}/..
 
 # Create clusters
 kind create cluster --config ${configs_dir}/multi/iad/kind.yaml

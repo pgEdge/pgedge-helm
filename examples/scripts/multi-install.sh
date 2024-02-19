@@ -6,6 +6,7 @@ set -o pipefail
 scripts_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 configs_dir=${scripts_dir}/../configs
 
+# Set cwd to repo root dir
 cd ${scripts_dir}/../..
 
 # Deploy pgedge to IAD
