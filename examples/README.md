@@ -8,6 +8,7 @@ multi-cluster installation.
   - [Pre-requisites](#pre-requisites)
   - [Single cluster](#single-cluster)
   - [Multi cluster](#multi-cluster)
+  - [Testing pgEdge image updates](#testing-pgedge-image-updates)
 
 ## Pre-requisites
 
@@ -134,3 +135,19 @@ PGPASSWORD=<password from secret> psql -h pgedge -U app defaultdb
 # Afterwards, you can clean up by deleting both clusters
 make multi-down
 ```
+
+## Testing pgEdge image updates
+
+The default image tag is specified in the top-level [values.yaml](../values.yaml)
+file. You can do the following to use the the example configurations to test
+image updates:
+
+* Build and tag the image if it doesn't already exist, e.g. `pgedge/pgedge:kube-testing`
+* Update the `pgEdge.imageTag` value in the top-level `values.yaml` file
+* Start one of the examples with either `make single-up` or `make multi-up`
+* Run the corresponding `*-load-image` recipe, e.g. `make single-load-image`
+  * This copies the image from your host machine into the `kind` cluster(s)
+* Install and test pgEdge using the steps from the previous sections
+
+After you've completed your tests, remember to update `pgedge.imageTag` to one
+that's been pushed to Docker Hub.
