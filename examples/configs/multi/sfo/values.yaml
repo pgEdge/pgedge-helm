@@ -4,6 +4,7 @@ service:
     service.cilium.io/affinity: local
 pgEdge:
   appName: pgedge-sfo
+  nodeCount: 2
   terminationGracePeriodSeconds: 0
   existingUsersSecret: pgedge-users
   dbSpec:

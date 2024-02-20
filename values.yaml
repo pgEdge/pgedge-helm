@@ -14,8 +14,13 @@ pgEdge:
   appName: pgedge
   imageTag: kube-testing
   existingUsersSecret: ""
-  nodeCount: 2
+  nodeCount: 3
   terminationGracePeriodSeconds: 10
+  extraMatchLabels: {}
+  podAffinity: {}
+  podAntiAffinityEnabled: true
+  podAntiAffinityOverride: {}
+  nodeAffinity: {}
   resources: {}
   port: 5432
   livenessProbe:

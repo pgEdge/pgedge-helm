@@ -2,15 +2,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "pgedge.v0.dbJsonName" $ }}
-  {{- if .Values.labels }}
-  labels:
-    {{- .Values.labels | toYaml | nindent 4 }}
-  {{- end }}
+  name: {{ include "pgedge.v0.dbJsonName" . }}
+  labels: {{- include "pgedge.v0.labels" . | nindent 4 }}
   {{- if .Values.annotations }}
   annotations:
     {{- .Values.annotations | toYaml | nindent 4 }}
   {{- end }}
 data:
   db.json: |
-    {{ include "pgedge.v0.dbSpec" $ }}
+    {{ include "pgedge.v0.dbSpec" . }}

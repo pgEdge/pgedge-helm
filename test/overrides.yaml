@@ -17,7 +17,36 @@ pgEdge:
   appName: pgedge-bar
   imageTag: some-tag
   existingUsersSecret: some-secret
-  nodeCount: 3
+  nodeCount: 4
+  extraMatchLabels:
+    some: label
+  podAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: security
+            operator: In
+            values:
+            - S1
+        topologyKey: topology.kubernetes.io/zone
+  podAntiAffinityOverride:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: some
+              operator: In
+              values:
+                - label
+        topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: topology.kubernetes.io/zone
+            operator: In
+            values:
+            - antarctica-east1
+            - antarctica-west1
   port: 6543
   resources:
     requests:

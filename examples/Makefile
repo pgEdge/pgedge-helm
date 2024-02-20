@@ -59,7 +59,7 @@ multi-up:
 multi-down:
 	kind delete cluster --name multi-iad
 	kind delete cluster --name multi-sfo
-	rm -f ./broker-info.subm ./kubeconfig
+	rm -f $(examples_dir)/broker-info.subm $(examples_dir)/kubeconfig
 
 .PHONY: multi-install
 multi-install:

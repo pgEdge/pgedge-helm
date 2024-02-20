@@ -1,4 +1,5 @@
 pgEdge:
+  nodeCount: 2
   terminationGracePeriodSeconds: 0
 storage:
   size: 1Gi

@@ -18,7 +18,10 @@ cilium install --context kind-multi-iad \
 	--set cluster.name=iad \
 	--set cluster.id=1 \
 	--set encryption.nodeEncryption=true \
-	--set encryption.type=wireguard
+	--set encryption.type=wireguard \
+    --set hubble.enabled=true \
+    --set hubble.relay.enabled=true \
+    --set hubble.ui.enabled=true
 cilium status --context kind-multi-iad --wait
 
 # Copy Cilium CA from IAD to SFO
@@ -33,7 +36,10 @@ cilium install --context kind-multi-sfo \
 	--set cluster.name=sfo \
 	--set cluster.id=2 \
 	--set encryption.nodeEncryption=true \
-	--set encryption.type=wireguard
+	--set encryption.type=wireguard \
+    --set hubble.enabled=true \
+    --set hubble.relay.enabled=true \
+    --set hubble.ui.enabled=true
 cilium status --context kind-multi-sfo --wait
 
 # Enable cluster mesh
@@ -45,10 +51,6 @@ cilium clustermesh status --context kind-multi-sfo --wait
 # Connect cluster mesh
 cilium clustermesh connect --context kind-multi-iad \
 	--destination-context kind-multi-sfo
-
-# Enable hubble for flow logs and observability
-cilium hubble enable --ui --context kind-multi-iad
-cilium hubble enable --ui --context kind-multi-sfo
 
 # It's easiest to install Submariner from inside the kind network, so we make a
 # new kubeconfig file with internal addresses. After it's deployed we'll be able

@@ -4,6 +4,7 @@ service:
     service.cilium.io/affinity: local
 pgEdge:
   appName: pgedge-iad
+  nodeCount: 2
   terminationGracePeriodSeconds: 0
   dbSpec:
     nodes:

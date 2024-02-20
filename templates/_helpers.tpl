@@ -20,11 +20,11 @@
 
 {{- define "pgedge.v0.dbSpec.users" -}}
 {{- $pgedgeUser := dict
-    "password" (randAlphaNum 24)
-    "username" "pgedge"
-    "superuser" true
-    "service" "postgres"
-    "type" "internal_admin"
+  "password" (randAlphaNum 24)
+  "username" "pgedge"
+  "superuser" true
+  "service" "postgres"
+  "type" "internal_admin"
 }}
 {{- $users := list $pgedgeUser }}
 {{- range $i, $u := $.Values.pgEdge.dbSpec.users }}
@@ -53,18 +53,18 @@
 
 {{- define "pgedge.v0.dbSpec" -}}
 {{- $dbSpec := dict
-    "name" $.Values.pgEdge.dbSpec.dbName
-    "port" $.Values.pgEdge.port
-    "nodes" (include "pgedge.v0.dbSpec.nodes" $ | fromJsonArray)
+  "name" $.Values.pgEdge.dbSpec.dbName
+  "port" $.Values.pgEdge.port
+  "nodes" (include "pgedge.v0.dbSpec.nodes" $ | fromJsonArray)
 }}
 {{- $dbSpec | toJson -}}
 {{- end -}}
 
 {{- define "pgedge.v0.probeExec" -}}
 {{- $cmd := list
-    "/bin/sh"
-    "-c"
-    (printf "pg_isready -U pgedge -d %s" $.Values.pgEdge.dbSpec.dbName)
+  "/bin/sh"
+  "-c"
+  (printf "pg_isready -U pgedge -d %s" $.Values.pgEdge.dbSpec.dbName)
 }}
 {{- dict "command" $cmd | toYaml -}}
 {{- end -}}
@@ -79,4 +79,42 @@
 {{- $exec := include "pgedge.v0.probeExec" . | fromYaml }}
 {{- $probe := omit $.Values.pgEdge.readinessProbe "enabled" }}
 {{- merge $probe (dict "exec" $exec) | toYaml -}}
+{{- end -}}
+
+{{- define "pgedge.v0.labels" -}}
+app.kubernetes.io/name: {{ $.Values.pgEdge.appName }}
+app.kubernetes.io/component: database
+app.kubernetes.io/managed-by: helm
+{{- if $.Values.labels }}
+{{ $.Values.labels | toYaml }}
+{{- end }}
+{{- end -}}
+
+{{- define "pgedge.v0.matchLabels" -}}
+app.kubernetes.io/name: {{ $.Values.pgEdge.appName }}
+{{- if $.Values.pgEdge.extraMatchLabels }}
+{{ $.Values.pgEdge.extraMatchLabels | toYaml}}
+{{- end }}
+{{- end -}}
+
+{{- define "pgedge.v0.affinity" -}}
+{{- if $.Values.pgEdge.podAffinity -}}
+podAffinity: {{- $.Values.pgEdge.podAffinity | toYaml | nindent 2 }}
+{{- end }}
+{{- if $.Values.pgEdge.podAntiAffinityEnabled -}}
+{{- if $.Values.pgEdge.podAntiAffinityOverride }}
+podAntiAffinity: {{- $.Values.pgEdge.podAntiAffinityOverride | toYaml | nindent 2 }}
+{{- else -}}
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels: {{- include "pgedge.v0.matchLabels" . | nindent 12 }}
+        topologyKey: kubernetes.io/hostname
+      weight: 1
+{{- end -}}
+{{- end -}}
+{{- if $.Values.pgEdge.nodeAffinity }}
+nodeAffinity: {{- $.Values.pgEdge.nodeAffinity | toYaml | nindent 2 }}
+{{- end }}
 {{- end -}}
