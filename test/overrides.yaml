@@ -47,6 +47,8 @@ pgEdge:
             values:
             - antarctica-east1
             - antarctica-west1
+  pdb:
+    create: true
   port: 6543
   resources:
     requests:
