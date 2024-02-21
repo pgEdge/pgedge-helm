@@ -1,0 +1,90 @@
+version: 2.1
+commands:
+  install-tools:
+    parameters:
+      kind-version:
+        type: string
+        default: v0.22.0
+      helm-version:
+        type: string
+        default: v3.14.1
+      kubectl-version:
+        type: string
+        default: v1.29.2
+    steps:
+      - restore_cache:
+          keys:
+            - kind-<<parameters.kind-version>>-helm-<<parameters.helm-version>>-kubectl-<<parameters.kubectl-version>>
+      - run:
+          name: Install tools
+          command: |
+            kind_version=<<parameters.kind-version>>
+            helm_version=<<parameters.helm-version>>
+            kubectl_version=<<parameters.kubectl-version>>
+
+            mkdir -p ~/.local/bin
+            cd ~/.local/bin
+
+            if [[ ! -x ./kind ]]; then
+              curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${kind_version}/kind-linux-amd64"
+              chmod +x ./kind
+            fi
+
+            if [[ ! -x ./helm ]]; then
+              curl -Lo helm.tar.gz "https://get.helm.sh/helm-${helm_version}-linux-amd64.tar.gz"
+              tar -xz --strip-components 1 -f helm.tar.gz linux-amd64/helm
+              chmod +x ./helm
+              rm helm.tar.gz
+            fi
+            
+            if [[ ! -x ./kubectl ]]; then
+              curl -LO "https://dl.k8s.io/release/${kubectl_version}/bin/linux/amd64/kubectl"
+              chmod +x ./kubectl
+            fi
+      - save_cache:
+          key: kind-<<parameters.kind-version>>-helm-<<parameters.helm-version>>-kubectl-<<parameters.kubectl-version>>
+          paths:
+            - ~/.local/bin/kind
+            - ~/.local/bin/helm
+            - ~/.local/bin/kubectl
+jobs:
+  helm-test:
+    machine:
+      image: ubuntu-2204:2024.01.1
+      docker_layer_caching: true
+    resource_class: large
+    steps:
+      - checkout
+      - install-tools
+      - run:
+          name: Helm lint
+          command: |
+            helm lint . --values examples/configs/single/values.yaml
+            helm lint . --values examples/configs/multi/iad/values.yaml
+            helm lint . --values examples/configs/multi/sfo/values.yaml
+      - run:
+          name: Cluster up
+          command: |
+            make -f examples/Makefile single-up
+      - run:
+          name: Install pgedge
+          command: |
+            make -f examples/Makefile single-install
+            # Wait until at least one pod is ready
+            kubectl wait pod \
+              --for=condition=ready \
+              --selector='app.kubernetes.io/name=pgedge' \
+              --timeout=45s
+      - run:
+          name: Helm test
+          command: |
+            make -f examples/Makefile single-test
+      - run:
+          name: Teardown
+          command: |
+            make -f examples/Makefile single-uninstall
+            make -f examples/Makefile single-down
+workflows:
+  test:
+    jobs:
+      - helm-test
