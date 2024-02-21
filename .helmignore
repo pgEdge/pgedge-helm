@@ -1,7 +1,6 @@
 .DS_Store
 .git/
 examples/
-test/
 Makefile
 broker-info.subm*
 .monokle

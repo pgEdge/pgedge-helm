@@ -43,6 +43,18 @@ single-enable-replication:
 single-load-image:
 	kind load docker-image $(pgedge_image) -n single
 
+.PHONY: single-test
+single-test:
+	helm test --kube-context kind-single pgedge
+
+.PHONY: single-upgrade
+single-upgrade:
+	helm upgrade \
+		--kube-context kind-single \
+		--values $(examples_dir)/configs/single/values.yaml \
+		--wait \
+		pgedge $(root_dir)
+
 .PHONY: ctx-single
 ctx-single:
 	kubectl config set current-context kind-single
@@ -89,6 +101,24 @@ multi-enable-replication:
 multi-load-image:
 	kind load docker-image $(pgedge_image) -n multi-iad
 	kind load docker-image $(pgedge_image) -n multi-sfo
+
+.PHONY: multi-upgrade
+multi-upgrade:
+	helm upgrade \
+		--kube-context kind-multi-iad \
+		--values $(examples_dir)/configs/multi/iad/values.yaml \
+		--wait \
+		pgedge $(root_dir)
+	helm upgrade \
+		--kube-context kind-multi-sfo \
+		--values $(examples_dir)/configs/multi/sfo/values.yaml \
+		--wait \
+		pgedge $(root_dir)
+
+.PHONY: multi-test
+multi-test:
+	helm test --kube-context kind-multi-iad pgedge
+	helm test --kube-context kind-multi-sfo pgedge
 
 .PHONY: clean
 clean:

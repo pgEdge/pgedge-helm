@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Values.pgEdge.appName }}-test-connection"
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: client
+    image: docker.io/library/postgres:16.2
+    command:
+    - bash
+    - -c
+    - |
+      apt-get update
+      apt-get install -y jq
+      PGEDGE_PW=$(jq -r '.users[]? |
+        select(.username == "pgedge") |
+        .password' /secret/users.json)
+      if [[ -z "${PGEDGE_PW}" ]]; then
+          echo "**** ERROR: pgedge user missing from spec ****"
+          exit 1
+      fi
+      PGPASSWORD=${PGEDGE_PW} psql \
+        -h {{ .Values.service.name }} \
+        -p {{ .Values.pgEdge.port }} \
+        -U pgedge \
+        {{ .Values.pgEdge.dbSpec.dbName }} \
+        -c 'select 1'
+    volumeMounts:
+    - name: users
+      readOnly: true
+      mountPath: /secret
+  volumes:
+  - name: users
+    secret:
+      secretName: {{ include "pgedge.v0.usersSecret" . }}
+  restartPolicy: Never
