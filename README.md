@@ -26,6 +26,7 @@ this chart using local Kubernetes clusters.
 | pgEdge.dbSpec.users[1].type | string | `"admin"` |  |
 | pgEdge.dbSpec.users[1].username | string | `"admin"` |  |
 | pgEdge.existingUsersSecret | string | `""` |  |
+| pgEdge.extraMatchLabels | object | `{}` |  |
 | pgEdge.imageTag | string | `"kube-testing"` |  |
 | pgEdge.livenessProbe.enabled | bool | `true` |  |
 | pgEdge.livenessProbe.failureThreshold | int | `6` |  |
@@ -33,7 +34,14 @@ this chart using local Kubernetes clusters.
 | pgEdge.livenessProbe.periodSeconds | int | `10` |  |
 | pgEdge.livenessProbe.successThreshold | int | `1` |  |
 | pgEdge.livenessProbe.timeoutSeconds | int | `5` |  |
-| pgEdge.nodeCount | int | `2` |  |
+| pgEdge.nodeAffinity | object | `{}` |  |
+| pgEdge.nodeCount | int | `3` |  |
+| pgEdge.pdb.create | bool | `false` |  |
+| pgEdge.pdb.maxUnavailable | string | `""` |  |
+| pgEdge.pdb.minAvailable | int | `1` |  |
+| pgEdge.podAffinity | object | `{}` |  |
+| pgEdge.podAntiAffinityEnabled | bool | `true` |  |
+| pgEdge.podAntiAffinityOverride | object | `{}` |  |
 | pgEdge.port | int | `5432` |  |
 | pgEdge.readinessProbe.enabled | bool | `true` |  |
 | pgEdge.readinessProbe.failureThreshold | int | `6` |  |
