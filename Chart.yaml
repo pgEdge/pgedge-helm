@@ -5,8 +5,9 @@ annotations:
       image: docker.io/pgedge/pgedge:367d6e0
 apiVersion: v2
 name: pgedge
-description: TODO
-# icon: TODO
+description: |
+  pgEdge is fully distributed PostgreSQL with multi-active replication. This chart installs the
+  community-licensed version of pgEdge as a StatefulSet.
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm

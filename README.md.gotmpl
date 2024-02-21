@@ -1,8 +1,31 @@
 {{ template "chart.header" . }}
 {{ template "chart.description" . }}
 
-See the [examples README](./examples/README.md) for instructions to demonstrate
-this chart using local Kubernetes clusters.
+## Commonly used values
+
+Most users will want to specify a database name and user names:
+
+```yaml
+pgEdge:
+  dbSpec:
+    dbName: my_application
+    users:
+      - username: my_application
+        superuser: false
+        service: postgres
+        type: application
+      - username: admin
+        # Note this user will only have a subset of superuser privileges to exclude the abilities to
+        # read files and execute programs on the host.
+        superuser: true
+        service: postgres
+        type: admin
+```
+
+## Examples
+
+See the [examples README](./examples/README.md) for instructions to try this chart using local
+Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
 
 {{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
 

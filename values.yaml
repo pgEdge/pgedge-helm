@@ -1,7 +1,11 @@
+# -- Additional annotations to apply to all created objects.
 annotations: {}
+# -- Additional labels to apply to all created objects.
 labels: {}
 service:
+  # -- The name of the Service created by this chart.
   name: pgedge
+  # -- Additional annotations to apply the the Service.
   annotations: {}
   type: ClusterIP
   externalTrafficPolicy: Cluster
@@ -11,19 +15,36 @@ service:
   sessionAffinity: None
   sessionAffinityConfig: {}
 pgEdge:
+  # -- Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other
+  # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
+  # -- Set a custom image tag from the docker.io/pgedge/pgedge repository.
   imageTag: kube-testing
+  # -- Sets how pods are created during the initial scale up. Parallel results in a faster cluster
+  # initialization.
   podManagementPolicy: Parallel
+  # -- The name of an existing users secret in the release namespace. If not specified, a new secret
+  # will generate random passwords for each user and store them in a new secret. See the
+  # pgedge-docker README for the format of this secret:
+  # https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration
   existingUsersSecret: ""
+  # -- Sets the number of replicas in the pgEdge StatefulSet.
   nodeCount: 3
   terminationGracePeriodSeconds: 10
+  # -- Specify additional labels to be used in the StatefulSet, Service, and other selectors.
   extraMatchLabels: {}
   podAffinity: {}
+  # -- Disable the default pod anti-affinity. By default, this chart uses a
+  # preferredDuringSchedulingIgnoredDuringExecution anti-affinity to spread the replicas across
+  # different nodes if possible.
   podAntiAffinityEnabled: true
+  # -- Override the default pod anti-affinity.
   podAntiAffinityOverride: {}
   nodeAffinity: {}
+  # -- Set resource requests and limits. There are none by default.
   resources: {}
   pdb:
+    # -- Enables the creation of a PodDisruptionBudget for pgEdge.
     create: false
     minAvailable: 1
     maxUnavailable: ""
@@ -43,8 +64,12 @@ pgEdge:
     failureThreshold: 6
     successThreshold: 1
   dbSpec:
+    # -- The name of the database to create.
     dbName: defaultdb
+    # -- Used to override the nodes in the generated db spec. This can be useful
+    # in multi-cluster setups, like the included multi-cluster example.
     nodes: []
+    # -- Database users to be created.
     users:
     - username: app
       superuser: false
@@ -55,6 +80,7 @@ pgEdge:
       service: postgres
       type: admin
 global:
+  # -- Set to the cluster's domain if the cluster uses a custom domain.
   clusterDomain: cluster.local
 storage:
   accessModes: [ "ReadWriteOnce" ]
