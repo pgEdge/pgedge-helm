@@ -41,6 +41,8 @@ commands:
               curl -LO "https://dl.k8s.io/release/${kubectl_version}/bin/linux/amd64/kubectl"
               chmod +x ./kubectl
             fi
+
+            echo 'export PATH=~/.local/bin:${PATH}' >> $BASH_ENV
       - save_cache:
           key: kind-<<parameters.kind-version>>-helm-<<parameters.helm-version>>-kubectl-<<parameters.kubectl-version>>
           paths:
