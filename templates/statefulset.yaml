@@ -11,6 +11,7 @@ metadata:
 spec:
   replicas: {{ .Values.pgEdge.nodeCount | int }}
   serviceName: {{ include "pgedge.v0.headlessSvcName" . }}
+  podManagementPolicy: {{ .Values.pgEdge.podManagementPolicy }}
   selector:
     matchLabels: {{- include "pgedge.v0.matchLabels" . | nindent 6 }}
   template:

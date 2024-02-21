@@ -13,6 +13,7 @@ service:
 pgEdge:
   appName: pgedge
   imageTag: kube-testing
+  podManagementPolicy: Parallel
   existingUsersSecret: ""
   nodeCount: 3
   terminationGracePeriodSeconds: 10
