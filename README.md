@@ -3,6 +3,8 @@
 pgEdge is fully distributed PostgreSQL with multi-active replication. This chart installs the
 community-licensed version of pgEdge as a StatefulSet.
 
+![Version: 0.0.1](https://img.shields.io/badge/Version-0.0.1-informational?style=flat-square)
+
 ## Commonly used values
 
 Most users will want to specify a database name and user names:
@@ -24,12 +26,31 @@ pgEdge:
         type: admin
 ```
 
+> [!WARNING]
+> Do not update database users via the Helm chart after they're created. Instead, you should either
+> modify the `pgedge-users` secret directly or create a new secret with updated values and specify
+> it via the `pgEdge.existingUsersSecret` value. See the [Limitations](#limitations) section below
+> for additional caveats on user management.
+
 ## Examples
 
 See the [examples README](./examples/README.md) for instructions to try this chart using local
 Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
 
-![Version: 0.0.1](https://img.shields.io/badge/Version-0.0.1-informational?style=flat-square)
+## Limitations
+
+Most of the pgEdge cluster configuration is set when it's first initialized, and further changes to
+the configuration are not read. This behavior affects two main areas:
+
+- Horizontal scaling
+  - Increasing the number of nodes in the cluster beyond its initial configuration requires
+    additional work to notify the existing pgEdge nodes about the new pgEdge nodes.
+- User management
+  - After initialization, the only user that's read from the users secret at startup is the internal
+    `pgedge` user.
+  - New users can be created via SQL, but note that they must be created on every pgEdge separately.
+  - Similarly, credential rotation must be performed on each pgEdge node individually. In the case
+    of the `pgedge` user, the password in `pgedge-users` secret should also be updated.
 
 ## Values
 
@@ -44,7 +65,7 @@ Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
 | pgEdge.dbSpec.users | list | `[{"service":"postgres","superuser":false,"type":"application","username":"app"},{"service":"postgres","superuser":true,"type":"admin","username":"admin"}]` | Database users to be created. |
 | pgEdge.existingUsersSecret | string | `""` | The name of an existing users secret in the release namespace. If not specified, a new secret will generate random passwords for each user and store them in a new secret. See the pgedge-docker README for the format of this secret: https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration |
 | pgEdge.extraMatchLabels | object | `{}` | Specify additional labels to be used in the StatefulSet, Service, and other selectors. |
-| pgEdge.imageTag | string | `"kube-testing"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
+| pgEdge.imageTag | string | `"pgedge-helm"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
 | pgEdge.livenessProbe.enabled | bool | `true` |  |
 | pgEdge.livenessProbe.failureThreshold | int | `6` |  |
 | pgEdge.livenessProbe.initialDelaySeconds | int | `30` |  |
