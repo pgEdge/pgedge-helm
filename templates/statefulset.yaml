@@ -24,7 +24,7 @@ spec:
       - name: pgedge
         image: docker.io/pgedge/pgedge:{{ .Values.pgEdge.imageTag }}
         command: ["/home/pgedge/scripts/run-database.sh"]
-        args: ["/home/pgedge/config/db.json", "/home/pgedge/secret/users.json"]
+        args: ["/home/pgedge/config/db.json", "/home/pgedge/config/users.json"]
         {{- if .Values.pgEdge.resources }}
         resources: {{- .Values.pgEdge.resources | toYaml | nindent 10 }}
         {{- end }}
@@ -47,19 +47,17 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
-        - name: db-json
+        - name: config
           readOnly: true
           mountPath: /home/pgedge/config
-        - name: users
-          readOnly: true
-          mountPath: /home/pgedge/secret
       volumes:
-        - name: db-json
-          configMap:
-            name: {{ include "pgedge.v0.dbJsonName" . }}
-        - name: users
-          secret:
-            secretName: {{ include "pgedge.v0.usersSecret" . }}
+        - name: config
+          projected:
+            sources:
+            - secret:
+                name: {{ include "pgedge.v0.usersSecret" . }}
+            - configMap:
+                name: {{ include "pgedge.v0.dbJsonName" . }}
   {{- if .Values.storage.retentionPolicy.enabled }}
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: {{ .Values.storage.retentionPolicy.whenDeleted }}
