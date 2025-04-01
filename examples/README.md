@@ -48,15 +48,18 @@ kubectl --context kind-single logs --follow pgedge-0
 # Create a test 'users' table on both instances
 make single-create-test-table
 
-# Enable replication on both instances
+# Optional: If you are not using AutoDDL, enable replication on both instances for this table
+# If you are using AutoDDL (the default), this will be handled automatically
 make single-enable-replication
 
 # From here, any writes to the `users` table on either instance will be replicated to the other
 # instance.
 
-# You can use kubectl invoke psql on individual instances to demonstrate this behavior:
+# You can use kubectl invoke psql on individual instances to demonstrate this behavior. 
+# If you are using AutoDDL, you can create tables and insert data to test the database
 kubectl --context kind-single exec -it pgedge-0 -- psql -U app defaultdb
 kubectl --context kind-single exec -it pgedge-1 -- psql -U app defaultdb
+
 
 # You can scale the statefulset down and back up to simulate node failure and
 # recovery
@@ -100,7 +103,8 @@ kubectl --context kind-multi-iad logs --follow pgedge-iad-0
 # Create a test 'users' table on all instances
 make multi-create-test-table
 
-# Enable replication on all instances
+# Optional: If you are not using AutoDDL, enable replication on both instances for this table
+# If you are using AutoDDL (the default), this will be handled automatically
 make multi-enable-replication
 
 # From here, any writes to the `users` table on any instance will be replicated to the other

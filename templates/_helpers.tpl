@@ -56,6 +56,7 @@
   "name" $.Values.pgEdge.dbSpec.dbName
   "port" $.Values.pgEdge.port
   "nodes" (include "pgedge.v0.dbSpec.nodes" $ | fromJsonArray)
+  "options" $.Values.pgEdge.dbSpec.options
 }}
 {{- $dbSpec | toJson -}}
 {{- end -}}
