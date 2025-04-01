@@ -65,7 +65,7 @@ the configuration are not read. This behavior affects two main areas:
 | pgEdge.dbSpec.users | list | `[{"service":"postgres","superuser":false,"type":"application","username":"app"},{"service":"postgres","superuser":true,"type":"admin","username":"admin"}]` | Database users to be created. |
 | pgEdge.existingUsersSecret | string | `""` | The name of an existing users secret in the release namespace. If not specified, a new secret will generate random passwords for each user and store them in a new secret. See the pgedge-docker README for the format of this secret: https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration |
 | pgEdge.extraMatchLabels | object | `{}` | Specify additional labels to be used in the StatefulSet, Service, and other selectors. |
-| pgEdge.imageTag | string | `"pgedge-helm"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
+| pgEdge.imageTag | string | `"pg16_4.0.10-1"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
 | pgEdge.livenessProbe.enabled | bool | `true` |  |
 | pgEdge.livenessProbe.failureThreshold | int | `6` |  |
 | pgEdge.livenessProbe.initialDelaySeconds | int | `30` |  |
