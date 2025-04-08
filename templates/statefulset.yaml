@@ -25,6 +25,7 @@ spec:
       containers:
       - name: pgedge
         image: docker.io/pgedge/pgedge:{{ .Values.pgEdge.imageTag }}
+        imagePullPolicy: {{ if regexMatch ".*latest$" .Values.pgEdge.imageTag }}Always{{ else }}IfNotPresent{{ end }}
         command: ["/home/pgedge/scripts/run-database.sh"]
         args: ["/home/pgedge/config/db.json", "/home/pgedge/config/users.json"]
         {{- if .Values.pgEdge.resources }}
