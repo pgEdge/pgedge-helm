@@ -19,7 +19,7 @@ pgEdge:
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
   # -- Set a custom image tag from the docker.io/pgedge/pgedge repository.
-  imageTag: pgedge-helm
+  imageTag: pg16-latest
   # -- Sets how pods are created during the initial scale up. Parallel results in a faster cluster
   # initialization.
   podManagementPolicy: Parallel
@@ -69,6 +69,8 @@ pgEdge:
     # -- Used to override the nodes in the generated db spec. This can be useful
     # in multi-cluster setups, like the included multi-cluster example.
     nodes: []
+    # -- Options for the database
+    options: ["autoddl:enabled"]
     # -- Database users to be created.
     users:
     - username: app
@@ -79,6 +81,7 @@ pgEdge:
       superuser: true
       service: postgres
       type: admin
+      
 global:
   # -- Set to the cluster's domain if the cluster uses a custom domain.
   clusterDomain: cluster.local

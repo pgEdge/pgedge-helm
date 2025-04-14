@@ -20,9 +20,12 @@ spec:
     spec:
       affinity: {{- include "pgedge.v0.affinity" . | nindent 8 }}
       terminationGracePeriodSeconds: {{ .Values.pgEdge.terminationGracePeriodSeconds | int }}
+      securityContext:
+        fsGroup: 1020
       containers:
       - name: pgedge
         image: docker.io/pgedge/pgedge:{{ .Values.pgEdge.imageTag }}
+        imagePullPolicy: {{ if regexMatch ".*latest$" .Values.pgEdge.imageTag }}Always{{ else }}IfNotPresent{{ end }}
         command: ["/home/pgedge/scripts/run-database.sh"]
         args: ["/home/pgedge/config/db.json", "/home/pgedge/config/users.json"]
         {{- if .Values.pgEdge.resources }}
@@ -50,6 +53,8 @@ spec:
         - name: config
           readOnly: true
           mountPath: /home/pgedge/config
+        securityContext:
+          runAsUser: 1020
       volumes:
         - name: config
           projected:

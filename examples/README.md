@@ -48,15 +48,18 @@ kubectl --context kind-single logs --follow pgedge-0
 # Create a test 'users' table on both instances
 make single-create-test-table
 
-# Enable replication on both instances
+# Optional: If you are not using AutoDDL, enable replication on both instances for this table
+# If you are using AutoDDL (the default), this will be handled automatically
 make single-enable-replication
 
 # From here, any writes to the `users` table on either instance will be replicated to the other
 # instance.
 
-# You can use kubectl invoke psql on individual instances to demonstrate this behavior:
+# You can use kubectl invoke psql on individual instances to demonstrate this behavior. 
+# If you are using AutoDDL, you can create tables and insert data to test the database
 kubectl --context kind-single exec -it pgedge-0 -- psql -U app defaultdb
 kubectl --context kind-single exec -it pgedge-1 -- psql -U app defaultdb
+
 
 # You can scale the statefulset down and back up to simulate node failure and
 # recovery
@@ -100,7 +103,8 @@ kubectl --context kind-multi-iad logs --follow pgedge-iad-0
 # Create a test 'users' table on all instances
 make multi-create-test-table
 
-# Enable replication on all instances
+# Optional: If you are not using AutoDDL, enable replication on both instances for this table
+# If you are using AutoDDL (the default), this will be handled automatically
 make multi-enable-replication
 
 # From here, any writes to the `users` table on any instance will be replicated to the other
@@ -148,3 +152,22 @@ the following to use the the example configurations to test image updates:
 
 After you've completed your tests, remember to update `pgedge.imageTag` to one that's been pushed to
 Docker Hub.
+
+## Running ACE (the Active Consistency Engine)
+
+A sample config for running ACE as a temporary Pod is [included](/ace/ace.yaml) in this repository. This can be useful to analyze the state of your database across nodes. You can learn more about ACE in the [pgEdge documentation](https://docs.pgedge.com/platform/ace).
+
+This example assumes that the Helm chart is already deployed and running, and leverages the deployed ConfigMap and Secret to setup the required configuration for ACE.
+
+You can run the Pod using kubectl:
+
+``` sh
+kubectl apply -f examples/ace/ace.yaml
+```
+
+From there, ACE can be invoked by shelling into the Pod and invoking ACE.
+
+```sh
+kubectl exec -it ace -- /bin/bash
+./ace schema-diff defaultdb public
+```
