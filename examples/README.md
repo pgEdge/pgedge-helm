@@ -152,3 +152,22 @@ the following to use the the example configurations to test image updates:
 
 After you've completed your tests, remember to update `pgedge.imageTag` to one that's been pushed to
 Docker Hub.
+
+## Running ACE (the Active Consistency Engine)
+
+A sample config for running ACE as a temporary Pod is [included](/ace/ace.yaml) in this repository. This can be useful to analyze the state of your database across nodes. You can learn more about ACE in the [pgEdge documentation](https://docs.pgedge.com/platform/ace).
+
+This example assumes that the Helm chart is already deployed and running, and leverages the deployed ConfigMap and Secret to setup the required configuration for ACE.
+
+You can run the Pod using kubectl:
+
+``` sh
+kubectl apply -f examples/ace/ace.yaml
+```
+
+From there, ACE can be invoked by shelling into the Pod and invoking ACE.
+
+```sh
+kubectl exec -it ace -- /bin/bash
+./ace schema-diff defaultdb public
+```
