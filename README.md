@@ -1,7 +1,6 @@
 # pgedge
 
-pgEdge is fully distributed PostgreSQL with multi-active replication. This chart installs the
-community-licensed version of pgEdge as a StatefulSet.
+pgEdge is fully distributed PostgreSQL with multi-active replication. This chart installs pgEdge Postgres as a StatefulSet.
 
 ![Version: 0.0.2](https://img.shields.io/badge/Version-0.0.2-informational?style=flat-square)
 
