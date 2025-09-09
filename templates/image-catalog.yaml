@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: pgedge-catalog
+spec:
+  images:
+    - major: 16
+      image: ghcr.io/pgedge/pgedge-postgres:16.10-spock5.0.1-standard-1
+    - major: 17
+      image: ghcr.io/pgedge/pgedge-postgres:17.5-spock5.0.1-standard-1

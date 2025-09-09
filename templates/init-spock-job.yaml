@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-spock
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: init-spock
+      containers:
+      - name: init-spock
+        image: python:3.12-slim
+        command:
+          - /bin/sh
+          - -c
+          - |
+            pip install psycopg2-binary kubernetes
+            python /scripts/init-spock.py
+        env:
+          - name: DB_NAME
+            value: app
+          - name: ADMIN_USER
+            valueFrom:
+              secretKeyRef:
+                name: admin-user-secret
+                key: username
+          - name: ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: admin-user-secret
+                key: password
+          - name: PGEDGE_USER
+            valueFrom:
+              secretKeyRef:
+                name: pgedge-user-secret
+                key: username
+          - name: PGEDGE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: pgedge-user-secret
+                key: password
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        volumeMounts:
+          - name: spock-init-script
+            mountPath: /scripts
+      volumes:
+        - name: spock-init-script
+          configMap:
+            name: spock-init-script

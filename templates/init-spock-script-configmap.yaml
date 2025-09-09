@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spock-init-script
+data:
+  init-spock.py: |-
+{{ .Files.Get "scripts/init-spock.py" | indent 4 }}
