@@ -82,7 +82,7 @@ def run_sql(host, db_name, admin_user, admin_password, statement, ignore_duplica
                 conn.commit()
             except errors.DuplicateObject:
                 if ignore_duplicate:
-                    print(f"ℹ️ Already exists on {host}: {statement.strip()}")
+                    print(f"\tℹ️ Already exists on {host}")
                 else:
                     raise
             except Exception as e:
@@ -120,6 +120,7 @@ def main():
             CREATE ROLE {pgedge_user} WITH LOGIN SUPERUSER REPLICATION PASSWORD '{pgedge_password}';
         """
         run_sql(f"{cluster}-rw", db_name, admin_user, admin_password, stmt)
+        print(f"👤 Created user {pgedge_user} on {cluster}")
 
     # Step 4: Create spock nodes
     for cluster in clusters:
@@ -132,6 +133,7 @@ def main():
             WHERE '{cluster}' NOT IN (SELECT node_name FROM spock.node);
         """
         run_sql(f"{cluster}-rw", db_name, admin_user, admin_password, stmt)
+        print(f"🖥️ Created spock node {cluster} on {cluster}")
 
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
@@ -151,11 +153,12 @@ def main():
                     synchronize_structure := 'false',
                     synchronize_data := 'false',
                     apply_delay := '0'
-                );
+                ) WHERE '{sub_name}' NOT IN (SELECT sub_name FROM spock.subscription);
                 """
                 run_sql(f"{src}-rw", db_name, admin_user, admin_password, stmt)
+                print(f"🔗 Created spock subscription {sub_name} on {src}")
 
-    print("🎉 Spock nodes + subscriptions fully wired")
+    print("🎉 Spock nodes and subscriptions successfully initialized")
 
 if __name__ == "__main__":
     main()

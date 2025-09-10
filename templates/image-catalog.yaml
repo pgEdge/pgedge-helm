@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ImageCatalog
 metadata:
-  name: pgedge-catalog
+  name: {{ printf "%s-image-catalog" .Values.pgEdge.appName }}
 spec:
   images:
     - major: 16

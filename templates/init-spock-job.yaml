@@ -21,7 +21,7 @@ spec:
           - -c
           - |
             pip install psycopg2-binary kubernetes
-            python /scripts/init-spock.py
+            python -u /scripts/init-spock.py
         env:
           - name: DB_NAME
             value: app

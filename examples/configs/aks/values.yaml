@@ -1,9 +1,9 @@
 pgEdge:
-  nodeCount: 3
-  terminationGracePeriodSeconds: 0
-storage:
-  size: 1Gi
-  className: managed
-  retentionPolicy:
-    enabled: true
-    whenDeleted: Delete
+  appName: pgedge
+  nodeCount: 4
+  pgMajorVersion: 17
+  clusterSpec:
+    instances: 1
+    affinity:
+      nodeSelector:
+        agentpool: agentpool

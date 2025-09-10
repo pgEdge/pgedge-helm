@@ -6,15 +6,17 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ printf "%s-%d" $.Release.Name $nodeOrdinal }}
+  name: {{ printf "%s-%d" $.Values.pgEdge.appName $nodeOrdinal }}
   labels:
     app.kubernetes.io/name: {{ $.Chart.Name }}
     app.kubernetes.io/instance-index: "{{ $nodeOrdinal }}"
 spec:
-  instances: 1
+  instances: {{ $.Values.pgEdge.clusterSpec.instances }}
   affinity:
+    {{- with $.Values.pgEdge.clusterSpec.affinity.nodeSelector }}
     nodeSelector:
-      agentpool: "armpool"
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   bootstrap:
     initdb:
       postInitApplicationSQL:
@@ -55,8 +57,8 @@ spec:
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog
-    name: pgedge-catalog
-    major: 17
+    name: {{ printf "%s-image-catalog" $.Values.pgEdge.appName }}
+    major: {{ $.Values.pgEdge.pgMajorVersion }}
   storage:
     size: 1Gi
   
