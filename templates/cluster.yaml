@@ -54,9 +54,6 @@ spec:
       {{- with $merged.postgresql.shared_preload_libraries }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
-  replicationSlots:
-    highAvailability:
-      synchronizeLogicalDecoding: true
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog

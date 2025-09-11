@@ -68,7 +68,7 @@ def wait_ready(host, db_name, admin_user, admin_password):
             print(f"⏳ waiting for {host}: {e}")
             time.sleep(3)
 
-def run_sql(host, db_name, admin_user, admin_password, statement, ignore_duplicate=True):
+def run_sql(host, db_name, admin_user, admin_password, statement, autocommit=False, ignore_duplicate=True):
     """Run a SQL statement on the given host."""
 
     with psycopg2.connect(
@@ -78,18 +78,20 @@ def run_sql(host, db_name, admin_user, admin_password, statement, ignore_duplica
         host=host,
         connect_timeout=3,
     ) as conn:
-        conn.autocommit = False
+        conn.autocommit = autocommit
         with conn.cursor() as cur:
             try:
                 cur.execute(statement)
-                conn.commit()
+                if not autocommit:
+                    conn.commit()
             except errors.DuplicateObject:
                 if ignore_duplicate:
                     print(f"\tℹ️ Already exists on {host}")
                 else:
                     raise
             except Exception as e:
-                conn.rollback()
+                if not autocommit:
+                    conn.rollback()
                 print(f"❌ Error on {host}: {e}")
                 raise
 
@@ -156,12 +158,34 @@ def main():
                         forward_origins := '{forward_origins}',
                         synchronize_structure := 'false',
                         synchronize_data := 'false',
-                        apply_delay := '0'
+                        apply_delay := '0',
+                        enabled := 'false'
                     )
                     WHERE '{sub_name}' NOT IN (SELECT sub_name FROM spock.subscription);
                 """
                 run_sql(src["hostname"], db_name, admin_user, admin_password, stmt)
                 print(f"🔗 Created spock subscription {sub_name} on {src['name']}")
+
+    # Step 6: Create replication slots for spock subscriptions to absorb
+    for src in nodes:
+        for dst in nodes:
+            if src["name"] != dst["name"]:
+                # spk_app_n1_sub_n2_n1
+                slot_name = f"spk_{db_name}_{dst['name']}_sub_{src['name']}_{dst['name']}".replace("-", "_")
+                stmt = f"SELECT pg_create_logical_replication_slot('{slot_name}', 'spock_output', false, false, true)"
+                run_sql(dst["hostname"], db_name, admin_user, admin_password, stmt)
+                print(f"🪑 Created replication slot {slot_name} on {dst['name']}")
+
+    # Step 7: Enable all subscriptions
+    for src in nodes:
+        for dst in nodes:
+            if src["name"] != dst["name"]:
+                sub_name = f"sub_{src['name']}_{dst['name']}".replace("-", "_")
+                stmt = f"SELECT spock.sub_enable(subscription_name := '{sub_name}')"
+                run_sql(src["hostname"], db_name, admin_user, admin_password, stmt, autocommit=True)
+                print(f"✅ Enabled spock subscription {sub_name} on {src['name']}")
+
+
 
     print("🎉 Spock nodes and subscriptions successfully initialized")
 
