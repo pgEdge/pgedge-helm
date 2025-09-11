@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
 import time
 import psycopg2
 from psycopg2 import errors
 from kubernetes import client, config
+import json
 
 def get_clusters(namespace):
     """Return list of CNPG cluster names in the namespace."""
@@ -19,13 +21,14 @@ def get_clusters(namespace):
     clusters = [item["metadata"]["name"] for item in objs.get("items", [])]
     return sorted(clusters)
 
-def wait_for_clusters(namespace, clusters):
+def wait_for_clusters(namespace, nodes):
     """Wait until all CNPG clusters are Ready."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
     while True:
         ready = True
-        for name in clusters:
+        for node in nodes:
+            name = "pgedge-" + node["name"]
             try:
                 cr = api.get_namespaced_custom_object(
                     group="postgresql.cnpg.io",
@@ -42,7 +45,7 @@ def wait_for_clusters(namespace, clusters):
                 print(f"❌ Error fetching {name}: {e}")
                 ready = False
         if ready:
-            print("✅ All clusters ready")
+            print("✅ All CNPG clusters in namespace ready")
             return
         time.sleep(5)
 
@@ -98,67 +101,70 @@ def main():
     pgedge_password = os.environ["PGEDGE_PASSWORD"]
     namespace = os.environ.get("NAMESPACE", "default")
 
-    # Step 1: Discover CNPG clusters and wait for them to be ready
-    time.sleep(10)  # wait a bit for k8s API to be ready
-    print("🔎 Discovering CNPG clusters in namespace...")
+    with open("/config/pgedge.json") as f:
+        nodes = json.load(f)
+
+    # You are guaranteed only "name" and "hostname"
+    for node in nodes:
+        print(node["name"], node["hostname"])
+
+    # Step 1: Wait for any nodes on this cluster to become ready
     clusters = get_clusters(namespace)
-    if not clusters:
-        print("❌ No CNPG clusters found")
-        sys.exit(1)
+    print(f"Found clusters in namespace {namespace}: {clusters}")
+    wait_for_clusters(namespace, nodes)
 
-    print(f"🔎 Discovered clusters: {clusters}")
-    wait_for_clusters(namespace, clusters)
-
-    # Step 2: Wait for all clusters to accept connections
-    for cluster in clusters:
-        wait_ready(f"{cluster}-rw", db_name, admin_user, admin_password)
+    # Step 2: Wait for all clusters to accept connections across all nodes
+    for node in nodes:
+        wait_ready(node["hostname"], db_name, admin_user, admin_password)
 
     # Step 3: Create pgedge user
-    for cluster in clusters:
+    for node in nodes:
         stmt = f"""
             SELECT spock.repair_mode('True');
             CREATE ROLE {pgedge_user} WITH LOGIN SUPERUSER REPLICATION PASSWORD '{pgedge_password}';
         """
-        run_sql(f"{cluster}-rw", db_name, admin_user, admin_password, stmt)
-        print(f"👤 Created user {pgedge_user} on {cluster}")
+        run_sql(node["hostname"], db_name, admin_user, admin_password, stmt)
+        print(f"👤 Created user {pgedge_user} on {node['name']}")
 
     # Step 4: Create spock nodes
-    for cluster in clusters:
+    for node in nodes:
         stmt = f"""
             SELECT spock.repair_mode('True');
             SELECT spock.node_create(
-            node_name := '{cluster}',
-            dsn := 'host={cluster}-rw.{namespace}.svc.cluster.local dbname={db_name} user={pgedge_user} password={pgedge_password} port=5432'
+                node_name := '{node["name"]}',
+                dsn := 'host={node["hostname"]} dbname={db_name} user={pgedge_user} password={pgedge_password} port=5432'
             )
-            WHERE '{cluster}' NOT IN (SELECT node_name FROM spock.node);
+            WHERE '{node["name"]}' NOT IN (SELECT node_name FROM spock.node);
         """
-        run_sql(f"{cluster}-rw", db_name, admin_user, admin_password, stmt)
-        print(f"🖥️ Created spock node {cluster} on {cluster}")
+        run_sql(node["hostname"], db_name, admin_user, admin_password, stmt)
+        print(f"🖥️ Created spock node {node['name']} on {node['hostname']}")
 
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
 
     # Step 5: Wire subscriptions between every pair of spock nodes
-    for src in clusters:
-        for dst in clusters:
-            if src != dst:
-                other_dsn = f"host={dst}-rw.{namespace}.svc.cluster.local dbname={db_name} user={pgedge_user} password={pgedge_password} port=5432"
-                sub_name = f"sub_{src}_{dst}".replace("-", "_")
+    for src in nodes:
+        for dst in nodes:
+            if src["name"] != dst["name"]:
+                other_dsn = f"host={dst['hostname']} dbname={db_name} user={pgedge_user} password={pgedge_password} port=5432"
+                sub_name = f"sub_{src['name']}_{dst['name']}".replace("-", "_")
                 stmt = f"""
                     SELECT spock.sub_create(
-                    subscription_name := '{sub_name}',
-                    provider_dsn := '{other_dsn}',
-                    replication_sets := '{replication_sets}',
-                    forward_origins := '{forward_origins}',
-                    synchronize_structure := 'false',
-                    synchronize_data := 'false',
-                    apply_delay := '0'
-                ) WHERE '{sub_name}' NOT IN (SELECT sub_name FROM spock.subscription);
+                        subscription_name := '{sub_name}',
+                        provider_dsn := '{other_dsn}',
+                        replication_sets := '{replication_sets}',
+                        forward_origins := '{forward_origins}',
+                        synchronize_structure := 'false',
+                        synchronize_data := 'false',
+                        apply_delay := '0'
+                    )
+                    WHERE '{sub_name}' NOT IN (SELECT sub_name FROM spock.subscription);
                 """
-                run_sql(f"{src}-rw", db_name, admin_user, admin_password, stmt)
-                print(f"🔗 Created spock subscription {sub_name} on {src}")
+                run_sql(src["hostname"], db_name, admin_user, admin_password, stmt)
+                print(f"🔗 Created spock subscription {sub_name} on {src['name']}")
 
     print("🎉 Spock nodes and subscriptions successfully initialized")
+
 
 if __name__ == "__main__":
     main()

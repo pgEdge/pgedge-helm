@@ -1,9 +1,18 @@
 pgEdge:
   appName: pgedge
-  nodeCount: 4
   pgMajorVersion: 17
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw.matt.svc.cluster.local
+      clusterSpec: 
+        instances: 2
+    - name: n2
+      hostname: pgedge-n2-rw.matt.svc.cluster.local
+    - name: n3
+      hostname: pgedge-n3-rw.matt.svc.cluster.local
   clusterSpec:
-    instances: 1
     affinity:
       nodeSelector:
         agentpool: agentpool
+    storage:
+      size: 1Gi

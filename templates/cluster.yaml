@@ -1,28 +1,39 @@
 {{- $ := . -}}
-{{- $count := (.Values.pgEdge.nodeCount | int) -}}
-{{- range $i := until $count }}
-{{- $nodeOrdinal := add1 $i }}
+{{- $defaults := .Values.pgEdge.clusterSpec -}}
+{{- range $i, $node := .Values.pgEdge.nodes }}
+{{- $spec := ($node.clusterSpec | default dict) -}}
+{{- $merged := merge $spec $defaults -}}
+{{- $ordinal := default (trimPrefix "n" $node.name) $node.ordinal }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ printf "%s-%d" $.Values.pgEdge.appName $nodeOrdinal }}
+  name: {{ printf "%s-%s" $.Values.pgEdge.appName $node.name }}
   labels:
     app.kubernetes.io/name: {{ $.Chart.Name }}
-    app.kubernetes.io/instance-index: "{{ $nodeOrdinal }}"
 spec:
-  instances: {{ $.Values.pgEdge.clusterSpec.instances }}
+  instances: {{ $merged.instances }}
   affinity:
-    {{- with $.Values.pgEdge.clusterSpec.affinity.nodeSelector }}
-    nodeSelector:
+    {{- with $merged.affinity }}
       {{- toYaml . | nindent 6 }}
     {{- end }}
   bootstrap:
     initdb:
-      postInitApplicationSQL:
-        - CREATE EXTENSION spock;
-        - CREATE EXTENSION snowflake;
-        - CREATE EXTENSION lolor;
+        database: {{ $merged.bootstrap.initdb.database }}
+        owner: {{ $merged.bootstrap.initdb.owner }}
+        encoding: {{ $merged.bootstrap.initdb.encoding }}
+{{- with $merged.bootstrap.initdb.postInitApplicationSQL }}
+        postInitApplicationSQL:
+{{- toYaml . | nindent 10 }}
+{{- end }}
+{{- with $merged.bootstrap.initdb.postInitSQL }}
+        postInitSQL:
+{{- toYaml . | nindent 10 }}
+{{- end }}
+{{- with $merged.bootstrap.initdb.postInitTemplateSQL }}
+        postInitTemplateSQL:
+{{- toYaml . | nindent 10 }}
+{{- end }}
   managed:
     roles:
     - name: admin
@@ -34,32 +45,25 @@ spec:
         name: admin-user-secret
   postgresql:
     parameters:
-      dynamic_shared_memory_type: "posix"
-      wal_level: "logical"
-      checkpoint_timeout: "15min"
-      checkpoint_completion_target: "0.9"
-      wal_sender_timeout: "5s"
-      track_commit_timestamp: "on"
-      hot_standby_feedback: "on"
-      track_io_timing: "on"
-      spock.enable_ddl_replication: "on"
-      spock.include_ddl_repset: "on"
-      spock.allow_ddl_from_functions: "on"
-      spock.conflict_resolution: "last_update_wins"
-      spock.save_resolutions: "on"
-      spock.conflict_log_level: "DEBUG"
-      snowflake.node: "{{ $nodeOrdinal }}"
-      lolor.node: "{{ $nodeOrdinal }}"
+      {{- with $merged.postgresql.parameters }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      snowflake.node: "{{ $ordinal }}"
+      lolor.node: "{{ $ordinal }}"
     shared_preload_libraries:
-      - pg_stat_statements
-      - snowflake
-      - spock
+      {{- with $merged.postgresql.shared_preload_libraries }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog
     name: {{ printf "%s-image-catalog" $.Values.pgEdge.appName }}
     major: {{ $.Values.pgEdge.pgMajorVersion }}
   storage:
-    size: 1Gi
-  
-{{- end }}
+    {{- with $merged.storage }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+{{ end }}

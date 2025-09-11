@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: init-spock
+  name: {{ printf "%s-init-spock" .Values.pgEdge.appName }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "10"
@@ -11,8 +11,8 @@ spec:
   ttlSecondsAfterFinished: 3600
   template:
     spec:
-      restartPolicy: Never
       serviceAccountName: init-spock
+      restartPolicy: Never
       containers:
       - name: init-spock
         image: python:3.12-slim
@@ -52,7 +52,17 @@ spec:
         volumeMounts:
           - name: spock-init-script
             mountPath: /scripts
+          - name: pgedge-config
+            mountPath: /config
+            readOnly: true
       volumes:
         - name: spock-init-script
           configMap:
             name: spock-init-script
+        - name: pgedge-config
+          configMap:
+            name: pgedge-config
+            items:
+              - key: pgedge.json
+                path: pgedge.json 
+        

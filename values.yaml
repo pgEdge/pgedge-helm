@@ -2,97 +2,73 @@
 annotations: {}
 # -- Additional labels to apply to all created objects.
 labels: {}
-service:
-  # -- The name of the Service created by this chart.
-  name: pgedge
-  # -- Additional annotations to apply the the Service.
-  annotations: {}
-  type: ClusterIP
-  externalTrafficPolicy: Cluster
-  loadBalancerSourceRanges: []
-  loadBalancerIP: ""
-  clusterIP: ""
-  sessionAffinity: None
-  sessionAffinityConfig: {}
 pgEdge:
   # -- Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
-  # -- Set a custom image tag from the docker.io/pgedge/pgedge repository.
-  imageTag: pg16-latest
-  # -- Sets how pods are created during the initial scale up. Parallel results in a faster cluster
-  # initialization.
-  podManagementPolicy: Parallel
+  # -- Sets the major version of PostgreSQL to use. Must be one of the major versions defined in the  
+  # included ImageCatalog. The default is 17, which uses PostgreSQL 17 with pgEdge extensions.
+  pgMajorVersion: 17
   # -- The name of an existing users secret in the release namespace. If not specified, a new secret
   # will generate random passwords for each user and store them in a new secret. See the
   # pgedge-docker README for the format of this secret:
   # https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration
   existingUsersSecret: ""
-  # -- Sets the number of replicas in the pgEdge StatefulSet.
-  nodeCount: 3
-  terminationGracePeriodSeconds: 10
-  # -- Specify additional labels to be used in the StatefulSet, Service, and other selectors.
-  extraMatchLabels: {}
-  podAffinity: {}
-  # -- Disable the default pod anti-affinity. By default, this chart uses a
-  # preferredDuringSchedulingIgnoredDuringExecution anti-affinity to spread the replicas across
-  # different nodes if possible.
-  podAntiAffinityEnabled: true
-  # -- Override the default pod anti-affinity.
-  podAntiAffinityOverride: {}
-  nodeAffinity: {}
-  # -- Set resource requests and limits. There are none by default.
-  resources: {}
-  pdb:
-    # -- Enables the creation of a PodDisruptionBudget for pgEdge.
-    create: false
-    minAvailable: 1
-    maxUnavailable: ""
-  port: 5432
-  livenessProbe:
-    enabled: true
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 6
-    successThreshold: 1
-  readinessProbe:
-    enabled: true
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 5
-    failureThreshold: 6
-    successThreshold: 1
+  nodes: []
+  clusterSpec:
+    # -- The number of PostgreSQL instances to deploy in each CNPG Cluster
+    instances: 1
+    # -- initdb bootstrap configuration for each CNPG Cluster.
+    bootstrap:
+      initdb:
+        database: app
+        owner: app
+        encoding: UTF8
+        postInitSQL: []
+        postInitApplicationSQL:
+          - CREATE EXTENSION spock;
+          - CREATE EXTENSION snowflake;
+          - CREATE EXTENSION lolor;
+        postInitTemplateSQL: []
+    # -- PostgreSQL configuration parameters to set for each CNPG cluster.
+    # These parameters will override the defaults defined in the values.yaml file.
+    # See https://www.postgresql.org/docs/current/runtime-config.html for a list of available
+    # parameters.
+    postgresql:
+      parameters:
+        dynamic_shared_memory_type: "posix"
+        wal_level: "logical"
+        checkpoint_timeout: "15min"
+        checkpoint_completion_target: "0.9"
+        wal_sender_timeout: "5s"
+        track_commit_timestamp: "on"
+        hot_standby_feedback: "on"
+        sync_replication_slots: 'on'
+        track_io_timing: "on"
+        spock.enable_ddl_replication: "on"
+        spock.include_ddl_repset: "on"
+        spock.allow_ddl_from_functions: "on"
+        spock.conflict_resolution: "last_update_wins"
+        spock.save_resolutions: "on"
+        spock.conflict_log_level: "DEBUG"
+      shared_preload_libraries:
+        - pg_stat_statements
+        - snowflake
+        - spock
+    affinity:
+      nodeSelector: {}
   dbSpec:
-    # -- The name of the database to create.
-    dbName: defaultdb
     # -- Used to override the nodes in the generated db spec. This can be useful
     # in multi-cluster setups, like the included multi-cluster example.
     nodes: []
-    # -- Options for the database
-    options: ["autoddl:enabled"]
     # -- Database users to be created.
     users:
     - username: app
       superuser: false
-      service: postgres
       type: application
     - username: admin
       superuser: true
-      service: postgres
-      type: admin
       
 global:
   # -- Set to the cluster's domain if the cluster uses a custom domain.
   clusterDomain: cluster.local
-storage:
-  accessModes: [ "ReadWriteOnce" ]
-  className: standard
-  selector: {}
-  labels: {}
-  annotations: {}
-  size: 8Gi
-  retentionPolicy:
-    enabled: false
-    whenDeleted: Retain
-    whenScaled: Retain

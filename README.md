@@ -1,6 +1,7 @@
 # pgedge
 
-pgEdge is fully distributed PostgreSQL with multi-active replication. This chart installs pgEdge Postgres as a StatefulSet.
+pgEdge is fully distributed PostgreSQL with multi-active replication. This
+chart installs pgEdge Distributed Postgres as a StatefulSet.
 
 ![Version: 0.0.2](https://img.shields.io/badge/Version-0.0.2-informational?style=flat-square)
 
@@ -59,55 +60,15 @@ the configuration are not read. This behavior affects two main areas:
 | global.clusterDomain | string | `"cluster.local"` | Set to the cluster's domain if the cluster uses a custom domain. |
 | labels | object | `{}` | Additional labels to apply to all created objects. |
 | pgEdge.appName | string | `"pgedge"` | Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other values are derived from this name, so it must be less than or equal to 26 characters in length. |
-| pgEdge.dbSpec.dbName | string | `"defaultdb"` | The name of the database to create. |
+| pgEdge.clusterSpec.affinity.nodeSelector | object | `{}` |  |
+| pgEdge.clusterSpec.bootstrap | object | `{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;","CREATE EXTENSION snowflake;","CREATE EXTENSION lolor;"],"postInitSQL":[],"postInitTemplateSQL":[]}}` | initdb bootstrap configuration for each CNPG Cluster. |
+| pgEdge.clusterSpec.instances | int | `1` | The number of PostgreSQL instances to deploy in each CNPG Cluster |
+| pgEdge.clusterSpec.postgresql | object | `{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]}` | PostgreSQL configuration parameters to set for each CNPG cluster. These parameters will override the defaults defined in the values.yaml file. See https://www.postgresql.org/docs/current/runtime-config.html for a list of available parameters. |
 | pgEdge.dbSpec.nodes | list | `[]` | Used to override the nodes in the generated db spec. This can be useful in multi-cluster setups, like the included multi-cluster example. |
-| pgEdge.dbSpec.options | list | `["autoddl:enabled"]` | Options for the database |
-| pgEdge.dbSpec.users | list | `[{"service":"postgres","superuser":false,"type":"application","username":"app"},{"service":"postgres","superuser":true,"type":"admin","username":"admin"}]` | Database users to be created. |
+| pgEdge.dbSpec.users | list | `[{"superuser":false,"type":"application","username":"app"},{"superuser":true,"username":"admin"}]` | Database users to be created. |
 | pgEdge.existingUsersSecret | string | `""` | The name of an existing users secret in the release namespace. If not specified, a new secret will generate random passwords for each user and store them in a new secret. See the pgedge-docker README for the format of this secret: https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration |
-| pgEdge.extraMatchLabels | object | `{}` | Specify additional labels to be used in the StatefulSet, Service, and other selectors. |
-| pgEdge.imageTag | string | `"pg16-latest"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
-| pgEdge.livenessProbe.enabled | bool | `true` |  |
-| pgEdge.livenessProbe.failureThreshold | int | `6` |  |
-| pgEdge.livenessProbe.initialDelaySeconds | int | `30` |  |
-| pgEdge.livenessProbe.periodSeconds | int | `10` |  |
-| pgEdge.livenessProbe.successThreshold | int | `1` |  |
-| pgEdge.livenessProbe.timeoutSeconds | int | `5` |  |
-| pgEdge.nodeAffinity | object | `{}` |  |
-| pgEdge.nodeCount | int | `3` | Sets the number of replicas in the pgEdge StatefulSet. |
-| pgEdge.pdb.create | bool | `false` | Enables the creation of a PodDisruptionBudget for pgEdge. |
-| pgEdge.pdb.maxUnavailable | string | `""` |  |
-| pgEdge.pdb.minAvailable | int | `1` |  |
-| pgEdge.podAffinity | object | `{}` |  |
-| pgEdge.podAntiAffinityEnabled | bool | `true` | Disable the default pod anti-affinity. By default, this chart uses a preferredDuringSchedulingIgnoredDuringExecution anti-affinity to spread the replicas across different nodes if possible. |
-| pgEdge.podAntiAffinityOverride | object | `{}` | Override the default pod anti-affinity. |
-| pgEdge.podManagementPolicy | string | `"Parallel"` | Sets how pods are created during the initial scale up. Parallel results in a faster cluster initialization. |
-| pgEdge.port | int | `5432` |  |
-| pgEdge.readinessProbe.enabled | bool | `true` |  |
-| pgEdge.readinessProbe.failureThreshold | int | `6` |  |
-| pgEdge.readinessProbe.initialDelaySeconds | int | `5` |  |
-| pgEdge.readinessProbe.periodSeconds | int | `5` |  |
-| pgEdge.readinessProbe.successThreshold | int | `1` |  |
-| pgEdge.readinessProbe.timeoutSeconds | int | `5` |  |
-| pgEdge.resources | object | `{}` | Set resource requests and limits. There are none by default. |
-| pgEdge.terminationGracePeriodSeconds | int | `10` |  |
-| service.annotations | object | `{}` | Additional annotations to apply the the Service. |
-| service.clusterIP | string | `""` |  |
-| service.externalTrafficPolicy | string | `"Cluster"` |  |
-| service.loadBalancerIP | string | `""` |  |
-| service.loadBalancerSourceRanges | list | `[]` |  |
-| service.name | string | `"pgedge"` | The name of the Service created by this chart. |
-| service.sessionAffinity | string | `"None"` |  |
-| service.sessionAffinityConfig | object | `{}` |  |
-| service.type | string | `"ClusterIP"` |  |
-| storage.accessModes[0] | string | `"ReadWriteOnce"` |  |
-| storage.annotations | object | `{}` |  |
-| storage.className | string | `"standard"` |  |
-| storage.labels | object | `{}` |  |
-| storage.retentionPolicy.enabled | bool | `false` |  |
-| storage.retentionPolicy.whenDeleted | string | `"Retain"` |  |
-| storage.retentionPolicy.whenScaled | string | `"Retain"` |  |
-| storage.selector | object | `{}` |  |
-| storage.size | string | `"8Gi"` |  |
+| pgEdge.nodes | list | `[]` |  |
+| pgEdge.pgMajorVersion | int | `17` | Sets the major version of PostgreSQL to use. Must be one of the major versions defined in the   included ImageCatalog. The default is 17, which uses PostgreSQL 17 with pgEdge extensions. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

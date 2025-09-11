@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-config" .Values.pgEdge.appName }}
+data:
+  pgedge.json: |-
+    [
+    {{- range $i, $n := .Values.pgEdge.nodes }}
+      {{- if $i}},{{ end }}
+      {
+        "name": "{{ $n.name }}",
+        "hostname": "{{ $n.hostname }}"
+      }
+    {{- end }}
+    ]
