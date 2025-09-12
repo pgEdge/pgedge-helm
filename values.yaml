@@ -3,22 +3,25 @@ annotations: {}
 # -- Additional labels to apply to all created objects.
 labels: {}
 pgEdge:
-  # -- Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other
+  # -- Determines the name of resources in the pgEdge cluster. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
   # -- Sets the major version of PostgreSQL to use. Must be one of the major versions defined in the  
   # included ImageCatalog. The default is 17, which uses PostgreSQL 17 with pgEdge extensions.
   pgMajorVersion: 17
-  # -- The name of an existing users secret in the release namespace. If not specified, a new secret
-  # will generate random passwords for each user and store them in a new secret. See the
-  # pgedge-docker README for the format of this secret:
-  # https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration
-  existingUsersSecret: ""
+  # --- Whether to deploy cert-manager to manage TLS certificates for the cluster.
+  # If false, you must provide your own TLS certificates by creating the secrets defined in
+  # `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`.
+  provisionCerts: true
+  # -- Configuration for each node in the cluster. Each node will be deployed as a separate CNPG Cluster.
   nodes: []
+  # -- Default CNPG Cluster specification applied to all nodes, which can be overridden on a per-node basis
+  # using the `clusterSpec` field in each node definition.
   clusterSpec:
-    # -- The number of PostgreSQL instances to deploy in each CNPG Cluster
     instances: 1
-    # -- initdb bootstrap configuration for each CNPG Cluster.
+    certificates:
+        clientCASecret: client-ca-key-pair
+        replicationTLSSecret: streaming-replica-client-cert
     bootstrap:
       initdb:
         database: app
@@ -30,10 +33,6 @@ pgEdge:
           - CREATE EXTENSION snowflake;
           - CREATE EXTENSION lolor;
         postInitTemplateSQL: []
-    # -- PostgreSQL configuration parameters to set for each CNPG cluster.
-    # These parameters will override the defaults defined in the values.yaml file.
-    # See https://www.postgresql.org/docs/current/runtime-config.html for a list of available
-    # parameters.
     postgresql:
       parameters:
         dynamic_shared_memory_type: "posix"
@@ -57,18 +56,3 @@ pgEdge:
         - spock
     affinity:
       nodeSelector: {}
-  dbSpec:
-    # -- Used to override the nodes in the generated db spec. This can be useful
-    # in multi-cluster setups, like the included multi-cluster example.
-    nodes: []
-    # -- Database users to be created.
-    users:
-    - username: app
-      superuser: false
-      type: application
-    - username: admin
-      superuser: true
-      
-global:
-  # -- Set to the cluster's domain if the cluster uses a custom domain.
-  clusterDomain: cluster.local

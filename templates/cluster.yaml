@@ -34,6 +34,9 @@ spec:
         postInitTemplateSQL:
 {{- toYaml . | nindent 10 }}
 {{- end }}
+  certificates:
+    clientCASecret: client-ca-key-pair
+    replicationTLSSecret: streaming-replica-client-cert
   managed:
     roles:
     - name: admin
@@ -41,8 +44,6 @@ spec:
       comment: Admin role
       login: true
       superuser: true
-      passwordSecret:
-        name: admin-user-secret
   postgresql:
     parameters:
       {{- with $merged.postgresql.parameters }}
@@ -54,6 +55,23 @@ spec:
       {{- with $merged.postgresql.shared_preload_libraries }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
+    pg_hba:
+      - hostssl app pgedge 0.0.0.0/0 cert
+      - hostssl app admin 0.0.0.0/0 cert
+  projectedVolumeTemplate:
+    sources:
+      - secret:
+          name: pgedge-client-cert
+          items:
+            - key: tls.crt
+              path: pgedge/certificates/tls.crt
+              mode: 0600 
+            - key: tls.key
+              path: pgedge/certificates/tls.key
+              mode: 0600 
+            - key: ca.crt
+              path: pgedge/certificates/ca.crt
+              mode: 0600 
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ImageCatalog

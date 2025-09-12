@@ -1,0 +1,88 @@
+{{- if .Values.pgEdge.provisionCerts }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: client-ca
+spec:
+  isCA: true
+  commonName: my-selfsigned-client-ca
+  secretName: client-ca-key-pair
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: client-ca-issuer
+spec:
+  ca:
+    secretName: client-ca-key-pair
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: streaming-replica-client-cert
+  labels:
+    cnpg.io/reload: ""
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: streaming-replica-client-cert
+spec:
+  secretName: streaming-replica-client-cert
+  usages:
+    - client auth
+  commonName: streaming_replica
+  issuerRef:
+    name: client-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pgedge-client-cert
+  labels:
+    cnpg.io/reload: ""
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pgedge-client-cert
+spec:
+  secretName: pgedge-client-cert
+  usages:
+    - client auth
+  commonName: pgedge
+  issuerRef:
+    name: client-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: admin-client-cert
+spec:
+  secretName: admin-client-cert
+  usages:
+    - client auth
+  commonName: admin
+  issuerRef:
+    name: client-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}
