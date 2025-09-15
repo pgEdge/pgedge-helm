@@ -1,3 +1,4 @@
+{{- if .Values.pgEdge.initSpock }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -5,3 +6,4 @@ metadata:
 data:
   init-spock.py: |-
 {{ .Files.Get "scripts/init-spock.py" | indent 4 }}
+{{- end }}

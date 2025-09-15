@@ -1,84 +1,45 @@
 {{- $ := . -}}
 {{- $defaults := .Values.pgEdge.clusterSpec -}}
+{{- $total := len .Values.pgEdge.nodes -}}
+
 {{- range $i, $node := .Values.pgEdge.nodes }}
-{{- $spec := ($node.clusterSpec | default dict) -}}
-{{- $merged := merge $spec $defaults -}}
-{{- $ordinal := default (trimPrefix "n" $node.name) $node.ordinal }}
+{{- $spec    := (default dict $node.clusterSpec) -}}
+{{- $merged  := mergeOverwrite (deepCopy $defaults) $spec -}}
+
+{{- /* derive ordinal */ -}}
+{{- $ord := "" -}}
+{{- if hasKey $node "ordinal" -}}
+  {{- $ord = $node.ordinal -}}
+{{- else -}}
+  {{- $ord = (trimPrefix "n" $node.name) -}}
+{{- end -}}
+{{- $ordStr := printf "%v" $ord -}}
+
+{{- /* ensure postgresql.parameters exists */ -}}
+{{- if not (hasKey $merged "postgresql") -}}
+  {{- $_ := set $merged "postgresql" (dict) -}}
+{{- end -}}
+{{- if not (hasKey $merged.postgresql "parameters") -}}
+  {{- $_ := set $merged.postgresql "parameters" (dict) -}}
+{{- end -}}
+
+{{- /* inject node-specific params */ -}}
+{{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
+{{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
+
+{{- if gt $i 0 }}
 ---
+{{- end }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ printf "%s-%s" $.Values.pgEdge.appName $node.name }}
   labels:
     app.kubernetes.io/name: {{ $.Chart.Name }}
+  {{- if $.Values.annotations }}
+  annotations:
+    {{- $.Values.annotations | toYaml | nindent 4 }}
+  {{- end }}
 spec:
-  instances: {{ $merged.instances }}
-  affinity:
-    {{- with $merged.affinity }}
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-  bootstrap:
-    initdb:
-        database: {{ $merged.bootstrap.initdb.database }}
-        owner: {{ $merged.bootstrap.initdb.owner }}
-        encoding: {{ $merged.bootstrap.initdb.encoding }}
-{{- with $merged.bootstrap.initdb.postInitApplicationSQL }}
-        postInitApplicationSQL:
-{{- toYaml . | nindent 10 }}
+  {{- toYaml $merged | nindent 2 }}
 {{- end }}
-{{- with $merged.bootstrap.initdb.postInitSQL }}
-        postInitSQL:
-{{- toYaml . | nindent 10 }}
-{{- end }}
-{{- with $merged.bootstrap.initdb.postInitTemplateSQL }}
-        postInitTemplateSQL:
-{{- toYaml . | nindent 10 }}
-{{- end }}
-  certificates:
-    clientCASecret: client-ca-key-pair
-    replicationTLSSecret: streaming-replica-client-cert
-  managed:
-    roles:
-    - name: admin
-      ensure: present
-      comment: Admin role
-      login: true
-      superuser: true
-  postgresql:
-    parameters:
-      {{- with $merged.postgresql.parameters }}
-      {{- toYaml . | nindent 6 }}
-      {{- end }}
-      snowflake.node: "{{ $ordinal }}"
-      lolor.node: "{{ $ordinal }}"
-    shared_preload_libraries:
-      {{- with $merged.postgresql.shared_preload_libraries }}
-      {{- toYaml . | nindent 6 }}
-      {{- end }}
-    pg_hba:
-      - hostssl app pgedge 0.0.0.0/0 cert
-      - hostssl app admin 0.0.0.0/0 cert
-  projectedVolumeTemplate:
-    sources:
-      - secret:
-          name: pgedge-client-cert
-          items:
-            - key: tls.crt
-              path: pgedge/certificates/tls.crt
-              mode: 0600 
-            - key: tls.key
-              path: pgedge/certificates/tls.key
-              mode: 0600 
-            - key: ca.crt
-              path: pgedge/certificates/ca.crt
-              mode: 0600 
-  imageCatalogRef:
-    apiGroup: postgresql.cnpg.io
-    kind: ImageCatalog
-    name: {{ printf "%s-image-catalog" $.Values.pgEdge.appName }}
-    major: {{ $.Values.pgEdge.pgMajorVersion }}
-  storage:
-    {{- with $merged.storage }}
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-{{ end }}

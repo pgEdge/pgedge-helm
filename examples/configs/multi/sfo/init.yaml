@@ -1,0 +1,16 @@
+annotations:
+  service.cilium.io/global: "true"
+  service.cilium.io/affinity: local
+pgEdge:
+  appName: pgedge-init
+  initSpock: true
+  provisionCerts: false
+  externalNodes:
+    - name: n1
+      hostname: pgedge-iad-n1-rw.default.svc.clusterset.local
+    - name: n2
+      hostname: pgedge-iad-n2-rw.default.svc.clusterset.local
+    - name: n3
+      hostname: pgedge-sfo-n3-rw.default.svc.clusterset.local
+    - name: n4
+      hostname: pgedge-sfo-n4-rw.default.svc.clusterset.local

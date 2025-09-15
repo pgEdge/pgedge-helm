@@ -5,7 +5,8 @@ metadata:
 data:
   pgedge.json: |-
     [
-    {{- range $i, $n := .Values.pgEdge.nodes }}
+    {{- $allNodes := concat .Values.pgEdge.nodes .Values.pgEdge.externalNodes }}
+    {{- range $i, $n := $allNodes }}
       {{- if $i}},{{ end }}
       {
         "name": "{{ $n.name }}",

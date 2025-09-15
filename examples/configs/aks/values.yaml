@@ -1,15 +1,16 @@
 pgEdge:
   appName: pgedge
-  pgMajorVersion: 17
   nodes:
     - name: n1
-      hostname: pgedge-n1-rw.matt.svc.cluster.local
+      hostname: pgedge-n1-rw
       clusterSpec: 
-        instances: 2
+        instances: 3
+        minSyncReplicas: 1
+        maxSyncReplicas: 2
     - name: n2
-      hostname: pgedge-n2-rw.matt.svc.cluster.local
+      hostname: pgedge-n2-rw
     - name: n3
-      hostname: pgedge-n3-rw.matt.svc.cluster.local
+      hostname: pgedge-n3-rw
   clusterSpec:
     affinity:
       nodeSelector:

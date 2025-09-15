@@ -13,6 +13,14 @@ cd ${scripts_dir}/..
 kind create cluster --config ${configs_dir}/multi/iad/kind.yaml
 kind create cluster --config ${configs_dir}/multi/sfo/kind.yaml
 
+# Install dependencies on both clusters
+for ctx in kind-multi-iad kind-multi-sfo; do
+    kubectl apply --context $ctx --server-side -f \
+        https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
+    kubectl apply --context $ctx -f \
+        https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+done
+
 # Install Cilium on IAD
 cilium install --context kind-multi-iad \
 	--set cluster.name=iad \
@@ -82,12 +90,14 @@ subctl_docker deploy-broker \
 # Join clusters
 subctl_docker join broker-info.subm \
     --clusterid iad \
+    --service-cidr 10.21.0.0/16 \
     --context kind-multi-iad \
     --check-broker-certificate=false \
     --natt=false \
     --globalnet=false
 subctl_docker join broker-info.subm \
     --clusterid sfo \
+    --service-cidr 10.31.0.0/16 \
     --context kind-multi-sfo \
     --check-broker-certificate=false \
     --natt=false \

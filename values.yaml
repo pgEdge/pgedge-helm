@@ -6,19 +6,26 @@ pgEdge:
   # -- Determines the name of resources in the pgEdge cluster. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
-  # -- Sets the major version of PostgreSQL to use. Must be one of the major versions defined in the  
-  # included ImageCatalog. The default is 17, which uses PostgreSQL 17 with pgEdge extensions.
-  pgMajorVersion: 17
   # --- Whether to deploy cert-manager to manage TLS certificates for the cluster.
   # If false, you must provide your own TLS certificates by creating the secrets defined in
   # `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`.
   provisionCerts: true
-  # -- Configuration for each node in the cluster. Each node will be deployed as a separate CNPG Cluster.
+  # -- Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CNPG Cluster.
   nodes: []
+  # -- Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart.
+  # This can be leverage for multi-cluster deployments or to wire up existing CNPG Clusters to a pgEdge cluster.
+  externalNodes: []
+  # -- Whether or not to run the init spock job to initialize the pgEdge nodes and subscriptions
+  # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
+  initSpock: true
   # -- Default CNPG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.
   clusterSpec:
     instances: 1
+    imagePullPolicy: Always
+    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+    minSyncReplicas: 0
+    maxSyncReplicas: 0
     certificates:
         clientCASecret: client-ca-key-pair
         replicationTLSSecret: streaming-replica-client-cert
@@ -33,6 +40,13 @@ pgEdge:
           - CREATE EXTENSION snowflake;
           - CREATE EXTENSION lolor;
         postInitTemplateSQL: []
+    managed:
+      roles:
+      - name: admin
+        ensure: present
+        comment: Admin role
+        login: true
+        superuser: true
     postgresql:
       parameters:
         dynamic_shared_memory_type: "posix"
@@ -54,5 +68,22 @@ pgEdge:
         - pg_stat_statements
         - snowflake
         - spock
-    affinity:
-      nodeSelector: {}
+      pg_hba:
+        - hostssl app pgedge 0.0.0.0/0 cert
+        - hostssl app admin 0.0.0.0/0 cert
+        - hostssl all streaming_replica all cert map=cnpg_streaming_replica
+    projectedVolumeTemplate:
+      sources:
+        - secret:
+            name: pgedge-client-cert
+            items:
+              - key: tls.crt
+                path: pgedge/certificates/tls.crt
+                mode: 0600 
+              - key: tls.key
+                path: pgedge/certificates/tls.key
+                mode: 0600 
+              - key: ca.crt
+                path: pgedge/certificates/ca.crt
+                mode: 0600 
+    

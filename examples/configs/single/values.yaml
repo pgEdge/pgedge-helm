@@ -5,14 +5,13 @@ pgEdge:
     - name: n1
       hostname: postgres-n1
       clusterSpec: 
-        instances: 2
+        instances: 3
+        minSyncReplicas: 1
+        maxSyncReplicas: 2
     - name: n2
       hostname: postgres-n2
     - name: n3
       hostname: postgres-n3
   clusterSpec:
-    affinity:
-      nodeSelector:
-        agentpool: agentpool
     storage:
       size: 1Gi

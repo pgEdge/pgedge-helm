@@ -1,3 +1,4 @@
+{{- if .Values.pgEdge.initSpock }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -44,7 +45,7 @@ spec:
             name: spock-init-script
         - name: pgedge-config
           configMap:
-            name: pgedge-config
+            name: {{ printf "%s-config" .Values.pgEdge.appName }}
             items:
               - key: pgedge.json
                 path: pgedge.json 
@@ -61,5 +62,4 @@ spec:
               - key: ca.crt
                 path: ca.crt
                 mode: 0600
-
-        
+{{- end }}

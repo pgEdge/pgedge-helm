@@ -79,13 +79,19 @@ multi-install:
 
 .PHONY: multi-uninstall
 multi-uninstall:
-	helm uninstall --kube-context kind-multi-iad pgedge
-	helm uninstall --kube-context kind-multi-sfo pgedge
-	kubectl --context kind-multi-sfo delete secret pgedge-users
+	helm uninstall --kube-context kind-multi-iad --ignore-not-found pgedge 
+	helm uninstall --kube-context kind-multi-sfo --ignore-not-found pgedge 
+	helm uninstall --kube-context kind-multi-sfo --ignore-not-found pgedge-init
+	kubectl --context kind-multi-sfo delete secret --ignore-not-found=true client-ca-key-pair
+	kubectl --context kind-multi-sfo delete secret --ignore-not-found=true pgedge-client-cert
+	kubectl --context kind-multi-sfo delete secret --ignore-not-found=true admin-client-cert
+	kubectl --context kind-multi-sfo delete secret --ignore-not-found=true streaming-replica-client-cert
 	kubectl config set current-context kind-multi-iad
-	subctl unexport service pgedge-hl
+	-subctl unexport service pgedge-iad-n1-rw
+	-subctl unexport service pgedge-iad-n2-rw
 	kubectl config set current-context kind-multi-sfo
-	subctl unexport service pgedge-hl
+	-subctl unexport service pgedge-sfo-n1-rw
+	-subctl unexport service pgedge-sfo-n2-rw
 
 .PHONY: multi-create-test-table
 multi-create-test-table:
