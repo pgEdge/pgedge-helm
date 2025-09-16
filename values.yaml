@@ -2,7 +2,7 @@ pgEdge:
   # -- Determines the name of resources in the pgEdge cluster. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
-  # --- Whether to deploy cert-manager to manage TLS certificates for the cluster.
+  # -- Whether to deploy cert-manager to manage TLS certificates for the cluster.
   # If false, you must provide your own TLS certificates by creating the secrets defined in
   # `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`.
   provisionCerts: true
