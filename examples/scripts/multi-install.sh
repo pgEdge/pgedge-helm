@@ -18,9 +18,9 @@ helm install \
     pgedge .
 
 kubectl wait --context kind-multi-iad \
-    --for=condition=Ready cluster/pgedge-iad-n1
+    --for=condition=Ready cluster/pgedge-iad-n1 --timeout=120s
 kubectl wait --context kind-multi-iad \
-    --for=condition=Ready cluster/pgedge-iad-n2
+    --for=condition=Ready cluster/pgedge-iad-n2 --timeout=120s
 
 # Export pgedge headless service from IAD
 # This creates the global DNS entries for each node.
@@ -58,9 +58,9 @@ helm install \
     pgedge .
 
 kubectl wait --context kind-multi-sfo \
-    --for=condition=Ready cluster/pgedge-sfo-n3
+    --for=condition=Ready cluster/pgedge-sfo-n3 --timeout=120s
 kubectl wait --context kind-multi-sfo \
-    --for=condition=Ready cluster/pgedge-sfo-n4
+    --for=condition=Ready cluster/pgedge-sfo-n4 --timeout=120s
 
 # Export pgedge headless service from SFO
 kubectl config set current-context kind-multi-sfo

@@ -1,6 +1,3 @@
-annotations:
-  service.cilium.io/global: "true"
-  service.cilium.io/affinity: local
 pgEdge:
   appName: pgedge-init
   initSpock: true

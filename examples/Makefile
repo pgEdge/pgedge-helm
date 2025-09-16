@@ -90,8 +90,8 @@ multi-uninstall:
 	-subctl unexport service pgedge-iad-n1-rw
 	-subctl unexport service pgedge-iad-n2-rw
 	kubectl config set current-context kind-multi-sfo
-	-subctl unexport service pgedge-sfo-n1-rw
-	-subctl unexport service pgedge-sfo-n2-rw
+	-subctl unexport service pgedge-sfo-n3-rw
+	-subctl unexport service pgedge-sfo-n4-rw
 
 .PHONY: multi-create-test-table
 multi-create-test-table:

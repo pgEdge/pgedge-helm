@@ -90,14 +90,12 @@ subctl_docker deploy-broker \
 # Join clusters
 subctl_docker join broker-info.subm \
     --clusterid iad \
-    --service-cidr 10.21.0.0/16 \
     --context kind-multi-iad \
     --check-broker-certificate=false \
     --natt=false \
     --globalnet=false
 subctl_docker join broker-info.subm \
     --clusterid sfo \
-    --service-cidr 10.31.0.0/16 \
     --context kind-multi-sfo \
     --check-broker-certificate=false \
     --natt=false \
