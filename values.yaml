@@ -1,7 +1,3 @@
-# -- Additional annotations to apply to all created objects.
-annotations: {}
-# -- Additional labels to apply to all created objects.
-labels: {}
 pgEdge:
   # -- Determines the name of resources in the pgEdge cluster. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
@@ -71,7 +67,11 @@ pgEdge:
       pg_hba:
         - hostssl app pgedge 0.0.0.0/0 cert
         - hostssl app admin 0.0.0.0/0 cert
+        - hostssl app app 0.0.0.0/0 cert
         - hostssl all streaming_replica all cert map=cnpg_streaming_replica
+      pg_ident:
+        - local postgres admin
+        - local postgres app
     projectedVolumeTemplate:
       sources:
         - secret:

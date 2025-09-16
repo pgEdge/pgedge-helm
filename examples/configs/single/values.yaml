@@ -1,17 +1,16 @@
 pgEdge:
   appName: pgedge
-  pgMajorVersion: 17
   nodes:
     - name: n1
-      hostname: postgres-n1
+      hostname: pgedge-n1-rw
       clusterSpec: 
         instances: 3
         minSyncReplicas: 1
         maxSyncReplicas: 2
     - name: n2
-      hostname: postgres-n2
+      hostname: pgedge-n2-rw
     - name: n3
-      hostname: postgres-n3
+      hostname: pgedge-n3-rw
   clusterSpec:
     storage:
       size: 1Gi

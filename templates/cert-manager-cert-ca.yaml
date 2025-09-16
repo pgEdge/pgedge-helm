@@ -1,3 +1,32 @@
+# This configuration is adapted from CloudNativePG documentation:
+# https://github.com/cloudnative-pg/cloudnative-pg/blob/main/docs/src/samples/cluster-example-cert-manager.yaml
+#
+# Original work # Copyright (c) contributors to CloudNativePG, established as
+# CloudNativePG a Series of LF Projects, LLC.
+# Licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0):
+# https://creativecommons.org/licenses/by/4.0/
+#
+# Modifications for pgEdge:
+# Copyright (c) 2023 - 2025, pgEdge, Inc.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose, without fee, and without a written agreement is
+# hereby granted, provided that the above copyright notice and this paragraph and
+# the following two paragraphs appear in all copies.
+#
+# IN NO EVENT SHALL pgEdge, Inc. BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+# SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING
+# OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF pgEdge, Inc. HAS
+# BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# pgEdge, Inc. SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED
+# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND pgEdge,
+# Inc. HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+#
+# Modifications: updated comments and values to align with pgEdge example usage.
+
 {{- if .Values.pgEdge.provisionCerts }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -21,6 +50,8 @@ spec:
     name: selfsigned-issuer
     kind: Issuer
     group: cert-manager.io
+  privateKey:
+    rotationPolicy: Never
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -50,13 +81,8 @@ spec:
     name: client-ca-issuer
     kind: Issuer
     group: cert-manager.io
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: pgedge-client-cert
-  labels:
-    cnpg.io/reload: ""
+  privateKey:
+    rotationPolicy: Never
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -71,6 +97,8 @@ spec:
     name: client-ca-issuer
     kind: Issuer
     group: cert-manager.io
+  privateKey:
+    rotationPolicy: Never
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -85,4 +113,22 @@ spec:
     name: client-ca-issuer
     kind: Issuer
     group: cert-manager.io
+  privateKey:
+    rotationPolicy: Never
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: app-client-cert
+spec:
+  secretName: app-client-cert
+  usages:
+    - client auth
+  commonName: app
+  issuerRef:
+    name: client-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+  privateKey:
+    rotationPolicy: Never
 {{- end }}

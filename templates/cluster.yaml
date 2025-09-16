@@ -34,12 +34,6 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ printf "%s-%s" $.Values.pgEdge.appName $node.name }}
-  labels:
-    app.kubernetes.io/name: {{ $.Chart.Name }}
-  {{- if $.Values.annotations }}
-  annotations:
-    {{- $.Values.annotations | toYaml | nindent 4 }}
-  {{- end }}
 spec:
   {{- toYaml $merged | nindent 2 }}
 {{- end }}

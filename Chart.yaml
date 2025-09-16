@@ -7,8 +7,8 @@ apiVersion: v2
 name: pgedge
 description: |
   pgEdge is fully distributed PostgreSQL with multi-active replication. This
-  chart installs pgEdge Distributed Postgres as a StatefulSet.
+  chart installs pgEdge Distributed Postgres using CloudNativePG to manage each node.
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm
-version: 0.0.3
+version: 0.0.3-beta1
