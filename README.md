@@ -1,29 +1,21 @@
-# pgedge
+# pgEdge Distributed Postgres Helm Chart
 
-pgEdge is fully distributed PostgreSQL with multi-active replication. This
-chart installs pgEdge Distributed Postgres using CloudNativePG to manage each node.
+This chart installs pgEdge Distributed Postgres using CloudNativePG to manage each node.
 
 ![Version: 0.0.3-beta1](https://img.shields.io/badge/Version-0.0.3--beta1-informational?style=flat-square)
 
-## Overview
-
-### Pre-requisites
+## Prerequisites
 
 In order for this chart to work, you must pre-install two operators into your Kubernetes clusters:
 
 - [CloudNativePG](https://cloudnative-pg.io/)
 - [cert-manager](https://cert-manager.io/)
 
-You can install these like this:
+## Installation & Usage
 
-```
-	kubectl apply --server-side -f \
-		https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
-	kubectl apply -f \
-		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-```
+See the [Installation and Usage Guide](./docs/installation-usage.md) for installation and setup instructions for deploying this chart.
 
-### Values file
+## Configuration
 
 This chart is built around managing each pgEdge node as a [CloudNativePG](https://cloudnative-pg.io/) `Cluster`.
 
@@ -78,9 +70,11 @@ This override behavior is enabled via `mergeOverwrite` in Helm. You should be mi
 
 If you override a list in the `clusterSpec` for a node, you must include all required elements in that list, pulling from the values file example, and using `helm template` to verify your configuration.
 
+For more information on configuring CloudNativePG, be sure to reference their documentation at https://cloudnative-pg.io/docs/
+
 ## Certificates
 
-This chart leverages cert-manager to create a self-signed CA and issue client certificates for a set of managed users on each node:
+This chart leverages `cert-manager` to create a self-signed CA and issue client certificates for a set of managed users on each node:
 
 - `app`: a user for application connections
 - `admin`: a superuser for administrative purposes
@@ -100,7 +94,7 @@ pgEdge:
   provisionCerts: false
   nodes:
     - name: n1
-      hostname: pgedge-n1-rw       
+      hostname: pgedge-n1-rw      
     - name: n2
       hostname: pgedge-n2-rw
     - name: n3
@@ -134,11 +128,6 @@ This includes:
   b. Setting the `pgEdge.nodes` property to only list nodes which should be deployed in a particular cluster.
 4. Exposing the read/write services for each node across clusters using Kubernetes network tools like Cilium or Submariner to enable cross-cluster DNS and connectivity.
 5. Installing the chart into one of the clusters with all nodes listed under `pgEdge.externalNodes` and `pgEdge.initSpock` set to `true` to initialize spock configuration.
-
-## Examples
-
-See the [examples README](./examples/README.md) for instructions to try this chart using local
-Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
 
 ## Limitations
 
