@@ -32,6 +32,8 @@ In order to run through all steps, you’ll need the following tools installed o
 - `kubectl` CNPG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)  
   - Homebrew install command: `brew install kubectl-cnpg`
 
+In addition, you'll need a Kubernetes cluster in which to install the chart. If you wish to setup a local Kubernetes cluster, you can use `kind`. See [Using kind to test locally](#using-kind-to-test-locally).
+
 ### 1\. Configure your context and namespace
 
 For convenience, configure your desired context and namespace prior to running the rest of the commands.
