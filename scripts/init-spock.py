@@ -136,7 +136,29 @@ def main():
         run_sql(node["hostname"], db_name, admin_user, stmt)
         print(f"👤 Created user {pgedge_user} on {node['name']}")
 
-    # Step 4: Create spock nodes
+    # Step 4: Drop existing spock nodes and subscriptions, if applicable
+    # If a restore occurs, the nodes and subscriptions will come over from the source
+    # cluster, and need to be removed before recreating them. This will not affect
+    # nodes / subscriptions which should exist on this node.
+    for node in nodes:
+        stmt = f"""
+            SELECT spock.repair_mode('True');
+            SELECT spock.sub_drop(sub_name, true)
+              FROM spock.subscription
+             WHERE sub_target IN (
+            SELECT l.node_id
+              FROM spock.local_node l
+              JOIN spock.node n ON n.node_id = l.node_id
+             WHERE n.node_name != '{node["name"]}'
+             );
+            SELECT spock.node_drop(node_name, true)
+              FROM spock.local_node l
+              JOIN spock.node n ON n.node_id = l.node_id
+             WHERE n.node_name != '{node["name"]}';
+        """
+        run_sql(node["hostname"], db_name, admin_user, stmt)
+
+    # Step 5: Create spock nodes
     for node in nodes:
         ssl_settings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/projected/pgedge/certificates/tls.key sslmode=require"
         stmt = f"""
@@ -153,7 +175,7 @@ def main():
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
 
-    # Step 5: Wire subscriptions between every pair of spock nodes
+    # Step 6: Wire subscriptions between every pair of spock nodes
     for src in nodes:
         for dst in nodes:
             if src["name"] != dst["name"]:
