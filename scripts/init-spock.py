@@ -136,13 +136,34 @@ def main():
         run_sql(node["hostname"], db_name, admin_user, stmt)
         print(f"👤 Created user {pgedge_user} on {node['name']}")
 
-    # Step 4: Drop existing spock nodes and subscriptions, if applicable
-    # If a restore occurs, the nodes and subscriptions will come over from the source
-    # cluster, and need to be removed before recreating them. This will not affect
-    # nodes / subscriptions which should exist on this node.
+    # Step 4: Drop spock nodes and subscriptions which no longer exist
+    node_names = [node["name"] for node in nodes]
     for node in nodes:
         stmt = f"""
             SELECT spock.repair_mode('True');
+
+            SELECT spock.sub_drop(sub_name, true)
+              FROM spock.subscription
+             WHERE sub_origin IN (
+            SELECT n.node_id
+              FROM spock.node n
+             WHERE n.node_name NOT IN ({', '.join(f"'{name}'" for name in node_names)})
+             );
+
+            SELECT spock.node_drop(node_name, true)
+              FROM spock.node n
+             WHERE n.node_name NOT IN ({', '.join(f"'{name}'" for name in node_names)});
+        """
+        run_sql(node["hostname"], db_name, admin_user, stmt)
+
+    # Step 5: Drop spock nodes and subscriptions which may have come over in a restore
+    # If a restore occurs, the nodes and subscriptions will come over from the source
+    # Cluster, and need to be removed before recreating the correct values. 
+    # This will not affect nodes / subscriptions which should exist on this node.
+    for node in nodes:
+        stmt = f"""
+            SELECT spock.repair_mode('True');
+            
             SELECT spock.sub_drop(sub_name, true)
               FROM spock.subscription
              WHERE sub_target IN (
@@ -151,6 +172,7 @@ def main():
               JOIN spock.node n ON n.node_id = l.node_id
              WHERE n.node_name != '{node["name"]}'
              );
+
             SELECT spock.node_drop(node_name, true)
               FROM spock.local_node l
               JOIN spock.node n ON n.node_id = l.node_id
@@ -158,11 +180,12 @@ def main():
         """
         run_sql(node["hostname"], db_name, admin_user, stmt)
 
-    # Step 5: Create spock nodes
+    # Step 6: Create spock nodes
     for node in nodes:
         ssl_settings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/projected/pgedge/certificates/tls.key sslmode=require"
         stmt = f"""
             SELECT spock.repair_mode('True');
+
             SELECT spock.node_create(
                 node_name := '{node["name"]}',
                 dsn := 'host={node["hostname"]} dbname={db_name} user={pgedge_user} {ssl_settings} port=5432'
@@ -175,7 +198,7 @@ def main():
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
 
-    # Step 6: Wire subscriptions between every pair of spock nodes
+    # Step 7: Wire subscriptions between every pair of spock nodes
     for src in nodes:
         for dst in nodes:
             if src["name"] != dst["name"]:
