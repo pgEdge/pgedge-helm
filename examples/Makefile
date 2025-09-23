@@ -32,6 +32,10 @@ single-install:
 single-uninstall:
 	helm uninstall --kube-context kind-single pgedge
 
+.PHONY: single-test
+single-test:
+	helm test --kube-context kind-single pgedge
+	
 .PHONY: single-upgrade
 single-upgrade:
 	helm upgrade \

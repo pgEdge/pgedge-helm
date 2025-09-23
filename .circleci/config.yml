@@ -70,11 +70,6 @@ jobs:
           name: Install pgedge
           command: |
             make -f examples/Makefile single-install
-            # Wait until at least one pod is ready
-            kubectl wait pod \
-              --for=condition=ready \
-              --selector='app.kubernetes.io/name=pgedge' \
-              --timeout=45s
       - run:
           name: Helm test
           command: |
