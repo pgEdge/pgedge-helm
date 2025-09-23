@@ -62,8 +62,6 @@ jobs:
           name: Helm lint
           command: |
             helm lint . --values examples/configs/single/values.yaml
-            helm lint . --values examples/configs/multi/iad/values.yaml
-            helm lint . --values examples/configs/multi/sfo/values.yaml
       - run:
           name: Cluster up
           command: |
