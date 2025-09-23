@@ -10,7 +10,7 @@ import json
 
 
 def get_clusters(namespace):
-    """Return list of CNPG cluster names in the namespace."""
+    """Return list of CloudNativePG cluster names in the namespace."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
     objs = api.list_namespaced_custom_object(
@@ -24,7 +24,7 @@ def get_clusters(namespace):
 
 
 def wait_for_clusters(namespace, clusters):
-    """Wait until all CNPG clusters are Ready."""
+    """Wait until all CloudNativePG clusters are Ready."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
     while True:
@@ -46,7 +46,7 @@ def wait_for_clusters(namespace, clusters):
                 print(f"❌ Error fetching {cluster}: {e}")
                 ready = False
         if ready:
-            print("✅ All CNPG clusters in namespace ready")
+            print("✅ All CloudNativePG clusters in namespace ready")
             return
         time.sleep(5)
 

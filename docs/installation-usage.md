@@ -29,7 +29,7 @@ In order to run through all steps, you'll need the following tools installed on 
   - Homebrew install command: `brew install helm`
 - `kubectl` – [https://kubernetes.io/docs/tasks/tools/#kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)  
   - Homebrew install command: `brew install kubectl`
-- `kubectl` CNPG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)  
+- `kubectl` CloudNativePG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)  
   - Homebrew install command: `brew install kubectl-cnpg`
 
 ## Installation & Setup
@@ -243,6 +243,242 @@ Then configure your application to use these certificates when connecting to the
 `host=pgedge-n1-rw dbname=app user=app sslcert=/certificates/app/tls.crt sslkey=/certificates/app/tls.key sslmode=require port=5432`
 
 **NOTE:** The current version of the pgEdge Helm chart does not implement server certificate verification, so the `sslmode` in your DSN should be set to `require`
+
+### Performing backups
+
+CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/documentation/1.27/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
+
+#### Backups via Barman Cloud CNPG-I plugin
+
+The images utilized in this chart do not contain bundled Barman, and therefore it is required to leverage the Barman Cloud CNPG-I plugin to perform backups / wal archiving.
+
+You can follow these steps to setup backups to an S3 bucket:
+
+1. Install the Barman Cloud CNPG-I plugin
+
+Installation instructions can be accessed in the [Barman Cloud CNPG-I Plugin docs](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
+
+```shell
+kubectl apply -f \
+        https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.6.0/manifest.yaml
+```
+
+This step assumes you have already installed cert-manager as part of general instructions for this chart. If not, install that according to the documentation.
+
+2. Create an S3 Bucket and issue an Access Key / Secret Access Key for a user which has access to the bucket
+
+3. Create an Kubernetes secret and store your AWS credentials
+
+```sh
+kubectl create secret generic aws-creds \
+    --from-literal=ACCESS_KEY_ID=<ACCESS_KEY_ID> \
+    --from-literal=ACCESS_SECRET_KEY=<ACCESS_SECRET_KEY>
+```
+
+4. Create an ObjectStore which points to your S3 bucket and is configured to fetch secrets from the aws-creds secret above:
+
+You can add this template into the `templates` folder or manage it through a separate Helm deployment.
+
+```yaml
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: s3-store
+spec:
+  configuration:
+    destinationPath: "s3://<YOUR BUCKET NAME>/path/if/desired"
+    s3Credentials:
+      accessKeyId:
+        name: aws-creds
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: aws-creds
+        key: ACCESS_SECRET_KEY
+```
+
+Note: You should generally not re-use an ObjectStore across multiple CloudNativePG clusters, but the data will be namespaced with the name of each CloudNativePG cluster (pgedge-n1 for example).
+
+5. Create or update your cluster to configure backups via the plugin
+
+For example, this would enable backups and WAL archiving via the Barman Cloud CNPG-I plugin into the object store defined above:
+
+```yaml
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec: 
+        plugins:
+        - name: barman-cloud.cloudnative-pg.io
+          isWALArchiver: true
+          parameters:
+            barmanObjectName: s3-store
+    - name: n2
+      hostname: pgedge-n2-rw
+
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+6. Once deployed, you can run backups via the `kubectl cnpg` plugin:
+
+```sh
+kubectl cnpg backup pgedge-n1 -m plugin --plugin-name barman-cloud.cloudnative-pg.io
+```
+
+Once created, you can monitor your backup via kubectl:
+
+```sh
+kubectl get backups
+```
+
+7. Scheduled backups with Barman can be configured iva the `ScheduledBackup` resource
+
+For example, to setup a scheduled backup at midnight everyday for the `n1` node, use this template:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-pgedge-n1
+spec:
+  schedule: "0 0 0 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: pgedge-n1
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+```
+
+### Updating your deployment
+
+#### Configuration updates
+
+This chart is built upon passing through configuration details about each node to CloudNativePG. In order to perform configuration updates across your deployed nodes, simply make those updates to the `clusterSpec`, either within an individual node or for all nodes in your deployment.
+
+From there, run a helm upgrade:
+
+```shell
+helm upgrade \
+--values examples/configs/single/values.yaml \
+	--wait \
+	pgedge ./
+```
+
+You can monitor the status of these updates by monitoring each CloudNativePG cluster via `kubectl cnpg status pgedge-n1`.
+
+#### Adding a node
+
+In order to add a node after installing the chart, add a new entry to the `nodes` list with configuration for the new node.
+
+For example, if you have the chart installed with 2 nodes, like in this configuration:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+You can add a new node simply by introducing it to the `nodes` list:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+From there, perform a helm upgrade to deploy the new node. 
+
+```shell
+helm upgrade \
+--values examples/configs/single/values.yaml \
+	--wait \
+	pgedge ./
+```
+
+The `init-spock` job will run during the upgrade, ensuring that replication configuration is established across the new and existing nodes.
+
+*** NOTE ***
+
+By default, adding a node DOES NOT load data already on existing nodes. In order to ensure the health of replication across your nodes, you should:
+
+1. Stop writes to all nodes before performing the upgrade
+2. Ensure all previous writes have replicated to other nodes by monitoring replication lag via spock
+3. Bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability
+
+This will ensure that all nodes remain aligned during the update, and replication can continue successfully once you resume writes.
+
+Here is an example of adding a node `n3` using the Barman Cloud CNPG-I plugin to bootstrap the node from the existing node `n1` which has backups and wal archiving configured in S3. 
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec: 
+        plugins:
+        - name: barman-cloud.cloudnative-pg.io
+          isWALArchiver: true
+          parameters:
+            barmanObjectName: s3-store
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+      clusterSpec: 
+        bootstrap:
+          initdb: null
+          recovery:
+            source: pgedge-n1
+        externalClusters:
+        - name: pgedge-n1
+          plugin:
+            name: barman-cloud.cloudnative-pg.io
+            parameters:
+              barmanObjectName: s3-store
+              serverName: pgedge-n1
+
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+This builds upon the example above in [Performing Backups](#performing-backups).
+
+#### Removing a node
+
+In order to remove a node from your cluster, remove it from `nodes` in your values.yaml file, and perform a `helm upgrade`:
+
+```shell
+helm upgrade \
+--values examples/configs/single/values.yaml \
+	--wait \
+	pgedge ./
+```
+
+The `init-spock` job will run during the upgrade, ensuring that configuration which references the removed node are cleaned up on the remaining nodes.
 
 ## Using `kind` to test locally
 
