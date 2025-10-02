@@ -1,14 +1,33 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "properties": {
-      "pgEdge": {
-          "type": "object",
-          "properties": {
-              "appName": {
-                  "type": "string",
-                  "maxLength": 26
+    "pgEdge": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string",
+          "maxLength": 26
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "hostname": { "type": "string" },
+              "bootstrap": {
+                "type": "object",
+                "properties": {
+                  "mode": { "type": "string", "enum": ["spock", "cnpg"] },
+                  "sourceNode": { "type": "string" }
+                },
+                "required": ["mode"]
               }
+            },
+            "required": ["name", "hostname"]
           }
+        }
       }
+    }
   }
 }

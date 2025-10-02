@@ -133,9 +133,8 @@ This includes:
 
 - Certificate Management: The chart creates a self-signed CA and issues certificates for managed users on each node, but it does not issue or configure server certificates.
   - You may manage server certificates yourself using cert-manager and CloudNativePG, but the chart may require modification to use verify-full mode for client connections.
-- Node Management: Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but it does not load existing data into the new node.
-  - This operation currently requires that you bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability.
-  - See the [Installation and Usage Guide](./docs/installation-usage.md) for examples.
+- Node Management: Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but writes must be stopped on existing nodes during the upgrade.
+  - See the [Installation and Usage Guide](./docs/installation-usage.md) for more information.
 
 ## Values
 

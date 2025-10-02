@@ -33,8 +33,6 @@ pgEdge:
         postInitSQL: []
         postInitApplicationSQL:
           - CREATE EXTENSION spock;
-          - CREATE EXTENSION snowflake;
-          - CREATE EXTENSION lolor;
         postInitTemplateSQL: []
     managed:
       roles:

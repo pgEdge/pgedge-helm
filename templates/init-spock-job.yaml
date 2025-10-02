@@ -47,8 +47,8 @@ spec:
           configMap:
             name: {{ printf "%s-config" .Values.pgEdge.appName }}
             items:
-              - key: pgedge.json
-                path: pgedge.json 
+              - key: nodes
+                path: pgedge.yaml
         - name: admin-client-cert
           secret:
             secretName: admin-client-cert
