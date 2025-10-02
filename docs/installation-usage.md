@@ -474,7 +474,7 @@ pgEdge:
 
 This builds upon the example above in [Performing Backups](#performing-backups).
 
-The init-spock job will reconfigure the restored node, ensuring replication can continue after the new node comes online. Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.
+The init-spock job will reconfigure the restored node, ensuring to maintain existing replication configuration. Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.
 
 #### Removing a node
 

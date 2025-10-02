@@ -58,7 +58,7 @@ def load_nodes(path: str) -> List[Node]:
     return nodes
 
 
-def get_clusters(namespace: str):
+def get_clusters(namespace: str) -> List[str]:
     """Return list of CloudNativePG cluster names in the namespace."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
@@ -75,7 +75,7 @@ def get_clusters(namespace: str):
     return sorted(clusters)
 
 
-def wait_for_clusters(namespace, clusters):
+def wait_for_clusters(namespace: str, clusters: List[str]):
     """Wait until all CloudNativePG clusters are Ready."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
@@ -103,9 +103,8 @@ def wait_for_clusters(namespace, clusters):
         time.sleep(5)
 
 
-def wait_ready(node, db_name, user):
+def wait_ready(node: Node, db_name: str, user: str):
     """Wait until Postgres accepts connections."""
-
     while True:
         try:
             conn = get_conn(node.hostname, db_name, user)
@@ -117,7 +116,7 @@ def wait_ready(node, db_name, user):
             time.sleep(3)
 
 
-def get_conn(host, db_name, user):
+def get_conn(host: str, db_name: str, user: str):
     """Get a psycopg2 connection to the given host."""
     conn = psycopg2.connect(
         dbname=db_name,
@@ -134,10 +133,9 @@ def get_conn(host, db_name, user):
 
 
 def run_sql(
-    host, db_name, admin_user, statement, autocommit=False, ignore_duplicate=True
+    host: str, db_name: str, admin_user: str, statement: str, autocommit: bool = False, ignore_duplicate: bool = True
 ):
     """Run a SQL statement on the given host. Returns number of rows modified."""
-
     with get_conn(host, db_name, admin_user) as conn:
         conn.autocommit = autocommit
         with conn.cursor() as cur:
@@ -159,7 +157,7 @@ def run_sql(
                 raise
 
 
-def create_subscription(db_name, admin_user, pgedge_user, src_node, dst_node, sync):
+def create_subscription(db_name: str, admin_user: str, pgedge_user: str, src_node: Node, dst_node: Node, sync: bool):
     """Create a spock subscription from src_node to dst_node."""
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
@@ -192,7 +190,7 @@ def create_subscription(db_name, admin_user, pgedge_user, src_node, dst_node, sy
         print(f"🔗 Created spock subscription {sub_name} on {dst_node.name}" + (" (with initial sync)" if sync else ""))
 
 
-def create_node(node, db_name, admin_user, pgedge_user):
+def create_node(node: Node, db_name: str, admin_user: str, pgedge_user: str):
     """Create a spock node on a given node."""
     ssl_settings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/projected/pgedge/certificates/tls.key sslmode=require"
     stmt = f"""
@@ -209,7 +207,7 @@ def create_node(node, db_name, admin_user, pgedge_user):
         print(f"🖖 Created spock node {node.name} on {node.hostname}")
 
 
-def drop_recovered_node(node, db_name, admin_user):
+def drop_recovered_node(node: Node, db_name: str, admin_user: str):
     """Drop any spock nodes and subscriptions which were recovered from another cluster."""
 
     stmt = f"""
@@ -230,7 +228,7 @@ def drop_recovered_node(node, db_name, admin_user):
     return False
 
 
-def create_pgedge_user(node, db_name, admin_user, pgedge_user):
+def create_pgedge_user(node: Node, db_name: str, admin_user: str, pgedge_user: str):
     """Create the pgedge user on the given node for replication, if it does not exist."""
     print(f"👤 Creating user {pgedge_user} on {node.name}")
     stmt = f"""
@@ -241,7 +239,7 @@ def create_pgedge_user(node, db_name, admin_user, pgedge_user):
     run_sql(node.hostname, db_name, admin_user, stmt, ignore_duplicate=True)
 
 
-def drop_removed_nodes(node, db_name, admin_user, node_names):
+def drop_removed_nodes(node: Node, db_name: str, admin_user: str, node_names: List[str]):
     """Drop any spock nodes and subscriptions which no longer exist in the config."""
     stmt = f"""
             SELECT spock.repair_mode('True');
@@ -262,7 +260,7 @@ def drop_removed_nodes(node, db_name, admin_user, node_names):
         print(f"🗑️ Dropped removed spock nodes on {node.hostname}")
 
 
-def backup_spock_repsets(node, db_name, admin_user):
+def backup_spock_repsets(node: Node, db_name: str, admin_user: str):
     """Backup spock replication sets on the given node before dropping it."""
     with get_conn(node.hostname, db_name, admin_user) as conn:
         with conn.cursor() as cur:
@@ -270,7 +268,7 @@ def backup_spock_repsets(node, db_name, admin_user):
             try:
 
                 cleanup_stmt = f"""
-                    SELECT spock.repair_mode('True');
+                    SET spock.enable_ddl_replication = off;
 
                     DROP TABLE IF EXISTS spock.replication_set_table_backup;
                     DROP TABLE IF EXISTS spock.replication_set_backup;
@@ -278,7 +276,7 @@ def backup_spock_repsets(node, db_name, admin_user):
                 cur.execute(cleanup_stmt)
 
                 backup_stmt = f"""
-                    SELECT spock.repair_mode('True');
+                    SET spock.enable_ddl_replication = off;
 
                     CREATE TABLE spock.replication_set_backup AS 
                        SELECT * FROM spock.replication_set;
@@ -289,17 +287,17 @@ def backup_spock_repsets(node, db_name, admin_user):
 
                 conn.commit()
                 print(
-                    f"Successfully backed up spock replication sets for node {node.name}"
+                    f"💾 Successfully backed up spock replication sets for node {node.name}"
                 )
             except Exception as e:
                 conn.rollback()
                 print(
-                    f"Warning: Failed to backup spock replication sets for node {node.name}: {str(e)}"
+                    f"⚠️ Warning: Failed to backup spock replication sets for node {node.name}: {str(e)}"
                 )
                 raise
 
 
-def restore_spock_repsets(node, db_name, admin_user):
+def restore_spock_repsets(node: Node, db_name: str, admin_user: str):
     """Restore spock replication sets on the given node after recreating it."""
     with get_conn(node.hostname, db_name, admin_user) as conn:
         with conn.cursor() as cur:
@@ -364,7 +362,7 @@ def restore_spock_repsets(node, db_name, admin_user):
                             (set_name, table_name, att_list, row_filter),
                         )
                         print(
-                            f"Added table {table_name} to replication set {set_name} on node {node.name}"
+                            f"📄 Added table {table_name} to replication set {set_name} on node {node.name}"
                         )
                     except Exception as e:
                         print(
@@ -374,12 +372,12 @@ def restore_spock_repsets(node, db_name, admin_user):
 
                 conn.commit()
                 print(
-                    f"Successfully restored spock replication sets for node {node.name}"
+                    f"♻️ Successfully restored spock replication sets for node {node.name}"
                 )
             except Exception as e:
                 conn.rollback()
                 print(
-                    f"Error during replication set restore for node {node.name}: {str(e)}"
+                    f"❌ Error during replication set restore for node {node.name}: {str(e)}"
                 )
                 raise
             finally:
@@ -387,7 +385,7 @@ def restore_spock_repsets(node, db_name, admin_user):
                     conn.commit()
                     cur.execute("SET log_statement = 'none';")
                     cleanup_stmt = f"""
-                        SELECT spock.repair_mode('True');
+                        SET spock.enable_ddl_replication = off;
 
                         DROP TABLE IF EXISTS spock.replication_set_table_backup;
                         DROP TABLE IF EXISTS spock.replication_set_backup;
@@ -397,7 +395,7 @@ def restore_spock_repsets(node, db_name, admin_user):
                 except Exception as e:
                     conn.rollback()
                     print(
-                        f"Warning: Failed to clean up backup tables for node {node.name}: {str(e)}"
+                        f"⚠️ Warning: Failed to clean up backup tables for node {node.name}: {str(e)}"
                     )
 
 
@@ -430,6 +428,7 @@ def main():
         create_pgedge_user(node, db_name, admin_user, pgedge_user)
 
     # Step 4: Drop spock nodes and subscriptions which no longer exist
+    # If a node is being bootstrapped via cnpg, backup and drop existing spock config first
     current_node_names = [node.name for node in nodes]
     for node in nodes:
         if node.bootstrap.via_cnpg():
@@ -439,7 +438,7 @@ def main():
         drop_removed_nodes(node, db_name, admin_user, current_node_names)
 
     # Step 5: Recreate the spock nodes, dropping any recovered nodes first
-    # Restore replication sets after recreating nodes if they were dropped
+    # Restore replication sets if a node is being bootstrapped via cnpg
     for node in nodes:
         create_node(node, db_name, admin_user, pgedge_user)
 
