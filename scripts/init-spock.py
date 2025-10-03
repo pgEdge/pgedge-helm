@@ -58,7 +58,7 @@ def load_nodes(path: str) -> List[Node]:
     return nodes
 
 
-def get_clusters(namespace: str) -> List[str]:
+def get_clusters(namespace: str, label_selector: str) -> List[str]:
     """Return list of CloudNativePG cluster names in the namespace."""
     config.load_incluster_config()
     api = client.CustomObjectsApi()
@@ -67,6 +67,7 @@ def get_clusters(namespace: str) -> List[str]:
         version="v1",
         namespace=namespace,
         plural="clusters",
+        label_selector=label_selector
     )
     clusters = [item["metadata"]["name"] for item in objs.get("items", [])]
 
@@ -400,6 +401,7 @@ def restore_spock_repsets(node: Node, db_name: str, admin_user: str):
 
 
 def main():
+    app_name = os.environ["APP_NAME"]
     db_name = os.environ["DB_NAME"]
     admin_user = "admin"
     pgedge_user = "pgedge"
@@ -416,7 +418,7 @@ def main():
                 print(f"\tBootstrap Source Node: {node.bootstrap.sourceNode}")
 
     # Step 1: Wait for any nodes to become ready
-    clusters = get_clusters(namespace)
+    clusters = get_clusters(namespace, f"pgedge.com/app-name={app_name}")
     wait_for_clusters(namespace, clusters)
 
     # Step 2: Wait for all nodes to accept connections
