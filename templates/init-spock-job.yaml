@@ -24,6 +24,8 @@ spec:
             pip install psycopg2-binary kubernetes
             python -u /scripts/init-spock.py
         env:
+          - name: APP_NAME
+            value: {{ .Values.pgEdge.appName | quote }}
           - name: DB_NAME
             value: app
           - name: NAMESPACE

@@ -34,6 +34,8 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ printf "%s-%s" $.Values.pgEdge.appName $node.name }}
+  labels:
+    pgedge.com/app-name: {{ printf "%s" $.Values.pgEdge.appName }}
 spec:
   {{- toYaml $merged | nindent 2 }}
 {{- end }}
