@@ -22,9 +22,6 @@ pgEdge:
     imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
     minSyncReplicas: 0
     maxSyncReplicas: 0
-    certificates:
-        clientCASecret: client-ca-key-pair
-        replicationTLSSecret: streaming-replica-client-cert
     bootstrap:
       initdb:
         database: app

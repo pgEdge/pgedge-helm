@@ -31,54 +31,53 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: selfsigned-issuer
+  name: {{ .Values.pgEdge.appName }}-selfsigned-issuer
 spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: client-ca
+  name: {{ .Values.pgEdge.appName }}-client-ca
 spec:
   isCA: true
   commonName: my-selfsigned-client-ca
-  secretName: client-ca-key-pair
+  secretName: {{ .Values.pgEdge.appName }}-client-ca-key-pair
   privateKey:
+    rotationPolicy: Never
     algorithm: ECDSA
     size: 256
   issuerRef:
-    name: selfsigned-issuer
+    name: {{ .Values.pgEdge.appName }}-selfsigned-issuer
     kind: Issuer
     group: cert-manager.io
-  privateKey:
-    rotationPolicy: Never
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: client-ca-issuer
+  name: {{ .Values.pgEdge.appName }}-client-ca-issuer
 spec:
   ca:
-    secretName: client-ca-key-pair
+    secretName: {{ .Values.pgEdge.appName }}-client-ca-key-pair
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: streaming-replica-client-cert
+  name: {{ .Values.pgEdge.appName }}-streaming-replica-client-cert
   labels:
     cnpg.io/reload: ""
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: streaming-replica-client-cert
+  name: {{ .Values.pgEdge.appName }}-streaming-replica-client-cert
 spec:
-  secretName: streaming-replica-client-cert
+  secretName: {{ .Values.pgEdge.appName }}-streaming-replica-client-cert
   usages:
     - client auth
   commonName: streaming_replica
   issuerRef:
-    name: client-ca-issuer
+    name: {{ .Values.pgEdge.appName }}-client-ca-issuer
     kind: Issuer
     group: cert-manager.io
   privateKey:
@@ -87,14 +86,14 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: pgedge-client-cert
+  name: {{ .Values.pgEdge.appName }}-pgedge-client-cert
 spec:
-  secretName: pgedge-client-cert
+  secretName: {{ .Values.pgEdge.appName }}-pgedge-client-cert
   usages:
     - client auth
   commonName: pgedge
   issuerRef:
-    name: client-ca-issuer
+    name: {{ .Values.pgEdge.appName }}-client-ca-issuer
     kind: Issuer
     group: cert-manager.io
   privateKey:
@@ -103,14 +102,14 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: admin-client-cert
+  name: {{ .Values.pgEdge.appName }}-admin-client-cert
 spec:
-  secretName: admin-client-cert
+  secretName: {{ .Values.pgEdge.appName }}-admin-client-cert
   usages:
     - client auth
   commonName: admin
   issuerRef:
-    name: client-ca-issuer
+    name: {{ .Values.pgEdge.appName }}-client-ca-issuer
     kind: Issuer
     group: cert-manager.io
   privateKey:
@@ -119,14 +118,14 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: app-client-cert
+  name: {{ .Values.pgEdge.appName }}-app-client-cert
 spec:
-  secretName: app-client-cert
+  secretName: {{ .Values.pgEdge.appName }}-app-client-cert
   usages:
     - client auth
   commonName: app
   issuerRef:
-    name: client-ca-issuer
+    name: {{ .Values.pgEdge.appName }}-client-ca-issuer
     kind: Issuer
     group: cert-manager.io
   privateKey:

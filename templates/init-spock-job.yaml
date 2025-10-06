@@ -53,7 +53,7 @@ spec:
                 path: pgedge.yaml
         - name: admin-client-cert
           secret:
-            secretName: admin-client-cert
+            secretName: {{ .Values.pgEdge.appName }}-admin-client-cert
             items:
               - key: tls.crt
                 path: tls.crt
