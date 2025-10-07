@@ -12,10 +12,10 @@ spec:
   ttlSecondsAfterFinished: 3600
   template:
     spec:
-      serviceAccountName: init-spock
+      serviceAccountName: {{ .Values.pgEdge.appName }}-init-spock
       restartPolicy: Never
       containers:
-      - name: init-spock
+      - name: {{ .Values.pgEdge.appName }}-init-spock
         image: python:3.12-slim
         command:
           - /bin/sh
@@ -33,19 +33,19 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
         volumeMounts:
-          - name: spock-init-script
+          - name: {{ .Values.pgEdge.appName }}-spock-init-script
             mountPath: /scripts
-          - name: pgedge-config
+          - name: {{ .Values.pgEdge.appName }}-config
             mountPath: /config
             readOnly: true
           - name: admin-client-cert
             mountPath: /certificates/admin
             readOnly: true
       volumes:
-        - name: spock-init-script
+        - name: {{ .Values.pgEdge.appName }}-spock-init-script
           configMap:
-            name: spock-init-script
-        - name: pgedge-config
+            name: {{ .Values.pgEdge.appName }}-spock-init-script
+        - name: {{ .Values.pgEdge.appName }}-config
           configMap:
             name: {{ printf "%s-config" .Values.pgEdge.appName }}
             items:
