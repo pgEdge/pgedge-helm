@@ -27,22 +27,6 @@
 {{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
-{{- /* ensure certificates exists and set dynamic values */ -}}
-{{- if not (hasKey $merged "certificates") -}}
-  {{- $_ := set $merged "certificates" (dict) -}}
-{{- end -}}
-{{- $_ := set $merged.certificates "clientCASecret" (printf "%s-client-ca-key-pair" $.Values.pgEdge.appName) -}}
-{{- $_ := set $merged.certificates "replicationTLSSecret" (printf "%s-streaming-replica-client-cert" $.Values.pgEdge.appName) -}}
-
-{{- /* update projectedVolumeTemplate secret name */ -}}
-{{- if and (hasKey $merged "projectedVolumeTemplate") (hasKey $merged.projectedVolumeTemplate "sources") -}}
-  {{- if gt (len $merged.projectedVolumeTemplate.sources) 0 -}}
-    {{- if hasKey (index $merged.projectedVolumeTemplate.sources 0) "secret" -}}
-      {{- $_ := set (index $merged.projectedVolumeTemplate.sources 0).secret "name" (printf "%s-pgedge-client-cert" $.Values.pgEdge.appName) -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
 {{- if gt $i 0 }}
 ---
 {{- end }}
