@@ -115,6 +115,40 @@ This job runs by default, waiting for any clusters within the namespace to be re
 
 If you wish to disable this behavior, you can set `pgEdge.initSpock` to `false`.
 
+### snowflake.node and lolor.node
+
+This chart automatically configures `snowflake.node` and `lolor.node` based on the `name` property of each node.
+
+For example, a node named `n1` will have the following Postgres configuration applied to the node to ensure snowflake and lolor are configured appropriately:
+
+```yaml
+  postgresql:
+    parameters:
+      ...
+      lolor.node: "1"
+      snowflake.node: "1"
+```
+
+If you wish to override this behavior, or plan to utilize alternate naming schemes for your node, you can set the `ordinal` property for each node:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: a
+      hostname: pgedge-a-rw
+      ordinal: 1
+    - name: b
+      hostname: pgedge-b-rw
+      ordinal: 2
+    - name: c
+      hostname: pgedge-c-rw
+      ordinal: 3
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
 ## Multi-cluster considerations
 
 If you are deploying nodes across multiple Kubernetes clusters, you must take additional steps to leverage this chart, since Helm is not designed to manage resources across multiple clusters by default.
@@ -136,7 +170,9 @@ This includes:
 - Node Management: Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but writes must be stopped on existing nodes during the upgrade.
   - See the [Installation and Usage Guide](./docs/installation-usage.md) for more information.
 - App database name: The app database is named "app" by default, and cannot be renamed without modifying various Helm templates and the default values.yaml file.
-
+- Major Version Upgrades: The chart does not currently support in-place major version upgrades for existing nodes.
+  - You can use spock to bootstrap upgraded nodes into your cluster, but writes must be stopped on existing nodes during the upgrade process.
+  - See the [Installation and Usage Guide](./docs/installation-usage.md) for more information.
 {{ template "chart.requirementsSection" . }}
 
 {{ template "chart.valuesSection" . }}
