@@ -35,7 +35,7 @@ spec:
         volumeMounts:
           - name: {{ .Values.pgEdge.appName }}-spock-init-script
             mountPath: /scripts
-          - name: {{ .Values.pgEdge.appName }}-pgedge-config
+          - name: {{ .Values.pgEdge.appName }}-config
             mountPath: /config
             readOnly: true
           - name: admin-client-cert
@@ -45,7 +45,7 @@ spec:
         - name: {{ .Values.pgEdge.appName }}-spock-init-script
           configMap:
             name: {{ .Values.pgEdge.appName }}-spock-init-script
-        - name: {{ .Values.pgEdge.appName }}-pgedge-config
+        - name: {{ .Values.pgEdge.appName }}-config
           configMap:
             name: {{ printf "%s-config" .Values.pgEdge.appName }}
             items:
