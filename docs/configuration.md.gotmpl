@@ -1,0 +1,65 @@
+This chart is built around managing each pgEdge node as a [CloudNativePG](https://cloudnative-pg.io/) `Cluster`.
+
+The chart contains a default `clusterSpec` in `values.yaml` which sets up required configuration for pgEdge, including:
+
+- Using the [pgEdge Enterprise Postgres Image](https://github.com/pgedge/postgres-images)
+- Loading and initializing required extensions for pgEdge Distributed Postgres
+- Setting up required PostgreSQL configuration parameters
+- Configuring client certificate authentication for managed users (app, admin, streaming_replica)
+- Allowing local connections for the `app` and `admin` users for testing / development purposes
+
+The simplest example values file, which deploys a single primary instance for each node, looks like this:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
+
+In addition, you can override the `clusterSpec` for individual nodes.
+
+For example, to create a 3-node cluster with 3 instances on node `n1` and single instances on nodes `n2` and `n3`, you could use:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 3
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+```
+
+This override behavior is enabled via `mergeOverwrite` in Helm. You should be mindful that lists are replaced, not merged.
+
+If you override a list in the `clusterSpec` for a node, you must include all required elements in that list, pulling from the values file example, and using `helm template` to verify your configuration.
+
+For more information on configuring CloudNativePG, be sure to reference their documentation at https://cloudnative-pg.io/docs/
+
+## Values reference
+
+You can customize this Helm chart by specifying configuration parameters in your `values.yaml` file. 
+
+The following table lists all available options and their descriptions.
+
+{{ template "chart.valuesTable" . }}
