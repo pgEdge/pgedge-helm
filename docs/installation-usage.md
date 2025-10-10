@@ -12,8 +12,11 @@ pgEdge:
       hostname: pgedge-n1-rw
       clusterSpec: 
         instances: 3
-        minSyncReplicas: 1
-        maxSyncReplicas: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
     - name: n2
       hostname: pgedge-n2-rw
     - name: n3
