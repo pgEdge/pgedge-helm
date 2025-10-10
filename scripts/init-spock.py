@@ -239,7 +239,7 @@ def create_pgedge_user(node: Node, db_name: str, admin_user: str, pgedge_user: s
         """
     run_sql(node.hostname, db_name, admin_user, stmt, ignore_duplicate=True)
 
-def is_post_upgrade(node: Node, db_name: str, admin_user: str) -> bool:
+def has_subscriptions_with_missing_slots(node: Node, db_name: str, admin_user: str) -> bool:
     """Detect if we're running after upgrade by checking for missing slots."""
     try:
         with get_conn(node.hostname, db_name, admin_user) as conn:
@@ -256,17 +256,17 @@ def is_post_upgrade(node: Node, db_name: str, admin_user: str) -> bool:
                     return True
                 return False
     except Exception as e:
-        print(f"⚠️  Could not check for missing slots on {node.name}: {e}")
+        print(f"⚠️ Could not check for missing slots on {node.name}: {e}")
         return False
 
-def force_recreate_subscriptions(node: Node, db_name: str, admin_user: str):
+def drop_subscriptions(node: Node, db_name: str, admin_user: str):
     """Drop all subscriptions to force recreation after upgrade."""
     stmt = """
         SELECT spock.repair_mode('True');
         SELECT spock.sub_drop(sub_name, true) FROM spock.subscription;
     """
     run_sql(node.hostname, db_name, admin_user, stmt)
-    print(f"🔄 Forced recreation of subscriptions on {node.name}")
+    print(f"🔄 Dropped existing subscriptions on {node.name}")
 
 def drop_removed_nodes(node: Node, db_name: str, admin_user: str, node_names: List[str]):
     """Drop any spock nodes and subscriptions which no longer exist in the config."""
@@ -460,13 +460,12 @@ def main():
     # Step 4: Detect post-upgrade scenario with missing slots
     needs_recreation = []
     for node in nodes:
-        if is_post_upgrade(node, db_name, admin_user):
-            print(f"⚠️  Post-upgrade detected on {node.name}")
+        if has_subscriptions_with_missing_slots(node, db_name, admin_user):
             needs_recreation.append(node)
 
     # Step 4.5: Force drop subscriptions on nodes with missing slots
     for node in needs_recreation:
-        force_recreate_subscriptions(node, db_name, admin_user)
+        drop_subscriptions(node, db_name, admin_user)
 
     # Step 5: Drop spock nodes and subscriptions which no longer exist
     # If a node is being bootstrapped via cnpg, backup and drop existing spock config first
