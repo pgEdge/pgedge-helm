@@ -1,11 +1,7 @@
-README.md: README.md.gotmpl values.yaml
-	helm-docs
-
-docs/configuration.md: docs/configuration.md.gotmpl values.yaml
-	helm-docs -t docs/configuration.md.gotmpl -o docs/configuration.md
-
 .PHONY: gen-docs
-gen-docs: README.md docs/configuration.md
+gen-docs:
+	docker run --rm -v ${PWD}:/helm-docs jnorwood/helm-docs
+	docker run --rm -v ${PWD}:/helm-docs jnorwood/helm-docs -t docs/configuration.md.gotmpl -o docs/configuration.md
 
 .PHONY: docs
 docs:

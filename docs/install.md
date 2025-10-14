@@ -1,8 +1,8 @@
 # Installation
 
-This guide uses the single cluster example to install the pgEdge Helm chart into a single Kubernetes cluster with three nodes (n1, n2, n3).
+This guide demonstrates how to installthe pgedge-helm chart into a single Kubernetes cluster containing three nodes: n1, n2, and n3.
 
-n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary.
+In this single cluster example, n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary instance.
 
 ```yaml
 pgEdge:
@@ -26,7 +26,7 @@ pgEdge:
       size: 1Gi
 ```
 
-In order to run through all steps, you'll need the following tools installed on your machine:
+In order to run through all installation steps, you'll need the following tools installed on your machine:
 
 - `helm` – [https://helm.sh/](https://helm.sh/)
   - Homebrew install command: `brew install helm`
@@ -35,11 +35,11 @@ In order to run through all steps, you'll need the following tools installed on 
 - `kubectl` CloudNativePG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)
   - Homebrew install command: `brew install kubectl-cnpg`
 
-## Creating your kubectl context
+## Step 1: Configure your kubectl context and namespace
 
 Before you get started, you should setup your `kubectl` context to interact with the correct cluster and namespace before performing the install.
 
-**Identify Your Cluster and User**
+**Identify Your Kubernetes Cluster and User**
 
 First, you need to know the names of the cluster and user you want to use. You can list them with these commands:
 
@@ -60,7 +60,7 @@ kubectl config set-context helm-test --cluster=kubernetes --user=kubernetes-admi
 
 This command creates a new context and links it to your existing cluster and user credentials.
 
-## Configuring your kubectl context and namespace
+**Configuring your kubectl context and namespace**
 
 For convenience, configure your desired context and namespace prior to running the rest of the commands.
 
@@ -74,7 +74,7 @@ For example:
 kubectl config use-context helm-test --namespace pgedge
 ```
 
-## Installing chart dependencies
+## Step 2: Install chart dependencies
 
 First, install the `CloudNativePG` and `cert-manager` operators into your cluster:
 
@@ -93,7 +93,7 @@ kubectl wait --for=condition=Available deployment \
 	-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
 ```
 
-## Install the chart
+## Step 3: Install the chart
 
 To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package: the chart itself (the `./` at the end) and the configuration file (`values.yaml`).
 
@@ -140,44 +140,30 @@ REVISION: 1
 TEST SUITE: None
 ```
 
-## Spock initialization
+## Uninstallation
 
-This chart contains a python job to initialize spock multi-master replication across all nodes once they are all available.
+If you wish to uninstall the pgedge-helm chart, you can perform a `helm uninstall` using the following command:
 
-This job runs by default, waiting for any clusters associated with the current deployment to be ready before performing initialization.
-
-If you wish to disable this behavior, you can set `pgEdge.initSpock` to `false`.
-
-### snowflake.node and lolor.node
-
-This chart automatically configures `snowflake.node` and `lolor.node` based on the `name` property of each node.
-
-For example, a node named `n1` will have the following Postgres configuration applied to the node to ensure snowflake and lolor are configured appropriately:
-
-```yaml
-  postgresql:
-    parameters:
-      ...
-      lolor.node: "1"
-      snowflake.node: "1"
+```shell
+helm uninstall pgedge
 ```
 
-If you wish to override this behavior, or plan to utilize alternate naming schemes for your node, you can set the `ordinal` property for each node:
+All resources will be removed, with the exception of secrets which were created to store generated client certificates by `cert-manager`. 
 
-```yaml
-pgEdge:
-  appName: pgedge
-  nodes:
-    - name: a
-      hostname: pgedge-a-rw
-      ordinal: 1
-    - name: b
-      hostname: pgedge-b-rw
-      ordinal: 2
-    - name: c
-      hostname: pgedge-c-rw
-      ordinal: 3
-  clusterSpec:
-    storage:
-      size: 1Gi
+This is a safety mechanism which aligns with cert-manager's default behavior, and ensures that dependent services are not brought down by an accidental update.
+
+If you wish to delete these secrets, you can query them via `kubectl`:
+
+```shell
+kubectl get secrets
+
+NAME                 TYPE                DATA   AGE
+pgedge-admin-client-cert    kubernetes.io/tls   3      3m43s
+pgedge-app-client-cert      kubernetes.io/tls   3      3m43s
+pgedge-client-ca-key-pair   kubernetes.io/tls   3      3m46s
+pgedge-pgedge-client-cert   kubernetes.io/tls   3      3m45s
 ```
+
+From there, you can delete each secret using the following command:
+
+`kubectl delete secret <name>`

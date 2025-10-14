@@ -1,4 +1,4 @@
-site_name: pgEdge Distributed Postgres Helm Chart
+site_name: pgedge-helm
 
 extra_css:
   - stylesheets/extra.css
@@ -19,7 +19,6 @@ theme:
   logo_light_mode: 'img/logo-light.png'
 
   features:
-    - navigation.expand
     - navigation.instant
     - navigation.tracking
     - navigation.prune
@@ -51,19 +50,17 @@ repo_url: https://github.com/pgEdge/pgedge-helm
 
 nav:
   - Introduction: index.md
-  - Installing the chart: install.md
+  - Installation: install.md
   - Configuration: configuration.md
-  - Certificate Management: certificates.md
-  - Upgrading the chart: upgrade.md
-  - Uninstalling the chart: uninstall.md
-  - Usage:
-    - Monitoring your deployment: usage/monitoring.md
+  - Usage Guides:
     - Connecting to Postgres: usage/connecting.md
+    - Monitoring: usage/monitoring.md
     - Adding nodes: usage/adding_nodes.md
     - Removing nodes: usage/removing_nodes.md
     - Configuring backups: usage/backups.md
     - Upgrading Postgres: usage/postgres_upgrades.md
     - Deploying replicas: usage/replicas.md
+  - Certificate Management: certificates.md
   - Multi-cluster deployments: multicluster.md
   - Testing locally: testing-locally.md
   - Limitations: limitations.md

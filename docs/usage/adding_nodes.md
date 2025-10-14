@@ -1,3 +1,8 @@
+This chart supports two methods for adding new nodes to an existing installation:
+
+1. Using spock to add a node via logical replication
+2. Using CloudNativePG to add a node via [bootstrap](https://cloudnative-pg.io/documentation/1.18/bootstrap/)
+
 ## Adding a node via spock
 
 In order to add a node after installing the chart, add a new entry to the `nodes` list with configuration for the new node.
@@ -57,7 +62,7 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
     This will ensure that all nodes remain aligned during the update, and replication can continue successfully once you resume writes.
 
-## Adding a node via CNPG bootstrap
+## Adding a node via CloudNativePG bootstrap
 
 As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability
 
@@ -101,4 +106,6 @@ pgEdge:
 
 This builds upon the example establish in [Performing Backups](backups.md).
 
-The init-spock job will reconfigure the restored node, ensuring to maintain existing replication configuration. Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.
+The init-spock job will reconfigure the restored node, ensuring to maintain existing replication configuration. 
+
+Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.

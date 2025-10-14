@@ -1,12 +1,15 @@
-# pgEdge Distributed Postgres Helm Chart
+# pgedge-helm
 
 This chart installs pgEdge Distributed Postgres using CloudNativePG to manage each node.
 
+At a high level, this chart features:
+
+- Support for Postgres 16, 17, and 18 via [pgEdge Enterprise Postgres Images](https://github.com/pgEdge/postgres-images)
+- Support for configuring Spock replication across all nodes during helm install and upgrade
 - Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes
-- Support for configuring Spock replication across all nodes during Helm install and upgrade
-- Ability to extend or override configuration to pass through settings to CloudNativePG for all nodes or specific nodes
-- Leverage CloudNativePG features via pass-through configuration
-- Add pgEdge nodes using Spock or CloudNativePG’s bootstrap capabilities to synchronize data from existing nodes or backups
-- Configure standby instances for each pgEdge node with automatic failover managed by CloudNativePG
-- Spock's delayed feedback feature and failover slots worker are configured to maintain multi-active replication across failovers and promotions
-- Client certificate authentication for all managed users using cert-manager
+- Ability to extend / override configuration for CloudNativePG across all nodes, or on specific nodes
+- Ability to configure standby instances with automatic failover, leveraging spock's delayed feedback and failover slots worker to maintain multi-active replication across failovers / promotions
+- Ability to add pgEdge nodes using spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups
+- Ability to perform Postgres major and minor version upgrades for Postgres
+- Client certificate authentication for managed users, including the pgedge replication user
+- Configuration mechanisms to support multi-cluster deployments

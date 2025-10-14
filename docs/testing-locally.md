@@ -1,24 +1,27 @@
 ## Using `kind` to test locally
 
-For local testing, you can use [kind](https://kind.sigs.k8s.io) to create a test cluster that runs on your machine. You'll need access to a Docker host, such as Docker Desktop.
+For local testing, you can use [kind](https://kind.sigs.k8s.io) to create a test cluster that runs on your machine. 
 
+You'll need access to a Docker host, such as [Docker Desktop](https://docs.docker.com/desktop/).
+
+Refer to the [Installation](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) section of kind's documentation for how to install kind on your system.
 Use this command to install `kind` with Homebrew:
 
-```shell
-brew install kind
-```
+### Creating a local kind cluster
 
-To deploy a local Kubernetes cluster, install kind and run this command:
+Once installed, you can deploy a local Kubernetes cluster, by running this command from the root of pgedge-helm:
 
 ```shell
 kind create cluster --config examples/configs/single/kind.yaml
 ```
 
-Next, set your kubectl config to use the kind cluster:
+Once deployed, set your kubectl config to use the kind cluster:
 
 ```shell
 kubectl config use-context kind-single --namespace default
 ```
+
+## Removing a local kind cluster
 
 To tear down the `kind` cluster, run this command:
 

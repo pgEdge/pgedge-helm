@@ -56,6 +56,48 @@ If you override a list in the `clusterSpec` for a node, you must include all req
 
 For more information on configuring CloudNativePG, be sure to reference their documentation at https://cloudnative-pg.io/docs/
 
+## Spock configuration
+
+This chart contains a python job to initialize spock multi-master replication across all nodes once they are all available.
+
+This job runs by default, waiting for any clusters associated with the current deployment to be ready before performing initialization.
+
+If you wish to disable this behavior, you can set `pgEdge.initSpock` to `false`.
+
+### snowflake.node and lolor.node
+
+This chart automatically configures `snowflake.node` and `lolor.node` based on the `name` property of each node.
+
+For example, a node named `n1` will have the following Postgres configuration applied to the node to ensure snowflake and lolor are configured appropriately:
+
+```yaml
+  postgresql:
+    parameters:
+      ...
+      lolor.node: "1"
+      snowflake.node: "1"
+```
+
+If you wish to override this behavior, or plan to utilize alternate naming schemes for your node, you can set the `ordinal` property for each node:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: a
+      hostname: pgedge-a-rw
+      ordinal: 1
+    - name: b
+      hostname: pgedge-b-rw
+      ordinal: 2
+    - name: c
+      hostname: pgedge-c-rw
+      ordinal: 3
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
 ## Values reference
 
 You can customize this Helm chart by specifying configuration parameters in your `values.yaml` file. 
