@@ -14,10 +14,8 @@ See the [Adding nodes](usage/adding_nodes.md) for more information.
 
 The app database is named "app" by default, and cannot be renamed without modifying various Helm templates and the default values.yaml file.
 
-## Major Version Upgrades: 
+## Installing multiple times into the same namespace
 
-The chart does not currently support in-place major version upgrades for existing nodes.
+Installing the chart multiple times into the same Kubernetes namespace is not recommended. Each release expects to manage its own set of resources, and resource name conflicts or unexpected behavior may occur if multiple releases are installed in the same namespace.
 
-You can use spock to bootstrap upgraded nodes into your cluster, but writes must be stopped on existing nodes during the upgrade process.
-
-See the [Upgrading Postgres](usage/postgres_upgrades.md) for more information.
+For testing purposes, you can modify the `appName` property to separate most chart resources across multiple helm deployments in the same namespace. However, certificates deployed when `provisionCerts` is set to `true` will have the same name across all deployments, and these will conflict in the same namespace.
