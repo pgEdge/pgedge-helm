@@ -2,10 +2,9 @@ A single Kubernetes cluster is most commonly deployed in one region, with suppor
 
 Deploying across multiple Kubernetes clusters with pgEdge Distributed requires addressing two aspects:
 
-1. Network Connectivity
-    a. We must ensure that pgEdge nodes can connect across Kubernetes clusters with cross-cluster DNS using tools like Cilium or Submariner
-2. Certificate Management
-    a. We must ensure that managed users have consistent client certificates across all pgEdge nodes by copying certificates across clusters using different tools
+**Network Connectivity:** We must ensure that pgEdge nodes can connect across Kubernetes clusters with cross-cluster DNS using tools like Cilium or Submariner.
+
+**Certificate Management:** We must ensure that managed users have consistent client certificates across all pgEdge nodes by copying certificates across clusters using different tools.
 
 These domains are well known in the Kubernetes community as part of operating other multi-cluster workloads, and customers often have solutions in place to manage them, so building a single approach into pgedge-helm doesn’t make sense.
 
@@ -19,8 +18,8 @@ In order to apply these to a multi-cluster scenario, you can utilize these confi
 
 For example, let’s assume you want to deploy 2 pgEdge nodes across 2 Kubernetes clusters, with a single helm install run against each cluster. These values files highlight how to leverage these options, ensuring that:
 
-1. Certificates are only issued during deployment to the first cluster
-2. Spock configuration is applied across nodes in both clusters by the initialization job run in the second cluster
+- Certificates are only issued during deployment to the first cluster.
+- Spock configuration is applied across nodes in both clusters by the initialization job run in the second cluster.
 
 **Cluster A: cluster-a.yaml**
 
