@@ -64,13 +64,13 @@ volumes:
           mode: 0600
 ```
 
-Then configure your application to use these certificates when connecting to the Postgres database via a DSN using `sslkey` and `sslcert`.
+Then, configure your application to use these certificates when connecting to the Postgres database via a DSN using `sslkey` and `sslcert`.
 
 `host=pgedge-n1-rw dbname=app user=app sslcert=/certificates/app/tls.crt sslkey=/certificates/app/tls.key sslmode=require port=5432`
 
 !!! note
     
-    The current version of pgedge-helm does not implement server certificate verification, so the `sslmode` in your DSN should be set to `require`
+    The current version of pgedge-helm does not implement server certificate verification, so the `sslmode` in your DSN should be set to `require`.
 
 ## Connecting with password authentication
 
