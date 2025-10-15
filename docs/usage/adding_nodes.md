@@ -22,7 +22,7 @@ pgEdge:
       size: 1Gi
 ```
 
-You can add a new node simply by introducing it to the `nodes` list, and use spock to bootstrap it from another node:
+You can add a new node simply by introducing it to the `nodes` list, and including the `mode: spock` property to bootstrap it from another node:
 
 ```yaml
 pgEdge:
@@ -57,14 +57,14 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
     In order to ensure the health of replication across your nodes, you should:
 
-    1. Stop writes to all nodes before performing the upgrade
-    2. Ensure all previous writes have replicated to other nodes by monitoring replication lag via spock
+    - Stop writes to all nodes before performing the upgrade.
+    - Ensure all previous writes have replicated to other nodes by monitoring replication lag via [spock](https://github.com/pgEdge/spock/blob/main/docs/monitoring/lag_tracking.md).
 
     This will ensure that all nodes remain aligned during the update, and replication can continue successfully once you resume writes.
 
 ## Adding a node via CloudNativePG bootstrap
 
-As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability
+As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability.
 
 Here is an example of adding a node `n3` using the Barman Cloud CNPG-I plugin to bootstrap the node from the existing node `n1` which has backups and wal archiving configured in S3. 
 
@@ -104,8 +104,8 @@ pgEdge:
       size: 1Gi
 ```
 
-This builds upon the example establish in [Performing Backups](backups.md).
+This builds upon the example configuration started in [Performing Backups](backups.md).
 
-The init-spock job will reconfigure the restored node, ensuring to maintain existing replication configuration. 
+The subsequent init-spock job reconfigures the restored node, ensuring replication remains healthy after performing the update.
 
 Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.
