@@ -1,12 +1,12 @@
 This chart is built around managing each pgEdge node as a [CloudNativePG](https://cloudnative-pg.io/) `Cluster`.
 
-The chart contains a default `clusterSpec` in `values.yaml` which sets up required configuration for pgEdge, including:
+The chart contains a default `clusterSpec` in `values.yaml` which defines the required configuration for deploying pgEdge with CloudNativePG, including:
 
-- Using the [pgEdge Enterprise Postgres Image](https://github.com/pgedge/postgres-images)
-- Loading and initializing required extensions for pgEdge Distributed Postgres
-- Setting up required PostgreSQL configuration parameters
-- Configuring client certificate authentication for managed users (app, admin, streaming_replica)
-- Allowing local connections for the `app` and `admin` users for testing / development purposes
+- deploying with the [pgEdge Enterprise Postgres Images](https://github.com/pgedge/postgres-images).
+- loading and initializing required extensions for pgEdge Distributed Postgres.
+- setting up required PostgreSQL configuration parameters.
+- configuring client certificate authentication for managed users (app, admin, streaming_replica).
+- allowing local connections for the app and admin users for testing / development purposes.
 
 The simplest example values file, which deploys a single primary instance for each node, looks like this:
 
@@ -27,7 +27,7 @@ pgEdge:
 
 As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
 
-In addition, you can override the `clusterSpec` for individual nodes.
+You can also override the `clusterSpec` for specific nodes if you require more granular control.
 
 For example, to create a 3-node cluster with 3 instances on node `n1` and single instances on nodes `n2` and `n3`, you could use:
 
@@ -58,7 +58,7 @@ For more information on configuring CloudNativePG, be sure to reference their do
 
 ## Spock configuration
 
-This chart contains a python job to initialize spock multi-master replication across all nodes once they are all available.
+This chart contains a python job to initialize Spock multi-master replication across all nodes once they are all available.
 
 This job runs by default, waiting for any clusters associated with the current deployment to be ready before performing initialization.
 
