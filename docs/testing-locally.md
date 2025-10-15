@@ -2,10 +2,9 @@
 
 For local testing, you can use [kind](https://kind.sigs.k8s.io) to create a test cluster that runs on your machine. 
 
-You'll need access to a Docker host, such as [Docker Desktop](https://docs.docker.com/desktop/).
+You'll need access to a Docker host, such as [Docker Desktop](https://docs.docker.com/desktop/), with an installed copy of kind.
 
 Refer to the [Installation](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) section of kind's documentation for how to install kind on your system.
-Use this command to install `kind` with Homebrew:
 
 ### Creating a local kind cluster
 
