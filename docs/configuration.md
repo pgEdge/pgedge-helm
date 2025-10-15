@@ -54,7 +54,7 @@ This override behavior is enabled via `mergeOverwrite` in Helm. You should be mi
 
 If you override a list in the `clusterSpec` for a node, you must include all required elements in that list, pulling from the values file example, and using `helm template` to verify your configuration.
 
-For more information on configuring CloudNativePG, be sure to reference their documentation at https://cloudnative-pg.io/docs/
+For more information about configuring CloudNativePG, see the [CloudNativePG documentation](https://cloudnative-pg.io/docs/).
 
 ## Spock configuration
 
