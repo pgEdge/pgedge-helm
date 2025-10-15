@@ -12,7 +12,7 @@ These domains are well known in the Kubernetes community as part of operating ot
 
 Instead, the new chart includes a few configuration mechanisms to support multi-cluster deployments:
 
-1. `pgEdge.initSpock` - controls whether spock configuration should be created and updated when deploying the chart. Defaults to true
+1. `pgEdge.initSpock` - controls whether Spock configuration should be created and updated when deploying the chart. Defaults to true
 2. `pgEdge.provisionCerts` - controls whether or not cert-manager certs should be deployed when deploying the chart. Defaults to true
 3. `pgEdge.externalNodes` - allows configuring nodes that are part of the pgEdge Distributed Postgres deployment, but managed externally to this Helm chart. These nodes will be configured in the spock-init job when it runs.
 

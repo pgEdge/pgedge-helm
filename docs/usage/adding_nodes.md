@@ -2,7 +2,7 @@
 
 This chart supports two methods for adding new nodes to an existing installation:
 
-1. Using spock to add a node via logical replication
+1. Using Spock to add a node via logical replication
 2. Using CloudNativePG to add a node via [bootstrap](https://cloudnative-pg.io/documentation/1.18/bootstrap/)
 
 ## Adding a node via spock
@@ -53,7 +53,7 @@ helm upgrade \
     pgedge ./
 ```
 
-The `init-spock` job will run during the upgrade, ensuring that replication configuration is established across the new and existing nodes, and use spock subscription's `sync_data` and `sync_structure` to align the new node via logical replication.
+The `init-spock` job will run during the upgrade, ensuring that replication configuration is established across the new and existing nodes, and use Spock subscription's `sync_data` and `sync_structure` to align the new node via logical replication.
 
 !!! note
 

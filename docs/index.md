@@ -9,7 +9,7 @@ At a high level, this chart features:
 - Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes
 - Ability to extend / override configuration for CloudNativePG across all nodes, or on specific nodes
 - Ability to configure standby instances with automatic failover, leveraging spock's delayed feedback and failover slots worker to maintain multi-active replication across failovers / promotions
-- Ability to add pgEdge nodes using spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups
+- Ability to add pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups
 - Ability to perform Postgres major and minor version upgrades for Postgres
 - Client certificate authentication for managed users, including the pgedge replication user
 - Configuration mechanisms to support multi-cluster deployments

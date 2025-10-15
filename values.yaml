@@ -11,7 +11,7 @@ pgEdge:
   # -- Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart.
   # This can be leverage for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster.
   externalNodes: []
-  # -- Whether or not to run the init spock job to initialize the pgEdge nodes and subscriptions
+  # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
   # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
   initSpock: true
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
