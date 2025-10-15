@@ -1,6 +1,6 @@
 # Installation
 
-This guide demonstrates how to installthe pgedge-helm chart into a single Kubernetes cluster containing three nodes: n1, n2, and n3.
+This guide demonstrates how to install the pgedge-helm chart into a single Kubernetes cluster containing three nodes: n1, n2, and n3.
 
 In this single cluster example, n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary instance.
 
@@ -26,14 +26,16 @@ pgEdge:
       size: 1Gi
 ```
 
-In order to run through all installation steps, you'll need the following tools installed on your machine:
+**Prerequisites**
+
+To perform the installation, you'll need the following tools installed on your machine:
 
 - `helm` – [https://helm.sh/](https://helm.sh/)
-  - Homebrew install command: `brew install helm`
+    - Homebrew install command: `brew install helm`
 - `kubectl` – [https://kubernetes.io/docs/tasks/tools/#kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-  - Homebrew install command: `brew install kubectl`
+    - Homebrew install command: `brew install kubectl`
 - `kubectl` CloudNativePG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)
-  - Homebrew install command: `brew install kubectl-cnpg`
+    - Homebrew install command: `brew install kubectl-cnpg`
 
 ## Step 1: Configure your kubectl context and namespace
 
@@ -48,7 +50,7 @@ kubectl config get-clusters
 kubectl config get-users
 ```
 
-Let's assume your cluster is named `kubernetes` and your user is named `kubernetes-admin`.
+The example that follows uses a cluster named `kubernetes`, accessed by a user named `kubernetes-admin`.
 
 **Create the New Context**
 
@@ -95,8 +97,11 @@ kubectl wait --for=condition=Available deployment \
 
 ## Step 3: Install the chart
 
-To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package: the chart itself (the `./` at the end) and the configuration file (`values.yaml`).
+To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package: 
 
+- the chart itself (the `./` at the end).
+- the configuration file (`values.yaml`).
+ 
 1. **Navigate to the Correct Directory**  
    First, change your current directory to the location where you unzipped/downloaded the Helm chart.
 
@@ -152,7 +157,7 @@ All resources will be removed, with the exception of secrets which were created 
 
 This is a safety mechanism which aligns with cert-manager's default behavior, and ensures that dependent services are not brought down by an accidental update.
 
-If you wish to delete these secrets, you can query them via `kubectl`:
+If you wish to delete these secrets, you can identify then via `kubectl`:
 
 ```shell
 kubectl get secrets
