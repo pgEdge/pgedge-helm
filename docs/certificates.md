@@ -5,10 +5,7 @@ This chart leverages `cert-manager` to create a self-signed CA and issue client 
 - `pgedge`: used for multi-active replication connections between nodes
 - `streaming_replica`: used for physical replication connections between nodes
 
-This makes it easier to get started with pgEdge, but you may want to use your own CA in production.
-
-In that case, you can disable the self-signed CA creation and certificate issuance by setting
-`pgEdge.provisionCerts` to `false`, and issuing your own certificates using cert-manager or another tool.
+Using a self-signed certificate makes it easier to get started with pgEdge, but you may want to use your own CA when you move to production. To use a managed certificate, disable the self-signed CA creation and certificate issuance by setting `pgEdge.provisionCerts` to false, and issue certificates with cert-manager or a similar tool.
 
 These can then be plugged into your clusterSpec accordingly:
 
