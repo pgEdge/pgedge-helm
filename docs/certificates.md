@@ -1,3 +1,5 @@
+# Certificate Management
+
 This chart leverages `cert-manager` to create a self-signed CA and issue client certificates for a set of managed users on each node:
 
 - `app`: a user for application connections

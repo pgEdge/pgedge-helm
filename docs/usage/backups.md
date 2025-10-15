@@ -1,6 +1,8 @@
+# Configuring Backups
+
 CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/documentation/1.27/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
 
-The current version of this chart does not provide wrapper configuration around CRDs for managing backup configuration - such as `ScheduledBackup` or `ObjectStore`.  You may configure these CRDs independently from this chart, or bundle them into the `templates` folder, based on your strategy for managing helm charts within your Kubernetes setup.
+The current version of this chart does not provide wrapper configuration around CRDs for managing backup configuration - such as `ScheduledBackup` or `ObjectStore`. You may configure these CRDs independently from this chart, or bundle them into the `templates` folder, based on your strategy for managing helm charts within your Kubernetes setup.
 
 !!! warning
 
@@ -10,7 +12,7 @@ The current version of this chart does not provide wrapper configuration around 
 
 You can follow these steps to setup scheduled backups to an S3 bucket using the Barman Cloud CNPG-I plugin.
 
-1. Install the Barman Cloud CNPG-I plugin
+1.  Install the Barman Cloud CNPG-I plugin
 
     Installation instructions can be accessed in the [Barman Cloud CNPG-I Plugin docs](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
 
@@ -21,9 +23,9 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
 
     This step assumes you have already installed `cert-manager` as part of general instructions for this chart. If not, install that according to the `cert-manager` documentation.
 
-2. Create an S3 Bucket and issue an Access Key / Secret Access Key for a user which has access to the bucket.
+2.  Create an S3 Bucket and issue an Access Key / Secret Access Key for a user which has access to the bucket.
 
-3. Create a Kubernetes secret and store your AWS credentials.
+3.  Create a Kubernetes secret and store your AWS credentials.
 
     ```sh
     kubectl create secret generic aws-creds \
@@ -31,7 +33,7 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
         --from-literal=ACCESS_SECRET_KEY=<ACCESS_SECRET_KEY>
     ```
 
-4. Create an `ObjectStore` which points to your S3 bucket and is configured to fetch secrets from the `aws-creds` secret above. 
+4.  Create an `ObjectStore` which points to your S3 bucket and is configured to fetch secrets from the `aws-creds` secret above.
 
     You can add this template into the templates folder or manage it through a separate Helm deployment:
 
@@ -56,23 +58,22 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
 
         You should generally not re-use an ObjectStore across multiple CloudNativePG clusters, but the data will be namespaced with the name of each CloudNativePG cluster (pgedge-n1 for example).
 
-5. Create or update your cluster to configure backups via the plugin.
+5.  Create or update your cluster to configure backups via the plugin.
 
     For example, the following template enables backups and WAL archiving via the Barman Cloud CNPG-I plugin into the `ObjectStore` defined above:
 
     ```yaml
-
     pgEdge:
       appName: pgedge
       nodes:
         - name: n1
           hostname: pgedge-n1-rw
-          clusterSpec: 
+          clusterSpec:
             plugins:
-            - name: barman-cloud.cloudnative-pg.io
-              isWALArchiver: true
-              parameters:
-                barmanObjectName: s3-store
+              - name: barman-cloud.cloudnative-pg.io
+                isWALArchiver: true
+                parameters:
+                  barmanObjectName: s3-store
         - name: n2
           hostname: pgedge-n2-rw
 
@@ -81,7 +82,7 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
           size: 1Gi
     ```
 
-6. Once deployed, run backups via the `kubectl cnpg` plugin.
+6.  Once deployed, run backups via the `kubectl cnpg` plugin.
 
     ```sh
     kubectl cnpg backup pgedge-n1 -m plugin --plugin-name barman-cloud.cloudnative-pg.io
@@ -93,7 +94,7 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
     kubectl get backups
     ```
 
-7. If desired, configure scheduled backups with Barman via the `ScheduledBackup` resource.
+7.  If desired, configure scheduled backups with Barman via the `ScheduledBackup` resource.
 
     For example, to setup a scheduled backup at midnight everyday for the `n1` node, use this template:
 

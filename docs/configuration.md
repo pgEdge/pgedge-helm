@@ -1,3 +1,5 @@
+# Configuration
+
 This chart is built around managing each pgEdge node as a [CloudNativePG](https://cloudnative-pg.io/) `Cluster`.
 
 The chart contains a default `clusterSpec` in `values.yaml` which defines the required configuration for deploying pgEdge with CloudNativePG, including:

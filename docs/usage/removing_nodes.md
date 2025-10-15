@@ -1,4 +1,6 @@
-In order to remove a node from your installation, remove it from `nodes` in your values.yaml file, and perform a `helm upgrade`:
+# Removing Nodes
+
+To remove a node from your installation, remove it from the `nodes` property in your `values.yaml` file, and perform a `helm upgrade`.
 
 For example, if your existing installation has three nodes:
 

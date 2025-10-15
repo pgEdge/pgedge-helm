@@ -1,5 +1,7 @@
 # Monitoring
 
+You can use the `kubectl cnpg` plugin to monitor the CloudNativePG Cluster operating each pgEdge node.
+
 ## Checking Status
 
 You can view the status of each node's CloudNativePG Cluster by using the `kubectl cnpg` plugin.

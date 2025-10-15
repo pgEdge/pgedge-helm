@@ -1,3 +1,7 @@
+# Upgrading Postgres
+
+You can use simple chart modifications to perform either a minor or major version upgrade of Spock or pgEdge Distributed Postgres.
+
 ## Minor Version Upgrades
 
 This chart utilizes a mutable tag by default to pull the latest pgEdge Enterprise Postgres image for Postgres 17 and Spock 5.

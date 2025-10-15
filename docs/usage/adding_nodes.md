@@ -1,3 +1,5 @@
+# Adding Nodes
+
 This chart supports two methods for adding new nodes to an existing installation:
 
 1. Using spock to add a node via logical replication

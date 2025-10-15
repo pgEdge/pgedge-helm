@@ -1,3 +1,5 @@
+# Multi-cluster Deployments
+
 A single Kubernetes cluster is most commonly deployed in one region, with support for running workloads across multiple availability zones. Most customers who are taking advantage of pgEdge Distributed Postgres operate nodes in different regions for performance or availability reasons, sometimes across multiple Cloud providers.
 
 Deploying across multiple Kubernetes clusters with pgEdge Distributed requires addressing two aspects:

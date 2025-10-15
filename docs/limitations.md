@@ -1,3 +1,7 @@
+# Limitations
+
+The following limitations apply when deploying `pgedge-helm`.
+
 ## Certificate Management
 
 The chart creates a self-signed CA and issues certificates for managed users on each node, but it does not issue or configure server certificates.
@@ -8,7 +12,7 @@ You may manage server certificates yourself using cert-manager and CloudNativePG
 
 Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but writes must be stopped on existing nodes during the upgrade.
 
-See the [Adding nodes](usage/adding_nodes.md) for more information.
+See the [Adding Nodes](usage/adding_nodes.md) for more information.
 
 ## App database name
 

@@ -1,3 +1,7 @@
+# Connecting To Postgres
+
+You can connect to your deployed pgEdge database using several methods, depending on your security and operational requirements.
+
 ## Connecting via kubectl
 
 To connect to a specific database node, use the `kubectl cnpg psql` command with the appropriate details for your cluster.

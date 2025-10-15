@@ -1,4 +1,4 @@
-## Using `kind` to test locally
+# Testing Locally
 
 For local testing, you can use [kind](https://kind.sigs.k8s.io) to create a test cluster that runs on your machine. 
 
@@ -6,7 +6,7 @@ You'll need access to a Docker host, such as [Docker Desktop](https://docs.docke
 
 Refer to the [Installation](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) section of kind's documentation for how to install kind on your system.
 
-### Creating a local kind cluster
+## Creating a local kind cluster
 
 Once installed, you can deploy a local Kubernetes cluster, by running this command from the root of pgedge-helm:
 

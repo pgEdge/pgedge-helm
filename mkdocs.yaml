@@ -53,14 +53,14 @@ nav:
   - Installation: install.md
   - Configuration: configuration.md
   - Usage Guides:
-    - Connecting to Postgres: usage/connecting.md
+    - Connecting To Postgres: usage/connecting.md
     - Monitoring: usage/monitoring.md
-    - Adding nodes: usage/adding_nodes.md
-    - Removing nodes: usage/removing_nodes.md
-    - Configuring backups: usage/backups.md
+    - Adding Nodes: usage/adding_nodes.md
+    - Removing Nodes: usage/removing_nodes.md
+    - Configuring Backups: usage/backups.md
     - Upgrading Postgres: usage/postgres_upgrades.md
-    - Deploying replicas: usage/replicas.md
+    - Configuring Standby Instances: usage/standby.md
   - Certificate Management: certificates.md
-  - Multi-cluster deployments: multicluster.md
-  - Testing locally: testing-locally.md
+  - Multi-cluster Deployments: multicluster.md
+  - Testing Locally: testing-locally.md
   - Limitations: limitations.md
