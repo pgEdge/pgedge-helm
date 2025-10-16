@@ -74,7 +74,7 @@ Then, configure your application to use these certificates when connecting to th
 
 !!! note
     
-    The current version of pgedge-helm does not implement server certificate verification, so the `sslmode` in your DSN should be set to `require`.
+    The current version of the pgEdge Helm chart does not implement server certificate verification, so the `sslmode` in your DSN should be set to `require`.
 
 ## Connecting with password authentication
 

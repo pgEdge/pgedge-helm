@@ -1,4 +1,4 @@
-site_name: pgedge-helm
+site_name: pgEdge Helm
 
 extra_css:
   - stylesheets/extra.css

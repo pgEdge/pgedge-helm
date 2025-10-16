@@ -4,11 +4,11 @@ A single Kubernetes cluster is most commonly deployed in one region, with suppor
 
 Deploying across multiple Kubernetes clusters with pgEdge Distributed requires addressing two aspects:
 
-**Network Connectivity:** We must ensure that pgEdge nodes can connect across Kubernetes clusters with cross-cluster DNS using tools like Cilium or Submariner.
+**Network Connectivity:** We must ensure that pgEdge nodes can connect across Kubernetes clusters with cross-cluster DNS using tools such as [Cilium](https://cilium.io/) or [Submariner](https://submariner.io/).
 
 **Certificate Management:** We must ensure that managed users have consistent client certificates across all pgEdge nodes by copying certificates across clusters using different tools.
 
-These domains are well known in the Kubernetes community as part of operating other multi-cluster workloads, and customers often have solutions in place to manage them, so building a single approach into pgedge-helm doesn’t make sense.
+These domains are well known in the Kubernetes community as part of operating other multi-cluster workloads, and customers often have solutions in place to manage them, so building a single approach into the pgEdge Helm chart doesn’t make sense.
 
 Instead, the new chart includes a few configuration mechanisms to support multi-cluster deployments:
 

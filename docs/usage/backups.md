@@ -10,7 +10,12 @@ The current version of this chart does not provide wrapper configuration around 
 
 ## Backups via Barman Cloud CNPG-I plugin
 
-You can follow these steps to setup scheduled backups to an S3 bucket using the Barman Cloud CNPG-I plugin.
+You can follow these steps to setup scheduled backups to an AWS S3 bucket using the Barman Cloud CNPG-I plugin.
+
+!!! note
+    The Barman Cloud CNPG-I plugin supports additional ObjectStore providers, including Microsoft Azure Blob Storage, Google Cloud Storage, and additional S3-compatible services such as MinIO, Linode Object Storage, and Digital Ocean Spaces. 
+
+    For more information, refer to the [Barman Cloud CNPG-I plugin documentation](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
 
 1.  Install the Barman Cloud CNPG-I plugin
 
@@ -21,7 +26,7 @@ You can follow these steps to setup scheduled backups to an S3 bucket using the 
             https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.6.0/manifest.yaml
     ```
 
-    This step assumes you have already installed `cert-manager` as part of general instructions for this chart. If not, install that according to the `cert-manager` documentation.
+    This step assumes you have already installed `cert-manager` as part of general instructions for this chart. If not, install that according to the [cert-manager documentation](https://cert-manager.io/docs/installation/).
 
 2.  Create an S3 Bucket and issue an Access Key / Secret Access Key for a user which has access to the bucket.
 

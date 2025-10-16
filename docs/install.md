@@ -1,8 +1,12 @@
 # Installation
 
-This guide demonstrates how to install the pgedge-helm chart into a single Kubernetes cluster containing three nodes: n1, n2, and n3.
+pgEdge Helm supports both Enterprise and Distributed deployment models. This grants you flexibility to deploy across one or more regions with the same chart.
 
-In this single cluster example, n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary instance.
+This guide demonstrates how to install pgEdge Helm into a single Kubernetes cluster with the distributed deployment model.
+
+This example uses three pgEdge nodes: n1, n2, and n3 deployed into a single Kubernetes cluster.
+
+n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary instance.
 
 ```yaml
 pgEdge:
@@ -26,16 +30,40 @@ pgEdge:
       size: 1Gi
 ```
 
+You can also follow this guide for single region deployments with pgEdge Enterprise Postgres. 
+
+To do this, specify a single node `n1` under `nodes` with standby instances configured:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 3
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+  clusterSpec:
+    storage:
+      size: 1Gi
+```
+
+If you want to extend this configuration later to use a distributed architecture, see [Adding Nodes](usage/adding_nodes.md).
+
 **Prerequisites**
 
 To perform the installation, you'll need the following tools installed on your machine:
 
 - `helm`: The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
-    - [Install Helm](https://helm.sh/docs/intro/install/)
+  - [Install Helm](https://helm.sh/docs/intro/install/)
 - `kubectl`: The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
-    - [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+  - [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 - `kubectl cnpg` plugin: A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
-    - [Install CloudNativePG kubectl plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install)
+  - [Install CloudNativePG kubectl plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install)
 
 ## Step 1: Configure your kubectl context and namespace
 
@@ -97,11 +125,11 @@ kubectl wait --for=condition=Available deployment \
 
 ## Step 3: Install the chart
 
-To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package: 
+To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package:
 
 - the chart itself (the `./` at the end).
 - the configuration file (`values.yaml`).
- 
+
 1. **Navigate to the Correct Directory**  
    First, change your current directory to the location where you unzipped/downloaded the Helm chart.
 
@@ -147,13 +175,13 @@ TEST SUITE: None
 
 ## Uninstallation
 
-If you wish to uninstall the pgedge-helm chart, you can perform a `helm uninstall` using the following command:
+If you wish to uninstall the pgEdge Helm chart, you can perform a `helm uninstall` using the following command:
 
 ```shell
 helm uninstall pgedge
 ```
 
-All resources will be removed, with the exception of secrets which were created to store generated client certificates by `cert-manager`. 
+All resources will be removed, with the exception of secrets which were created to store generated client certificates by `cert-manager`.
 
 This is a safety mechanism which aligns with cert-manager's default behavior, and ensures that dependent services are not brought down by an accidental update.
 
