@@ -1,8 +1,25 @@
-# pgEdge Distributed Postgres Helm Chart
+# pgEdge Helm
 
 {{ template "chart.description" . }}
 
 {{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+## Features
+
+At a high level, this chart features support for:
+
+- Postgres 16, 17, and 18 via [pgEdge Enterprise Postgres Images](https://github.com/pgEdge/postgres-images).
+- Flexible deployment options for both single-region and multi-region deployments
+    - Deploy pgEdge Enterprise Postgres in a single region with optional standby replicas.
+    - Deploy pgEdge Distributed Postgres across multiple regions with Spock active-active replication.
+- Configuring Spock replication configuration across all nodes during helm install and upgrade processes.
+- Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes.
+- Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
+- Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
+- Adding pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups.
+- Performing Postgres major and minor version upgrades.
+- Client certificate authentication for managed users, including the `pgedge` replication user.
+- Configuration options to support deployments across multiple Kubernetes clusters.
 
 ## Prerequisites
 
@@ -11,171 +28,29 @@ In order for this chart to work, you must pre-install two operators into your Ku
 - [CloudNativePG](https://cloudnative-pg.io/)
 - [cert-manager](https://cert-manager.io/)
 
-## Installation & Usage
+## Documentation
 
-See the [Installation and Usage Guide](./docs/installation-usage.md) for installation and setup instructions for deploying this chart.
+The documentation for this chart uses MkDocs with the Material theme to generate styled static HTML documentation from Markdown files in the docs directory.
 
-## Configuration
+The documentation can be accessed locally at http://localhost:8000 using:
 
-This chart is built around managing each pgEdge node as a [CloudNativePG](https://cloudnative-pg.io/) `Cluster`.
-
-The chart contains a default `clusterSpec` in `values.yaml` which sets up required configuration for pgEdge, including:
-
-- Using the [pgEdge Enterprise Postgres Image](https://github.com/pgedge/postgres-images)
-- Loading and initializing required extensions for pgEdge Distributed Postgres
-- Setting up required PostgreSQL configuration parameters
-- Configuring client certificate authentication for managed users (app, admin, streaming_replica)
-- Allowing local connections for the `app` and `admin` users for testing / development purposes
-
-The simplest example values file, which deploys a single primary instance for each node, looks like this:
-
-```yaml
-pgEdge:
-  appName: pgedge
-  nodes:
-    - name: n1
-      hostname: pgedge-n1-rw
-    - name: n2
-      hostname: pgedge-n2-rw
-    - name: n3
-      hostname: pgedge-n3-rw
-  clusterSpec:
-    storage:
-      size: 1Gi
+```shell
+make docs
 ```
 
-As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
+### helm-docs
 
-In addition, you can override the `clusterSpec` for individual nodes.
+[helm-docs](https://github.com/norwoodj/helm-docs) is used to generate values.yaml reference documentation dynamically from `values.yaml`. 
 
-For example, to create a 3-node cluster with 3 instances on node `n1` and single instances on nodes `n2` and `n3`, you could use:
+This is in use in the following files:
 
-```yaml
-pgEdge:
-  appName: pgedge
-  nodes:
-    - name: n1
-      hostname: pgedge-n1-rw
-      clusterSpec:
-        instances: 3
-        postgresql:
-          synchronous:
-            method: any
-            number: 1
-            dataDurability: required
-    - name: n2
-      hostname: pgedge-n2-rw
-    - name: n3
-      hostname: pgedge-n3-rw
-```
+- README.md.gotmpl
+  - generates README.md
+- docs/configuration.md.gotmpl
+  - generates docs/configuration.md
 
-This override behavior is enabled via `mergeOverwrite` in Helm. You should be mindful that lists are replaced, not merged.
+You can run `make gen-docs` after updating the templates to generate the associated markdown file.
 
-If you override a list in the `clusterSpec` for a node, you must include all required elements in that list, pulling from the values file example, and using `helm template` to verify your configuration.
-
-For more information on configuring CloudNativePG, be sure to reference their documentation at https://cloudnative-pg.io/docs/
-
-## Certificates
-
-This chart leverages `cert-manager` to create a self-signed CA and issue client certificates for a set of managed users on each node:
-
-- `app`: a user for application connections
-- `admin`: a superuser for administrative purposes
-- `pgedge`: used for multi-active replication connections between nodes
-- `streaming_replica`: used for physical replication connections between nodes
-
-This makes it easier to get started with pgEdge, but you may want to use your own CA in production.
-
-In that case, you can disable the self-signed CA creation and certificate issuance by setting
-`pgEdge.provisionCerts` to `false`, and issuing your own certificates using cert-manager or another tool.
-
-These can then be plugged into your clusterSpec accordingly:
-
-```yaml
-pgEdge:
-  appName: pgedge
-  provisionCerts: false
-  nodes:
-    - name: n1
-      hostname: pgedge-n1-rw       
-    - name: n2
-      hostname: pgedge-n2-rw
-    - name: n3
-      hostname: pgedge-n3-rw
-  clusterSpec:
-    storage:
-      size: 1Gi
-    certificates:
-        clientCASecret: <secret-containing-client-ca>
-        replicationTLSSecret: <secret-containing-replication-tls-cert>
-```
-
-## Spock initialization
-
-This chart contains a python job to initialize spock multi-master replication across all nodes once they are all available.
-
-This job runs by default, waiting for any clusters within the namespace to be ready before performing initialization.
-
-If you wish to disable this behavior, you can set `pgEdge.initSpock` to `false`.
-
-### snowflake.node and lolor.node
-
-This chart automatically configures `snowflake.node` and `lolor.node` based on the `name` property of each node.
-
-For example, a node named `n1` will have the following Postgres configuration applied to the node to ensure snowflake and lolor are configured appropriately:
-
-```yaml
-  postgresql:
-    parameters:
-      ...
-      lolor.node: "1"
-      snowflake.node: "1"
-```
-
-If you wish to override this behavior, or plan to utilize alternate naming schemes for your node, you can set the `ordinal` property for each node:
-
-```yaml
-pgEdge:
-  appName: pgedge
-  nodes:
-    - name: a
-      hostname: pgedge-a-rw
-      ordinal: 1
-    - name: b
-      hostname: pgedge-b-rw
-      ordinal: 2
-    - name: c
-      hostname: pgedge-c-rw
-      ordinal: 3
-  clusterSpec:
-    storage:
-      size: 1Gi
-```
-
-## Multi-cluster considerations
-
-If you are deploying nodes across multiple Kubernetes clusters, you must take additional steps to leverage this chart, since Helm is not designed to manage resources across multiple clusters by default.
-
-This includes:
-
-1. Installing the required operators (CloudNativePG and cert-manager) into each Kubernetes cluster.
-2. Creating required certificates for managed users (app, admin, pgedge, streaming_replica) in each Kubernetes cluster.
-3. Installing the chart into each Kubernetes cluster separately, with the following configuration:
-  a. Setting `pgEdge.initSpock` to `false` to defer spock initialization until a later deployment.
-  b. Setting the `pgEdge.nodes` property to only list nodes which should be deployed in a particular cluster.
-4. Exposing the read/write services for each node across clusters using Kubernetes network tools like Cilium or Submariner to enable cross-cluster DNS and connectivity.
-5. Installing the chart into one of the clusters with all nodes listed under `pgEdge.externalNodes` and `pgEdge.initSpock` set to `true` to initialize spock configuration.
-
-## Limitations
-
-- Certificate Management: The chart creates a self-signed CA and issues certificates for managed users on each node, but it does not issue or configure server certificates.
-  - You may manage server certificates yourself using cert-manager and CloudNativePG, but the chart may require modification to use verify-full mode for client connections.
-- Node Management: Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but writes must be stopped on existing nodes during the upgrade.
-  - See the [Installation and Usage Guide](./docs/installation-usage.md) for more information.
-- App database name: The app database is named "app" by default, and cannot be renamed without modifying various Helm templates and the default values.yaml file.
-- Major Version Upgrades: The chart does not currently support in-place major version upgrades for existing nodes.
-  - You can use spock to bootstrap upgraded nodes into your cluster, but writes must be stopped on existing nodes during the upgrade process.
-  - See the [Installation and Usage Guide](./docs/installation-usage.md) for more information.
 {{ template "chart.requirementsSection" . }}
 
 {{ template "chart.valuesSection" . }}
