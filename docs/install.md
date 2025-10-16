@@ -30,12 +30,12 @@ pgEdge:
 
 To perform the installation, you'll need the following tools installed on your machine:
 
-- `helm` – [https://helm.sh/](https://helm.sh/)
-    - Homebrew install command: `brew install helm`
-- `kubectl` – [https://kubernetes.io/docs/tasks/tools/#kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-    - Homebrew install command: `brew install kubectl`
-- `kubectl` CloudNativePG plugin – [https://cloudnative-pg.io/documentation/current/kubectl-plugin/](https://cloudnative-pg.io/documentation/current/kubectl-plugin/)
-    - Homebrew install command: `brew install kubectl-cnpg`
+- `helm`: The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
+    - [Install Helm](https://helm.sh/docs/intro/install/)
+- `kubectl`: The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
+    - [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- `kubectl cnpg` plugin: A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
+    - [Install CloudNativePG kubectl plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install)
 
 ## Step 1: Configure your kubectl context and namespace
 
