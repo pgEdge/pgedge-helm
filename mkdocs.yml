@@ -24,6 +24,7 @@ theme:
     - navigation.prune
     - navigation.top
     - toc.follow
+    - content.code.copy
 
   palette:
     - media: "(prefers-color-scheme: light)"
