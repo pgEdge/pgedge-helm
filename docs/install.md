@@ -118,7 +118,9 @@ kubectl wait --for=condition=Available deployment \
 
 ## Step 3: Install the chart
 
-To install the Helm chart, run the `helm install` command from the directory containing the downloaded `pgedge-helm` package.
+Download the latest `pgedge-helm` release package from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/).  
+
+After downloading and extracting the package, run the `helm install` command from the directory containing the extracted `pgedge-helm` chart.
 
 1. **Navigate to the Correct Directory**  
    First, change your current directory to the location where you unzipped/downloaded the Helm chart.
