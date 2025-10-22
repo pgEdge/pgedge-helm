@@ -58,12 +58,9 @@ If you want to extend this configuration later to use a distributed architecture
 
 To perform the installation, you'll need the following tools installed on your machine:
 
-- `helm`: The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
-  - [Install Helm](https://helm.sh/docs/intro/install/)
-- `kubectl`: The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
-  - [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-- `kubectl cnpg` plugin: A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
-  - [Install CloudNativePG kubectl plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install)
+- [helm](https://helm.sh/docs/intro/install/): The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
+- [kubectl cnpg plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
 
 ## Step 1: Configure your kubectl context and namespace
 
@@ -111,24 +108,17 @@ First, install the `CloudNativePG` and `cert-manager` operators into your cluste
 ```shell
 kubectl apply --server-side -f \
 https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
-```
 
-```shell
 kubectl apply -f \
 https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-```
 
-```shell
 kubectl wait --for=condition=Available deployment \
 	-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
 ```
 
 ## Step 3: Install the chart
 
-To install the Helm chart, you need to run the `helm install` command from the correct directory. This command needs access to two key parts of the downloaded `pgedge-helm` package:
-
-- the chart itself (the `./` at the end).
-- the configuration file (`values.yaml`).
+To install the Helm chart, run the `helm install` command from the directory containing the downloaded `pgedge-helm` package.
 
 1. **Navigate to the Correct Directory**  
    First, change your current directory to the location where you unzipped/downloaded the Helm chart.
