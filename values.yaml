@@ -1,98 +1,84 @@
-# -- Additional annotations to apply to all created objects.
-annotations: {}
-# -- Additional labels to apply to all created objects.
-labels: {}
-service:
-  # -- The name of the Service created by this chart.
-  name: pgedge
-  # -- Additional annotations to apply the the Service.
-  annotations: {}
-  type: ClusterIP
-  externalTrafficPolicy: Cluster
-  loadBalancerSourceRanges: []
-  loadBalancerIP: ""
-  clusterIP: ""
-  sessionAffinity: None
-  sessionAffinityConfig: {}
 pgEdge:
-  # -- Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other
+  # -- Determines the name of resources in the pgEdge cluster. Many other
   # values are derived from this name, so it must be less than or equal to 26 characters in length.
   appName: pgedge
-  # -- Set a custom image tag from the docker.io/pgedge/pgedge repository.
-  imageTag: pg16-latest
-  # -- Sets how pods are created during the initial scale up. Parallel results in a faster cluster
-  # initialization.
-  podManagementPolicy: Parallel
-  # -- The name of an existing users secret in the release namespace. If not specified, a new secret
-  # will generate random passwords for each user and store them in a new secret. See the
-  # pgedge-docker README for the format of this secret:
-  # https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration
-  existingUsersSecret: ""
-  # -- Sets the number of replicas in the pgEdge StatefulSet.
-  nodeCount: 3
-  terminationGracePeriodSeconds: 10
-  # -- Specify additional labels to be used in the StatefulSet, Service, and other selectors.
-  extraMatchLabels: {}
-  podAffinity: {}
-  # -- Disable the default pod anti-affinity. By default, this chart uses a
-  # preferredDuringSchedulingIgnoredDuringExecution anti-affinity to spread the replicas across
-  # different nodes if possible.
-  podAntiAffinityEnabled: true
-  # -- Override the default pod anti-affinity.
-  podAntiAffinityOverride: {}
-  nodeAffinity: {}
-  # -- Set resource requests and limits. There are none by default.
-  resources: {}
-  pdb:
-    # -- Enables the creation of a PodDisruptionBudget for pgEdge.
-    create: false
-    minAvailable: 1
-    maxUnavailable: ""
-  port: 5432
-  livenessProbe:
-    enabled: true
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 6
-    successThreshold: 1
-  readinessProbe:
-    enabled: true
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 5
-    failureThreshold: 6
-    successThreshold: 1
-  dbSpec:
-    # -- The name of the database to create.
-    dbName: defaultdb
-    # -- Used to override the nodes in the generated db spec. This can be useful
-    # in multi-cluster setups, like the included multi-cluster example.
-    nodes: []
-    # -- Options for the database
-    options: ["autoddl:enabled"]
-    # -- Database users to be created.
-    users:
-    - username: app
-      superuser: false
-      service: postgres
-      type: application
-    - username: admin
-      superuser: true
-      service: postgres
-      type: admin
-      
-global:
-  # -- Set to the cluster's domain if the cluster uses a custom domain.
-  clusterDomain: cluster.local
-storage:
-  accessModes: [ "ReadWriteOnce" ]
-  className: standard
-  selector: {}
-  labels: {}
-  annotations: {}
-  size: 8Gi
-  retentionPolicy:
-    enabled: false
-    whenDeleted: Retain
-    whenScaled: Retain
+  # -- Whether to deploy cert-manager to manage TLS certificates for the cluster.
+  # If false, you must provide your own TLS certificates by creating the secrets defined in
+  # `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`.
+  provisionCerts: true
+  # -- Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster.
+  nodes: []
+  # -- Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart.
+  # This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster.
+  externalNodes: []
+  # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
+  # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
+  initSpock: true
+  # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
+  # using the `clusterSpec` field in each node definition.
+  clusterSpec:
+    instances: 1
+    imagePullPolicy: Always
+    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+    certificates:
+        clientCASecret: client-ca-key-pair
+        replicationTLSSecret: streaming-replica-client-cert
+    bootstrap:
+      initdb:
+        database: app
+        owner: app
+        encoding: UTF8
+        postInitSQL: []
+        postInitApplicationSQL:
+          - CREATE EXTENSION spock;
+        postInitTemplateSQL: []
+    managed:
+      roles:
+      - name: admin
+        ensure: present
+        comment: Admin role
+        login: true
+        superuser: true
+    postgresql:
+      parameters:
+        dynamic_shared_memory_type: "posix"
+        wal_level: "logical"
+        checkpoint_timeout: "15min"
+        checkpoint_completion_target: "0.9"
+        wal_sender_timeout: "5s"
+        track_commit_timestamp: "on"
+        hot_standby_feedback: "on"
+        track_io_timing: "on"
+        spock.enable_ddl_replication: "on"
+        spock.include_ddl_repset: "on"
+        spock.allow_ddl_from_functions: "on"
+        spock.conflict_resolution: "last_update_wins"
+        spock.save_resolutions: "on"
+        spock.conflict_log_level: "DEBUG"
+      shared_preload_libraries:
+        - pg_stat_statements
+        - snowflake
+        - spock
+      pg_hba:
+        - hostssl app pgedge 0.0.0.0/0 cert
+        - hostssl app admin 0.0.0.0/0 cert
+        - hostssl app app 0.0.0.0/0 cert
+        - hostssl all streaming_replica all cert map=cnpg_streaming_replica
+      pg_ident:
+        - local postgres admin
+        - local postgres app
+    projectedVolumeTemplate:
+      sources:
+        - secret:
+            name: pgedge-client-cert
+            items:
+              - key: tls.crt
+                path: pgedge/certificates/tls.crt
+                mode: 0600 
+              - key: tls.key
+                path: pgedge/certificates/tls.key
+                mode: 0600 
+              - key: ca.crt
+                path: pgedge/certificates/ca.crt
+                mode: 0600 
+    

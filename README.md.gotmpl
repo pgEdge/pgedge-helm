@@ -1,54 +1,55 @@
-{{ template "chart.header" . }}
+# pgEdge Helm
+
 {{ template "chart.description" . }}
 
 {{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
 
-## Commonly used values
+## Features
 
-Most users will want to specify a database name and user names:
+At a high level, this chart features support for:
 
-```yaml
-pgEdge:
-  dbSpec:
-    dbName: my_application
-    users:
-      - username: my_application
-        superuser: false
-        service: postgres
-        type: application
-      - username: admin
-        # Note this user will only have a subset of superuser privileges to exclude the abilities to
-        # read files and execute programs on the host.
-        superuser: true
-        service: postgres
-        type: admin
+- Postgres 16, 17, and 18 via [pgEdge Enterprise Postgres Images](https://github.com/pgEdge/postgres-images).
+- Flexible deployment options for both single-region and multi-region deployments
+    - Deploy pgEdge Enterprise Postgres in a single region with optional standby replicas.
+    - Deploy pgEdge Distributed Postgres across multiple regions with Spock active-active replication.
+- Configuring Spock replication configuration across all nodes during helm install and upgrade processes.
+- Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes.
+- Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
+- Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
+- Adding pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups.
+- Performing Postgres major and minor version upgrades.
+- Client certificate authentication for managed users, including the `pgedge` replication user.
+- Configuration options to support deployments across multiple Kubernetes clusters.
+
+## Prerequisites
+
+In order for this chart to work, you must pre-install two operators into your Kubernetes clusters:
+
+- [CloudNativePG](https://cloudnative-pg.io/)
+- [cert-manager](https://cert-manager.io/)
+
+## Documentation
+
+The documentation for this chart uses MkDocs with the Material theme to generate styled static HTML documentation from Markdown files in the docs directory.
+
+The documentation can be accessed locally at http://localhost:8000 using:
+
+```shell
+make docs
 ```
 
-> [!WARNING]
-> Do not update database users via the Helm chart after they're created. Instead, you should either
-> modify the `pgedge-users` secret directly or create a new secret with updated values and specify
-> it via the `pgEdge.existingUsersSecret` value. See the [Limitations](#limitations) section below
-> for additional caveats on user management.
+### helm-docs
 
-## Examples
+[helm-docs](https://github.com/norwoodj/helm-docs) is used to generate values.yaml reference documentation dynamically from `values.yaml`. 
 
-See the [examples README](./examples/README.md) for instructions to try this chart using local
-Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
+This is in use in the following files:
 
-## Limitations
+- README.md.gotmpl
+  - generates README.md
+- docs/configuration.md.gotmpl
+  - generates docs/configuration.md
 
-Most of the pgEdge cluster configuration is set when it's first initialized, and further changes to
-the configuration are not read. This behavior affects two main areas:
-
-- Horizontal scaling
-  - Increasing the number of nodes in the cluster beyond its initial configuration requires
-    additional work to notify the existing pgEdge nodes about the new pgEdge nodes.
-- User management
-  - After initialization, the only user that's read from the users secret at startup is the internal
-    `pgedge` user.
-  - New users can be created via SQL, but note that they must be created on every pgEdge separately.
-  - Similarly, credential rotation must be performed on each pgEdge node individually. In the case
-    of the `pgedge` user, the password in `pgedge-users` secret should also be updated.
+You can run `make gen-docs` after updating the templates to generate the associated markdown file.
 
 {{ template "chart.requirementsSection" . }}
 

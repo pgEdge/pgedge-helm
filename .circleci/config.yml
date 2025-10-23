@@ -62,8 +62,6 @@ jobs:
           name: Helm lint
           command: |
             helm lint . --values examples/configs/single/values.yaml
-            helm lint . --values examples/configs/multi/iad/values.yaml
-            helm lint . --values examples/configs/multi/sfo/values.yaml
       - run:
           name: Cluster up
           command: |
@@ -72,11 +70,6 @@ jobs:
           name: Install pgedge
           command: |
             make -f examples/Makefile single-install
-            # Wait until at least one pod is ready
-            kubectl wait pod \
-              --for=condition=ready \
-              --selector='app.kubernetes.io/name=pgedge' \
-              --timeout=45s
       - run:
           name: Helm test
           command: |

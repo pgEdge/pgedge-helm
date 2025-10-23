@@ -1,113 +1,68 @@
-# pgEdge Distributed Postgres Helm Chart
+# pgEdge Helm
 
-This chart installs pgEdge Distributed Postgres as a StatefulSet.
+The **pgEdge Helm** chart supports deploying both pgEdge Enterprise Postgres and pgEdge Distributed Postgres in Kubernetes.
 
-![Version: 0.0.2](https://img.shields.io/badge/Version-0.0.2-informational?style=flat-square)
+This chart leverages [CloudNativePG](https://cloudnative-pg.io/) to manage Postgres, providing flexible options for single-region and multi-region deployments.
 
-## Commonly used values
+![Version: 0.0.3](https://img.shields.io/badge/Version-0.0.3-informational?style=flat-square)
 
-Most users will want to specify a database name and user names:
+## Features
 
-```yaml
-pgEdge:
-  dbSpec:
-    dbName: my_application
-    users:
-      - username: my_application
-        superuser: false
-        service: postgres
-        type: application
-      - username: admin
-        # Note this user will only have a subset of superuser privileges to exclude the abilities to
-        # read files and execute programs on the host.
-        superuser: true
-        service: postgres
-        type: admin
+At a high level, this chart features support for:
+
+- Postgres 16, 17, and 18 via [pgEdge Enterprise Postgres Images](https://github.com/pgEdge/postgres-images).
+- Flexible deployment options for both single and multi-region deployments
+    - Deploy pgEdge Enterprise Postgres in a single region with optional standby replicas.
+    - Deploy pgEdge Distributed Postgres across multiple regions with Spock active-active replication.
+- Configuring Spock replication configuration across all nodes during helm install and upgrade processes.
+- Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes.
+- Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
+- Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
+- Adding pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups.
+- Performing Postgres major and minor version upgrades.
+- Client certificate authentication for managed users, including the `pgedge` replication user.
+- Configuration options to support deployments across multiple Kubernetes clusters.
+
+## Prerequisites
+
+In order for this chart to work, you must pre-install two operators into your Kubernetes clusters:
+
+- [CloudNativePG](https://cloudnative-pg.io/)
+- [cert-manager](https://cert-manager.io/)
+
+## Documentation
+
+The documentation for this chart uses MkDocs with the Material theme to generate styled static HTML documentation from Markdown files in the docs directory.
+
+The documentation can be accessed locally at http://localhost:8000 using:
+
+```shell
+make docs
 ```
 
-> [!WARNING]
-> Do not update database users via the Helm chart after they're created. Instead, you should either
-> modify the `pgedge-users` secret directly or create a new secret with updated values and specify
-> it via the `pgEdge.existingUsersSecret` value. See the [Limitations](#limitations) section below
-> for additional caveats on user management.
+### helm-docs
 
-## Examples
+[helm-docs](https://github.com/norwoodj/helm-docs) is used to generate values.yaml reference documentation dynamically from `values.yaml`.
 
-See the [examples README](./examples/README.md) for instructions to try this chart using local
-Kubernetes clusters created with [`kind`](https://kind.sigs.k8s.io/).
+This is in use in the following files:
 
-## Limitations
+- README.md.gotmpl
+  - generates README.md
+- docs/configuration.md.gotmpl
+  - generates docs/configuration.md
 
-Most of the pgEdge cluster configuration is set when it's first initialized, and further changes to
-the configuration are not read. This behavior affects two main areas:
-
-- Horizontal scaling
-  - Increasing the number of nodes in the cluster beyond its initial configuration requires
-    additional work to notify the existing pgEdge nodes about the new pgEdge nodes.
-- User management
-  - After initialization, the only user that's read from the users secret at startup is the internal
-    `pgedge` user.
-  - New users can be created via SQL, but note that they must be created on every pgEdge separately.
-  - Similarly, credential rotation must be performed on each pgEdge node individually. In the case
-    of the `pgedge` user, the password in `pgedge-users` secret should also be updated.
+You can run `make gen-docs` after updating the templates to generate the associated markdown file.
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| annotations | object | `{}` | Additional annotations to apply to all created objects. |
-| global.clusterDomain | string | `"cluster.local"` | Set to the cluster's domain if the cluster uses a custom domain. |
-| labels | object | `{}` | Additional labels to apply to all created objects. |
-| pgEdge.appName | string | `"pgedge"` | Determines the name of the pgEdge StatefulSet and theapp.kubernetes.io/name label. Many other values are derived from this name, so it must be less than or equal to 26 characters in length. |
-| pgEdge.dbSpec.dbName | string | `"defaultdb"` | The name of the database to create. |
-| pgEdge.dbSpec.nodes | list | `[]` | Used to override the nodes in the generated db spec. This can be useful in multi-cluster setups, like the included multi-cluster example. |
-| pgEdge.dbSpec.options | list | `["autoddl:enabled"]` | Options for the database |
-| pgEdge.dbSpec.users | list | `[{"service":"postgres","superuser":false,"type":"application","username":"app"},{"service":"postgres","superuser":true,"type":"admin","username":"admin"}]` | Database users to be created. |
-| pgEdge.existingUsersSecret | string | `""` | The name of an existing users secret in the release namespace. If not specified, a new secret will generate random passwords for each user and store them in a new secret. See the pgedge-docker README for the format of this secret: https://github.com/pgEdge/pgedge-docker?tab=readme-ov-file#database-configuration |
-| pgEdge.extraMatchLabels | object | `{}` | Specify additional labels to be used in the StatefulSet, Service, and other selectors. |
-| pgEdge.imageTag | string | `"pg16-latest"` | Set a custom image tag from the docker.io/pgedge/pgedge repository. |
-| pgEdge.livenessProbe.enabled | bool | `true` |  |
-| pgEdge.livenessProbe.failureThreshold | int | `6` |  |
-| pgEdge.livenessProbe.initialDelaySeconds | int | `30` |  |
-| pgEdge.livenessProbe.periodSeconds | int | `10` |  |
-| pgEdge.livenessProbe.successThreshold | int | `1` |  |
-| pgEdge.livenessProbe.timeoutSeconds | int | `5` |  |
-| pgEdge.nodeAffinity | object | `{}` |  |
-| pgEdge.nodeCount | int | `3` | Sets the number of replicas in the pgEdge StatefulSet. |
-| pgEdge.pdb.create | bool | `false` | Enables the creation of a PodDisruptionBudget for pgEdge. |
-| pgEdge.pdb.maxUnavailable | string | `""` |  |
-| pgEdge.pdb.minAvailable | int | `1` |  |
-| pgEdge.podAffinity | object | `{}` |  |
-| pgEdge.podAntiAffinityEnabled | bool | `true` | Disable the default pod anti-affinity. By default, this chart uses a preferredDuringSchedulingIgnoredDuringExecution anti-affinity to spread the replicas across different nodes if possible. |
-| pgEdge.podAntiAffinityOverride | object | `{}` | Override the default pod anti-affinity. |
-| pgEdge.podManagementPolicy | string | `"Parallel"` | Sets how pods are created during the initial scale up. Parallel results in a faster cluster initialization. |
-| pgEdge.port | int | `5432` |  |
-| pgEdge.readinessProbe.enabled | bool | `true` |  |
-| pgEdge.readinessProbe.failureThreshold | int | `6` |  |
-| pgEdge.readinessProbe.initialDelaySeconds | int | `5` |  |
-| pgEdge.readinessProbe.periodSeconds | int | `5` |  |
-| pgEdge.readinessProbe.successThreshold | int | `1` |  |
-| pgEdge.readinessProbe.timeoutSeconds | int | `5` |  |
-| pgEdge.resources | object | `{}` | Set resource requests and limits. There are none by default. |
-| pgEdge.terminationGracePeriodSeconds | int | `10` |  |
-| service.annotations | object | `{}` | Additional annotations to apply the the Service. |
-| service.clusterIP | string | `""` |  |
-| service.externalTrafficPolicy | string | `"Cluster"` |  |
-| service.loadBalancerIP | string | `""` |  |
-| service.loadBalancerSourceRanges | list | `[]` |  |
-| service.name | string | `"pgedge"` | The name of the Service created by this chart. |
-| service.sessionAffinity | string | `"None"` |  |
-| service.sessionAffinityConfig | object | `{}` |  |
-| service.type | string | `"ClusterIP"` |  |
-| storage.accessModes[0] | string | `"ReadWriteOnce"` |  |
-| storage.annotations | object | `{}` |  |
-| storage.className | string | `"standard"` |  |
-| storage.labels | object | `{}` |  |
-| storage.retentionPolicy.enabled | bool | `false` |  |
-| storage.retentionPolicy.whenDeleted | string | `"Retain"` |  |
-| storage.retentionPolicy.whenScaled | string | `"Retain"` |  |
-| storage.selector | object | `{}` |  |
-| storage.size | string | `"8Gi"` |  |
+| pgEdge.appName | string | `"pgedge"` | Determines the name of resources in the pgEdge cluster. Many other values are derived from this name, so it must be less than or equal to 26 characters in length. |
+| pgEdge.clusterSpec | object | `{"bootstrap":{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;"],"postInitSQL":[],"postInitTemplateSQL":[]}},"certificates":{"clientCASecret":"client-ca-key-pair","replicationTLSSecret":"streaming-replica-client-cert"},"imageName":"ghcr.io/pgedge/pgedge-postgres:17-spock5-standard","imagePullPolicy":"Always","instances":1,"managed":{"roles":[{"comment":"Admin role","ensure":"present","login":true,"name":"admin","superuser":true}]},"postgresql":{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"pg_hba":["hostssl app pgedge 0.0.0.0/0 cert","hostssl app admin 0.0.0.0/0 cert","hostssl app app 0.0.0.0/0 cert","hostssl all streaming_replica all cert map=cnpg_streaming_replica"],"pg_ident":["local postgres admin","local postgres app"],"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]},"projectedVolumeTemplate":{"sources":[{"secret":{"items":[{"key":"tls.crt","mode":384,"path":"pgedge/certificates/tls.crt"},{"key":"tls.key","mode":384,"path":"pgedge/certificates/tls.key"},{"key":"ca.crt","mode":384,"path":"pgedge/certificates/ca.crt"}],"name":"pgedge-client-cert"}}]}}` | Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis using the `clusterSpec` field in each node definition. |
+| pgEdge.externalNodes | list | `[]` | Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart. This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster. |
+| pgEdge.initSpock | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |
+| pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
+| pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

@@ -1,8 +1,19 @@
 pgEdge:
-  nodeCount: 2
-  terminationGracePeriodSeconds: 0
-storage:
-  size: 1Gi
-  retentionPolicy:
-    enabled: true
-    whenDeleted: Delete
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec: 
+        instances: 3
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+  clusterSpec:
+    storage:
+      size: 1Gi

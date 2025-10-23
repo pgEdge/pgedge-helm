@@ -1,0 +1,11 @@
+{{ include "validate.newNodes" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-config" .Values.pgEdge.appName }}
+data:
+  nodes: |-
+    {{- $nodes := default (list) .Values.pgEdge.nodes -}}
+    {{- $ext   := default (list) .Values.pgEdge.externalNodes -}}
+    {{- $all   := concat $nodes $ext -}}
+    {{ toYaml $all | nindent 4 }}

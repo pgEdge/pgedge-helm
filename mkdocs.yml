@@ -1,0 +1,67 @@
+site_name: pgEdge Helm
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+
+plugins:
+  - search
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+
+  logo_dark_mode: 'img/logo-dark.png'
+  logo_light_mode: 'img/logo-light.png'
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.prune
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+extra:
+  generator: false
+
+copyright: Copyright &copy; 2023 - 2025 pgEdge, Inc
+repo_url: https://github.com/pgEdge/pgedge-helm
+
+nav:
+  - Introduction: index.md
+  - Installation: install.md
+  - Configuration: configuration.md
+  - Usage Guides:
+    - Connecting To Postgres: usage/connecting.md
+    - Monitoring: usage/monitoring.md
+    - Adding Nodes: usage/adding_nodes.md
+    - Removing Nodes: usage/removing_nodes.md
+    - Configuring Backups: usage/backups.md
+    - Upgrading Postgres: usage/postgres_upgrades.md
+    - Configuring Standby Instances: usage/standby.md
+  - Certificate Management: certificates.md
+  - Multi-cluster Deployments: multicluster.md
+  - Testing Locally: testing-locally.md
+  - Limitations: limitations.md

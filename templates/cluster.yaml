@@ -1,0 +1,41 @@
+{{- $ := . -}}
+{{- $defaults := .Values.pgEdge.clusterSpec -}}
+{{- $total := len .Values.pgEdge.nodes -}}
+
+{{- range $i, $node := .Values.pgEdge.nodes }}
+{{- $spec    := (default dict $node.clusterSpec) -}}
+{{- $merged  := mergeOverwrite (deepCopy $defaults) $spec -}}
+
+{{- /* derive ordinal */ -}}
+{{- $ord := "" -}}
+{{- if hasKey $node "ordinal" -}}
+  {{- $ord = $node.ordinal -}}
+{{- else -}}
+  {{- $ord = (trimPrefix "n" $node.name) -}}
+{{- end -}}
+{{- $ordStr := printf "%v" $ord -}}
+
+{{- /* ensure postgresql.parameters exists */ -}}
+{{- if not (hasKey $merged "postgresql") -}}
+  {{- $_ := set $merged "postgresql" (dict) -}}
+{{- end -}}
+{{- if not (hasKey $merged.postgresql "parameters") -}}
+  {{- $_ := set $merged.postgresql "parameters" (dict) -}}
+{{- end -}}
+
+{{- /* inject node-specific params */ -}}
+{{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
+{{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
+
+{{- if gt $i 0 }}
+---
+{{- end }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ printf "%s-%s" $.Values.pgEdge.appName $node.name }}
+  labels:
+    pgedge.com/app-name: {{ printf "%s" $.Values.pgEdge.appName }}
+spec:
+  {{- toYaml $merged | nindent 2 }}
+{{- end }}

@@ -7,3 +7,4 @@ broker-info.subm*
 .gitignore
 kubeconfig
 README.md.gotmpl
+.venv

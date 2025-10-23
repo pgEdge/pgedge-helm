@@ -1,14 +1,12 @@
 annotations:
   category: Database
-  images: |
-    - name: postgres
-      image: docker.io/pgedge/pgedge:367d6e0
 apiVersion: v2
 name: pgedge
 description: |
-  pgEdge is fully distributed PostgreSQL with multi-active replication. This
-  chart installs pgEdge Postgres as a StatefulSet.
+  The **pgEdge Helm** chart supports deploying both pgEdge Enterprise Postgres and pgEdge Distributed Postgres in Kubernetes. 
+
+  This chart leverages [CloudNativePG](https://cloudnative-pg.io/) to manage Postgres, providing flexible options for single-region and multi-region deployments.
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm
-version: 0.0.2
+version: 0.0.3
