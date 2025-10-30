@@ -10,13 +10,17 @@ markdown_extensions:
 
 plugins:
   - search
-
+  - macros:
+      j2_variable_start_string: "<<"
+      j2_variable_end_string: ">>"
+      j2_comment_start_string: "<#"
+      j2_comment_end_string: "#>"
 theme:
   name: material
   custom_dir: docs/overrides
 
-  logo_dark_mode: 'img/logo-dark.png'
-  logo_light_mode: 'img/logo-light.png'
+  logo_dark_mode: "img/logo-dark.png"
+  logo_light_mode: "img/logo-light.png"
 
   features:
     - navigation.instant
@@ -45,22 +49,25 @@ theme:
 
 extra:
   generator: false
+  cnpg_manifest_url: https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.1.yaml
+  certmanager_manifest_url: https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 
 copyright: Copyright &copy; 2023 - 2025 pgEdge, Inc
 repo_url: https://github.com/pgEdge/pgedge-helm
 
 nav:
   - Introduction: index.md
+  - Quickstart: quickstart.md
   - Installation: install.md
   - Configuration: configuration.md
   - Usage Guides:
-    - Connecting To Postgres: usage/connecting.md
-    - Monitoring: usage/monitoring.md
-    - Adding Nodes: usage/adding_nodes.md
-    - Removing Nodes: usage/removing_nodes.md
-    - Configuring Backups: usage/backups.md
-    - Upgrading Postgres: usage/postgres_upgrades.md
-    - Configuring Standby Instances: usage/standby.md
+      - Connecting To Postgres: usage/connecting.md
+      - Monitoring: usage/monitoring.md
+      - Adding Nodes: usage/adding_nodes.md
+      - Removing Nodes: usage/removing_nodes.md
+      - Configuring Backups: usage/backups.md
+      - Upgrading Postgres: usage/postgres_upgrades.md
+      - Configuring Standby Instances: usage/standby.md
   - Certificate Management: certificates.md
   - Multi-cluster Deployments: multicluster.md
   - Testing Locally: testing-locally.md

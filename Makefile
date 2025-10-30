@@ -5,4 +5,5 @@ gen-docs:
 
 .PHONY: docs
 docs:
-	docker run --rm -it -p 8000:8000 -v ${PWD}:/docs squidfunk/mkdocs-material
+	docker build -t pgedge-helm-docs ./docs
+	docker run --rm -it -p 8000:8000 -v ${PWD}:/docs pgedge-helm-docs
