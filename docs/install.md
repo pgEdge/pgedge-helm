@@ -107,10 +107,10 @@ First, install the `CloudNativePG` and `cert-manager` operators into your cluste
 
 ```shell
 kubectl apply --server-side -f \
-https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
+<< cnpg_manifest_url >>
 
 kubectl apply -f \
-https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+<< certmanager_manifest_url>>
 
 kubectl wait --for=condition=Available deployment \
 	-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s

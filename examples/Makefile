@@ -10,7 +10,7 @@ root_dir := $(abspath $(examples_dir)/..)
 single-up:
 	kind create cluster --config $(examples_dir)/configs/single/kind.yaml
 	kubectl apply --context kind-single --server-side -f \
-		https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.0.yaml
+		https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.1.yaml
 	kubectl apply --context kind-single -f \
 		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 	kubectl --context kind-single wait --for=condition=Available deployment \
