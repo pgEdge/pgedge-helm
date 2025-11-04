@@ -6,13 +6,13 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
 ## Prerequisites
 
-- Access to a Kubernetes cluster
-    - If you wish to run a cluster locally, we recommend using [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation).
-    - If you want to use `kind`, you can initialize a local Kubernetes cluster using this command:
+- Access to a Kubernetes cluster:
+    - To run a cluster locally, we recommend using [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation).
+    - To use `kind`, you can initialize a local Kubernetes cluster using this command:
         ``` sh
         kind create cluster --config examples/configs/single/kind.yaml
         ```
-- Required tools installed on your laptop to deploy and interact with Kubernetes and CloudNativePG
+- The following tools must be installed on your laptop to deploy and interact with Kubernetes and CloudNativePG:
     - [helm](https://helm.sh/docs/intro/install/): The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
     - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
     - [kubectl cnpg plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
@@ -21,11 +21,9 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
 1. Download the latest `pgedge-helm` release package from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/).  
 
-    After downloading and extracting the package on your machine, `cd` into the `pgedge-helm` directory.
+    After downloading and extracting the package on your machine, navigate into the `pgedge-helm` directory.
 
-2. Set your kubectl context and namespace
-
-    In order to ensure you will deploy the chart to the correct cluster, set your kubectl context and namespace.
+2. Set your kubectl context and namespace to ensure you will deploy the chart to the correct cluster. For example:
 
     ```sh
     kubectl config use-context <cluster-context> --namespace <desired-namespace>
@@ -33,7 +31,7 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
     If you are using `kind`, your context will be called `kind-single`.
 
-3. Install chart dependencies
+3. Install chart dependencies.
 
     pgEdge Helm requires the `CloudNativePG` and `cert-manager` operators to be installed into your cluster. Run the following commands to complete the required installation:
 
@@ -48,11 +46,11 @@ The guide covers basic usage of the Helm chart and its features, using either an
         -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
     ```
 
-4. Customize your chart configuration (optional)
+4. Customize your chart configuration (optional).
 
-    The chart includes an example configuration file at `examples/configs/single/values.yaml` which deploys three distributed pgEdge nodes deployed into a single Kubernetes cluster.
+    The chart includes a sample configuration file at `examples/configs/single/values.yaml` which deploys three distributed pgEdge nodes deployed into a single Kubernetes cluster.
 
-    n1 is configured with 3 instances (1 primary, 2 standby), and n2/n3 are configured with just 1 primary instance.
+    `n1` is configured with 3 instances (1 primary, 2 standby), and nodes `n2` and `n3` are configured with a single primary instance.
 
     You can also follow this guide to test out a single region deployment by removing the configuration for `n2` and `n3` under `nodes` in the configuration file:
 
@@ -76,7 +74,7 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
     If you want to change your configuration later to use a distributed architecture, see [Adding Nodes](usage/adding_nodes.md).
 
-5. Install the chart
+5. Install the chart with the command:
 
     ```sh
         helm install \
@@ -96,9 +94,7 @@ The guide covers basic usage of the Helm chart and its features, using either an
         TEST SUITE: None
     ```
 
-## Connecting to each database instance
-
-### With `kubectl cnpg`
+## Connecting to each Database Instance
 
 If you have the `kubectl cnpg` plugin installed on your machine, you can
 access each instance as follows:
@@ -117,7 +113,7 @@ kubectl cnpg psql pgedge-n2 -- -U app app
 kubectl cnpg psql pgedge-n3 -- -U app app
 ```
 
-## Try out replication
+## Trying out Replication
 
 1. Create a table on the first node:
 
@@ -137,9 +133,9 @@ kubectl cnpg psql pgedge-n3 -- -U app app
     kubectl cnpg psql pgedge-n1 -- -U app app -c "select * from example;"
     ```
 
-## Load the Northwind example dataset
+## Loading the Northwind Sample dataset
 
-The Northwind example dataset is a PostgreSQL database dump that you can use to
+The Northwind sample dataset is a PostgreSQL database dump that you can use to
 try replication with a more realistic database. To load the Northwind dataset
 into your pgEdge database, run:
 
@@ -154,17 +150,15 @@ Now, try querying one of the new tables from the another node:
 kubectl cnpg psql pgedge-n2 -- -U app app -c "select * from northwind.shippers"
 ```
 
-## Uninstall
+## Uninstalling the Helm Chart
 
-If you wish to uninstall the pgEdge Helm chart, you can perform a `helm uninstall` using the following command:
+If you wish to uninstall the pgEdge Helm chart, you can perform a `helm uninstall` with the following command:
 
 ```shell
 helm uninstall pgedge
 ```
 
-All resources will be removed, with the exception of secrets which were created to store generated client certificates by `cert-manager`.
-
-This is a safety mechanism which aligns with cert-manager's default behavior, and ensures that dependent services are not brought down by an accidental update.
+All resources will be removed, with the exception of secrets which were created to store generated client certificates by `cert-manager`. This is a safety mechanism which aligns with cert-manager's default behavior, and ensures that dependent services are not brought down by an accidental update.
 
 If you wish to delete these secrets, you can identify then via `kubectl`:
 
@@ -178,6 +172,6 @@ pgedge-client-ca-key-pair   kubernetes.io/tls   3      3m46s
 pgedge-pgedge-client-cert   kubernetes.io/tls   3      3m45s
 ```
 
-From there, you can delete each secret using the following command:
+Then, you can delete each secret using the following command:
 
 `kubectl delete secret <name>`
