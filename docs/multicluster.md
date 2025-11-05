@@ -81,10 +81,10 @@ pgEdge:
     kubectl get secrets
 
     NAME                 TYPE                DATA   AGE
-    pgedge-admin-client-cert    kubernetes.io/tls   3      3m43s
-    pgedge-app-client-cert      kubernetes.io/tls   3      3m43s
-    pgedge-client-ca-key-pair   kubernetes.io/tls   3      3m46s
-    pgedge-pgedge-client-cert   kubernetes.io/tls   3      3m45s
+    admin-client-cert    kubernetes.io/tls   3      3m43s
+    app-client-cert      kubernetes.io/tls   3      3m43s
+    client-ca-key-pair   kubernetes.io/tls   3      3m46s
+    pgedge-client-cert   kubernetes.io/tls   3      3m45s
     ```
     
 This example assumes you have a cross-cluster DNS solution in place. If you want to simulate this type of deployment in a single Kubernetes cluster, deploying into two separate namespaces should provide a similar experience without needing to handle this aspect.
