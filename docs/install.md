@@ -183,10 +183,10 @@ If you wish to delete these secrets, you can identify then via `kubectl`:
 kubectl get secrets
 
 NAME                 TYPE                DATA   AGE
-pgedge-admin-client-cert    kubernetes.io/tls   3      3m43s
-pgedge-app-client-cert      kubernetes.io/tls   3      3m43s
-pgedge-client-ca-key-pair   kubernetes.io/tls   3      3m46s
-pgedge-pgedge-client-cert   kubernetes.io/tls   3      3m45s
+admin-client-cert    kubernetes.io/tls   3      3m43s
+app-client-cert      kubernetes.io/tls   3      3m43s
+client-ca-key-pair   kubernetes.io/tls   3      3m46s
+pgedge-client-cert   kubernetes.io/tls   3      3m45s
 ```
 
 From there, you can delete each secret using the following command:
