@@ -4,14 +4,14 @@ The **pgEdge Helm** chart supports deploying both pgEdge Enterprise Postgres and
 
 This chart leverages [CloudNativePG](https://cloudnative-pg.io/) to manage Postgres, providing flexible options for single-region and multi-region deployments.
 
-![Version: 0.0.3](https://img.shields.io/badge/Version-0.0.3-informational?style=flat-square)
+![Version: 0.0.4](https://img.shields.io/badge/Version-0.0.4-informational?style=flat-square)
 
 ## Features
 
 At a high level, this chart features support for:
 
 - Postgres 16, 17, and 18 via [pgEdge Enterprise Postgres Images](https://github.com/pgEdge/postgres-images).
-- Flexible deployment options for both single and multi-region deployments
+- Flexible deployment options for both single-region and multi-region deployments
     - Deploy pgEdge Enterprise Postgres in a single region with optional standby replicas.
     - Deploy pgEdge Distributed Postgres across multiple regions with Spock active-active replication.
 - Configuring Spock replication configuration across all nodes during helm install and upgrade processes.
