@@ -1,0 +1,13 @@
+pgEdge:
+  appName: pgedge
+  initSpock: true
+  provisionCerts: false
+  nodes:
+    - name: n2
+      hostname: pgedge-n2-rw.default.svc.clusterset.local
+  externalNodes:
+    - name: n1
+      hostname: pgedge-n1-rw.default.svc.clusterset.local
+  clusterSpec:
+    storage:
+      size: 1Gi
