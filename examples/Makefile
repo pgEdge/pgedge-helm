@@ -113,10 +113,49 @@ multi-install:
 		--values $(examples_dir)/configs/multi/values-b.yaml \
 		--wait \
 		pgedge $(root_dir)
+	make multi-install-service-export
+
+.PHONY: multi-install-service-export	
+multi-install-service-export:
 	kubectl apply --context kind-cluster-a -f \
 		$(examples_dir)/configs/multi/cilium-a.yaml
 	kubectl apply --context kind-cluster-b -f \
 		$(examples_dir)/configs/multi/cilium-b.yaml
+
+.PHONY: multi-install-haproxy
+multi-install-haproxy:
+	helm repo add haproxytech https://haproxytech.github.io/helm-charts --force-update
+	helm repo update
+	helm install --kube-context kind-cluster-a pgedge-rw haproxytech/haproxy -f $(examples_dir)/configs/multi/haproxy.yaml
+	helm install --kube-context kind-cluster-b pgedge-rw haproxytech/haproxy -f $(examples_dir)/configs/multi/haproxy.yaml
+
+.PHONY: multi-uninstall-haproxy
+multi-uninstall-haproxy:
+	helm uninstall --kube-context kind-cluster-a pgedge-rw
+	helm uninstall --kube-context kind-cluster-b pgedge-rw
+
+.PHONY: multi-haproxy-connect
+multi-haproxy-connect:
+	kubectl delete pod psql-client --context kind-$(CLUSTER) --ignore-not-found=true
+	kubectl run psql-client --context kind-$(CLUSTER) --rm -it --restart=Never \
+	--image=ghcr.io/pgedge/pgedge-postgres:17-spock5-standard \
+	--overrides='{"apiVersion":"v1","spec":{"securityContext":{"fsGroup":26},"containers":[{"name":"psql-client","stdin":true,"tty":true,"image":"ghcr.io/pgedge/pgedge-postgres:17-spock5-standard","command":["psql"],"args":["host=pgedge-rw-haproxy dbname=app user=app sslcert=/certificates/app/tls.crt sslkey=/certificates/app/tls.key  sslmode=require"],"volumeMounts":[{"name":"app-client-cert","mountPath":"/certificates/app","readOnly":true}]}],"volumes":[{"name":"app-client-cert","secret":{"secretName":"app-client-cert","defaultMode":384}}]}}'
+
+.PHONY: multi-cluster-hibernate-a-on
+multi-cluster-hibernate-a-on:
+	kubectl annotate cluster pgedge-n1 --overwrite cnpg.io/hibernation=on --context kind-cluster-a
+
+.PHONY: multi-cluster-hibernate-b-on
+multi-cluster-hibernate-b-on:
+	kubectl annotate cluster pgedge-n2 --overwrite cnpg.io/hibernation=on --context kind-cluster-b
+
+.PHONY: multi-cluster-hibernate-a-off
+multi-cluster-hibernate-a-off:
+	kubectl annotate cluster pgedge-n1 --overwrite cnpg.io/hibernation=off --context kind-cluster-a
+
+.PHONY: multi-cluster-hibernate-b-off
+multi-cluster-hibernate-b-off:
+	kubectl annotate cluster pgedge-n2 --overwrite cnpg.io/hibernation=off --context kind-cluster-b
 
 .PHONY: multi-upgrade
 multi-upgrade:
@@ -130,7 +169,7 @@ multi-upgrade:
 		--values $(examples_dir)/configs/multi/values-b.yaml \
 		--wait \
 		pgedge $(root_dir)
-		
+
 .PHONY: copy-certs
 copy-certs:
 	@for secret in admin-client-cert app-client-cert client-ca-key-pair pgedge-client-cert streaming-replica-client-cert; do \

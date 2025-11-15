@@ -1,0 +1,30 @@
+kind: DaemonSet
+containerPorts:
+  postgres: 5432
+daemonset:
+  hostPorts:
+    postgres: 5432
+config: |
+  global
+    log stdout format raw local0
+
+  defaults
+      log global
+      mode tcp
+      retries 2
+      timeout client 30m
+      timeout connect 4s
+      timeout server 30m
+      timeout check 5s
+
+  frontend postgres
+    bind *:5432
+    mode tcp
+    default_backend cnpg_backends
+
+  backend cnpg_backends
+      mode tcp
+      option tcp-check
+      tcp-check connect
+      server n1 pgedge-n1-rw.default.svc.clusterset.local:5432 check
+      server n2 pgedge-n2-rw.default.svc.clusterset.local:5432 check backup
