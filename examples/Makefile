@@ -101,6 +101,7 @@ multi-down:
 
 .PHONY: multi-install
 multi-install:
+	make multi-install-service-export
 	helm install \
 		--kube-context kind-cluster-a \
 		--values $(examples_dir)/configs/multi/values-a.yaml \
@@ -113,7 +114,6 @@ multi-install:
 		--values $(examples_dir)/configs/multi/values-b.yaml \
 		--wait \
 		pgedge $(root_dir)
-	make multi-install-service-export
 
 .PHONY: multi-install-service-export	
 multi-install-service-export:
