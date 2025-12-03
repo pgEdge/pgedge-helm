@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: {{ .Values.pgEdge.appName }}-init-spock
-        image: python:3.12-slim
+        image: {{ .Values.pgEdge.initSpockImageName }}
         command:
           - /bin/sh
           - -c
