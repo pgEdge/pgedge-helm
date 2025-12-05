@@ -20,11 +20,16 @@ single-up:
 single-down:
 	kind delete cluster --name single
 
+.PHONY: single-load-kind
+single-load-kind:
+	kind load docker-image pgedge-helm-utils:dev --name single
+
 .PHONY: single-install
 single-install:
 	helm install \
 		--kube-context kind-single \
 		--values $(examples_dir)/configs/single/values.yaml \
+		--set pgEdge.initSpockImageName=pgedge-helm-utils:dev \
 		--wait \
 		pgedge $(root_dir)
 
@@ -41,6 +46,7 @@ single-upgrade:
 	helm upgrade \
 		--kube-context kind-single \
 		--values $(examples_dir)/configs/single/values.yaml \
+		--set pgEdge.initSpockImageName=pgedge-helm-utils:dev \
 		--wait \
 		pgedge $(root_dir)
 

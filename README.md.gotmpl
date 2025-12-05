@@ -28,6 +28,61 @@ In order for this chart to work, you must pre-install two operators into your Ku
 - [CloudNativePG](https://cloudnative-pg.io/)
 - [cert-manager](https://cert-manager.io/)
 
+## Local Development
+
+The `pgedge-helm-utils` image is a lightweight Python container that runs the init-spock job during Helm installation and upgrades.
+
+For local development and testing, you must build the image and load it into your local Kubernetes cluster (e.g., kind, minikube) prior to installing or upgrading the chart:
+
+First, build the image locally using:
+
+```shell
+make docker-build-dev
+```
+
+Next, load the image into your local cluster. For example, with kind:
+
+```shell
+kind load docker-image pgedge-helm-utils:dev --name <your-cluster-name>
+```
+
+Finally, set the `initSpockImageName` value to use the local image when installing or upgrading the chart:
+
+```shell
+	helm install \
+		--values examples/configs/single/values.yaml \
+		--set pgEdge.initSpockImageName=pgedge-helm-utils:dev \
+		--wait \
+		pgedge .
+```
+
+## Release Process
+
+Releases are tagged from the `main` branch using the format `v<chart-version>`, e.g., `v0.0.4`. 
+
+In order to create a release, you must:
+
+1.  Update the chart version in the following files:
+
+- `Chart.yaml`
+- `values.yaml` (for the `initSpockImageName` value)
+
+2. Run `make gen-docs` to update the generated documentation files.
+
+3. Verify any documentation changes by running `make docs` and checking the output locally.
+
+4. Commit and push your changes to a new release branch named `release/<chart-version>`, e.g., `release/0.0.4`.
+
+5. Create a pull request targetting the `main` branch and ensure that all checks pass.
+
+6. Once approved, publish the `pgedge-helm-utils` Docker image to GitHub Container Registry:
+
+```shell
+make docker-release
+```
+
+7. Merge the release pull request into `main`.
+
 ## Documentation
 
 The documentation for this chart uses MkDocs with the Material theme to generate styled static HTML documentation from Markdown files in the docs directory.
