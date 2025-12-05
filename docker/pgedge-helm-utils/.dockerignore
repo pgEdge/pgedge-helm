@@ -1,0 +1,12 @@
+# Ignore documentation
+README.md
+*.md
+
+# Ignore git
+.git
+.gitignore
+
+# Ignore test files
+test/
+tests/
+*.test

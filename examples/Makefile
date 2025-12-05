@@ -25,6 +25,7 @@ single-install:
 	helm install \
 		--kube-context kind-single \
 		--values $(examples_dir)/configs/single/values.yaml \
+		--set pgEdge.initSpockImageName=pgedge-helm-utils:dev \
 		--wait \
 		pgedge $(root_dir)
 
