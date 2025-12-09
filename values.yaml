@@ -14,7 +14,9 @@ pgEdge:
   # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
   # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
   initSpock: true
-  initSpockImageName: python:3.12-slim
+  # -- Docker image for the init-spock job. This image contains Python and required dependencies for the job to run.
+  # This image is versioned alongside the Helm chart.
+  initSpockImageName: ghcr.io/pgedge/pgedge-helm-utils:v0.0.4
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.
   clusterSpec:

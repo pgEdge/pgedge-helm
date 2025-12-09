@@ -59,6 +59,14 @@ jobs:
       - checkout
       - install-tools
       - run:
+          name: Set up Docker Buildx
+          command: |
+            docker buildx create --use --name builder || docker buildx use builder
+      - run:
+          name: Build pgedge-helm-utils dev image
+          command: |
+            make docker-build-dev
+      - run:
           name: Helm lint
           command: |
             helm lint . --values examples/configs/single/values.yaml
@@ -66,6 +74,10 @@ jobs:
           name: Cluster up
           command: |
             make -f examples/Makefile single-up
+      - run:
+          name: Load image into kind
+          command: |
+            make -f examples/Makefile single-load-kind
       - run:
           name: Install pgedge
           command: |
@@ -75,10 +87,45 @@ jobs:
           command: |
             make -f examples/Makefile single-test
       - run:
-          name: Teardown
+          name: Collect debug artifacts on failure
+          when: on_fail
           command: |
-            make -f examples/Makefile single-uninstall
-            make -f examples/Makefile single-down
+            mkdir -p /tmp/artifacts
+
+            # Get kind cluster logs
+            kind export logs /tmp/artifacts/kind-logs --name single || true
+
+            # Get all pods
+            kubectl get pods -A -o wide > /tmp/artifacts/pods.txt || true
+
+            # Get all events
+            kubectl get events -A --sort-by='.lastTimestamp' > /tmp/artifacts/events.txt || true
+
+            # Get helm release info
+            helm list -A > /tmp/artifacts/helm-releases.txt || true
+            helm get all pgedge -n default > /tmp/artifacts/helm-release-details.txt || true
+
+            # Get init-spock job logs
+            kubectl get jobs -n default > /tmp/artifacts/jobs.txt || true
+            kubectl describe job pgedge-init-spock -n default > /tmp/artifacts/init-spock-job.txt || true
+            kubectl logs -l job-name=pgedge-init-spock -n default --all-containers=true > /tmp/artifacts/init-spock-logs.txt || true
+
+            # Get PostgreSQL cluster info
+            kubectl get clusters.postgresql.cnpg.io -n default > /tmp/artifacts/pg-clusters.txt || true
+            kubectl describe clusters.postgresql.cnpg.io -n default > /tmp/artifacts/pg-cluster-details.txt || true
+
+            # Get PostgreSQL pod logs
+            kubectl logs -l cnpg.io/cluster -n default --all-containers=true --tail=500 > /tmp/artifacts/postgres-logs.txt || true
+      - store_artifacts:
+          path: /tmp/artifacts
+          destination: debug-logs
+      - run:
+          name: Teardown
+          when: always
+          command: |
+            make -f examples/Makefile single-uninstall || true
+            make -f examples/Makefile single-down || true
+
 workflows:
   test:
     jobs:
