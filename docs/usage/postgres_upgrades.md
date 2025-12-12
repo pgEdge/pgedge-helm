@@ -98,7 +98,7 @@ Using this approach, you can gradually upgrade to Postgres 17 by removing existi
 
 ### Performing in-place upgrades via CloudNativePG
 
-CloudNativePG supports in-place major version upgrades using its [Offline In-Place Major Upgrades](https://cloudnative-pg.io/documentation/1.27/postgres_upgrades/#offline-in-place-major-upgrades) approach.
+CloudNativePG supports in-place major version upgrades using its [Offline In-Place Major Upgrades](https://cloudnative-pg.io/documentation/1.28/postgres_upgrades/#offline-in-place-major-upgrades) approach.
 
 In order to perform a major version upgrade using this chart, simply update the `imageName` in the `clusterSpec` and perform a `helm upgrade`.
 
@@ -139,4 +139,4 @@ After running `helm upgrade`, CloudNativePG will orchestrate the upgrade, perfor
 
 You can monitor upgrade progress using `kubectl get clusters` or `kubectl cnpg status <node>`.
 
-For detailed instructions and troubleshooting for in-place upgrades, refer to the [CloudNativePG documentation](https://cloudnative-pg.io/documentation/1.27/postgres_upgrades/#offline-in-place-major-upgrades).
+For detailed instructions and troubleshooting for in-place upgrades, refer to the [CloudNativePG documentation](https://cloudnative-pg.io/documentation/1.28/postgres_upgrades/#offline-in-place-major-upgrades).

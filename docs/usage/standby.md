@@ -60,9 +60,9 @@ pgedge-n1-3  0/66005850  0/66005850  0/66005850  0/66005850  00:00:00   00:00:00
 Instances status
 Name         Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----         -----------  ----------------  ------  ---         ---------------  ----
-pgedge-n1-1  0/66005850   Primary           OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000000
-pgedge-n1-2  0/66005850   Standby (sync)    OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000002
-pgedge-n1-3  0/66005850   Standby (sync)    OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000001
+pgedge-n1-1  0/66005850   Primary           OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000000
+pgedge-n1-2  0/66005850   Standby (sync)    OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000002
+pgedge-n1-3  0/66005850   Standby (sync)    OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000001
 ```
 
 To perform the promotion, use this command to promote the specified replica. For example, to promote `pgedge-n1-2`:
