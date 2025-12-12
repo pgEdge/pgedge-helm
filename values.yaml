@@ -58,10 +58,16 @@ pgEdge:
         spock.conflict_resolution: "last_update_wins"
         spock.save_resolutions: "on"
         spock.conflict_log_level: "DEBUG"
+        cron.database_name: "app"
       shared_preload_libraries:
         - pg_stat_statements
         - snowflake
         - spock
+        - pg_stat_monitor
+        - pg_tokenizer
+        - pg_cron
+        - vectorize
+        - pgedge_vectorizer
       pg_hba:
         - hostssl app pgedge 0.0.0.0/0 cert
         - hostssl app admin 0.0.0.0/0 cert
