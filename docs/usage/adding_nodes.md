@@ -66,7 +66,7 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
 ## Adding a node via CloudNativePG bootstrap
 
-As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.27/bootstrap/#bootstrap-from-another-cluster) capability.
+As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.28/bootstrap/#bootstrap-from-another-cluster) capability.
 
 Here is an example of adding a node `n3` using the Barman Cloud CNPG-I plugin to bootstrap the node from the existing node `n1` which has backups and wal archiving configured in S3. 
 

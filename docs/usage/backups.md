@@ -1,6 +1,6 @@
 # Configuring Backups
 
-CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/documentation/1.27/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
+CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/documentation/1.28/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
 
 The current version of this chart does not provide wrapper configuration around CRDs for managing backup configuration - such as `ScheduledBackup` or `ObjectStore`. You may configure these CRDs independently from this chart, or bundle them into the `templates` folder, based on your strategy for managing helm charts within your Kubernetes setup.
 

@@ -66,9 +66,9 @@ pgedge-n1-primary  primary  1              1                1                   
 Instances status
 Name         Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----         -----------  ----------------  ------  ---         ---------------  ----
-pgedge-n1-1  0/57000B60   Primary           OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000000
-pgedge-n1-2  0/57000C18   Standby (sync)    OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000002
-pgedge-n1-3  0/57000C18   Standby (sync)    OK      BestEffort  1.27.0           aks-agentpool-14750958-vmss000001
+pgedge-n1-1  0/57000B60   Primary           OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000000
+pgedge-n1-2  0/57000C18   Standby (sync)    OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000002
+pgedge-n1-3  0/57000C18   Standby (sync)    OK      BestEffort  1.28.0           aks-agentpool-14750958-vmss000001
 
 Plugins status
 No plugins found
