@@ -75,7 +75,6 @@ For example, a node named `n1` will have the following Postgres configuration ap
 ```yaml
   postgresql:
     parameters:
-      ...
       lolor.node: "1"
       snowflake.node: "1"
 ```
@@ -99,6 +98,16 @@ pgEdge:
     storage:
       size: 1Gi
 ```
+
+## Extensions
+
+This chart supports all extensions included in the standard flavor of the [pgEdge Enterprise Postgres Image](https://github.com/pgedge/postgres-images?tab=readme-ov-file#standard-images).
+
+By default, `shared_preload_libraries` contains `pg_stat_statements`, `snowflake`, and `spock`. For additional extensions, you may need to override `postgresql.shared_preload_libraries` and set additional parameters in `postgresql.parameters` in your `values.yaml` to ensure the extension is loaded and configured properly.
+
+!!! note
+
+    Always include `spock` in `shared_preload_libraries`, as it is required for core functionality provided by this chart. This chart will call `CREATE EXTENSION` for spock when initializing each CloudNativePG Cluster.
 
 ## Values reference
 
