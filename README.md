@@ -73,7 +73,7 @@ In order to create a release, you must:
 
 3. Verify any documentation changes by running `make docs` and checking the output locally.
 
-4. Once approved, publish the `pgedge-helm-utils` Docker image to GitHub Container Registry:
+4. Publish the `pgedge-helm-utils` Docker image to GitHub Container Registry:
 
 	```shell
 	make docker-release
