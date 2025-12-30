@@ -9,4 +9,4 @@ description: |
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm
-version: 0.1.1
+version: 0.1.0
