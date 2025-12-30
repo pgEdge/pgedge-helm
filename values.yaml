@@ -17,6 +17,22 @@ pgEdge:
   # -- Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>.
   # Override this for local development or to use a custom image.
   initSpockImageName: ""
+  initSpockJobConfig:
+    # -- Pod Security context for the init-spock job. Set to a Restricted profile by default.
+    # Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      runAsNonRoot: true
+    # -- Container Security context for the init-spock job. Set to a Restricted profile by default.
+    # Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.
   clusterSpec:
@@ -84,4 +100,3 @@ pgEdge:
               - key: ca.crt
                 path: pgedge/certificates/ca.crt
                 mode: 0600
-    
