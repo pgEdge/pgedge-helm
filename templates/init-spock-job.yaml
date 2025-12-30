@@ -1,4 +1,4 @@
-{{- if .Values.pgEdge.initSpock }}
+{{- if .Values.pgEdge.initSpock.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: {{ .Values.pgEdge.appName }}-init-spock
-        image: {{ .Values.pgEdge.initSpockImageName }}
+        image: {{ .Values.pgEdge.initSpock.imageName }}
         command:
           - python
           - -u
@@ -37,6 +37,10 @@ spec:
           - name: admin-client-cert
             mountPath: /certificates/admin
             readOnly: true
+        securityContext:
+          {{- with .Values.pgEdge.initSpock.containerSecurityContext }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
       volumes:
         - name: {{ .Values.pgEdge.appName }}-config
           configMap:
@@ -59,4 +63,7 @@ spec:
                 mode: 0600
       securityContext:
         fsGroup: 65532
+        {{- with .Values.pgEdge.initSpock.podSecurityContext }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
 {{- end }}
