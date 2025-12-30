@@ -18,7 +18,7 @@ pgEdge:
     enabled: true
     # -- Docker image for the init-spock job. This image contains Python and required dependencies for the job to run.
     # This image is versioned alongside the Helm chart.
-    imageName: ghcr.io/kevinpthorne/pgedge-helm-utils:v0.1.1
+    imageName: ghcr.io/pgedge/pgedge-helm-utils:v0.1.1
     podSecurityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true

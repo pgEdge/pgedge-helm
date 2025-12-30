@@ -118,7 +118,7 @@ You can run `make gen-docs` after updating the templates to generate the associa
 | pgEdge.initSpock.containerSecurityContext.runAsNonRoot | bool | `true` |  |
 | pgEdge.initSpock.containerSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | pgEdge.initSpock.enabled | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |
-| pgEdge.initSpock.imageName | string | `"ghcr.io/kevinpthorne/pgedge-helm-utils:v0.1.1"` | Docker image for the init-spock job. This image contains Python and required dependencies for the job to run. This image is versioned alongside the Helm chart. |
+| pgEdge.initSpock.imageName | string | `"ghcr.io/pgedge/pgedge-helm-utils:v0.1.1"` | Docker image for the init-spock job. This image contains Python and required dependencies for the job to run. This image is versioned alongside the Helm chart. |
 | pgEdge.initSpock.podSecurityContext.allowPrivilegeEscalation | bool | `false` |  |
 | pgEdge.initSpock.podSecurityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | pgEdge.initSpock.podSecurityContext.readOnlyRootFilesystem | bool | `true` |  |
