@@ -27,6 +27,16 @@ pgEdge:
       size: 1Gi
 ```
 
+Each node in the `nodes` list supports the following properties:
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Unique identifier for the node (e.g., `n1`, `n2`). Used to derive Kubernetes resource names and Spock node names. |
+| `hostname` | Yes | The externally routable hostname for the node. This is stored in Spock's DSN and used by other nodes for replication connections. |
+| `internalHostname` | No | An optional cluster-internal hostname used for connectivity checks during initialization. When specified, the init-spock job uses this address to verify the node is accepting connections, while still using `hostname` for replication DSNs. Useful in multi-cluster deployments where `hostname` may be an external IP not routable from within the cluster. |
+| `ordinal` | No | Override the automatically derived node ordinal used for `snowflake.node` and `lolor.node` configuration. |
+| `clusterSpec` | No | Node-specific CloudNativePG Cluster configuration that overrides the global `clusterSpec`. |
+
 As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
 
 You can also override the `clusterSpec` for specific nodes if you require more granular control.
@@ -122,10 +132,7 @@ The following table lists all available options and their descriptions.
 | pgEdge.externalNodes | list | `[]` | Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart. This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster. |
 | pgEdge.initSpock | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |
 | pgEdge.initSpockImageName | string | `""` | Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>. Override this for local development or to use a custom image. |
-| pgEdge.initSpockJobConfig.containerSecurityContext.runAsNonRoot | bool | `true` |  |
-| pgEdge.initSpockJobConfig.containerSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
-| pgEdge.initSpockJobConfig.podSecurityContext.allowPrivilegeEscalation | bool | `false` |  |
-| pgEdge.initSpockJobConfig.podSecurityContext.capabilities.drop[0] | string | `"ALL"` |  |
-| pgEdge.initSpockJobConfig.podSecurityContext.readOnlyRootFilesystem | bool | `true` |  |
+| pgEdge.initSpockJobConfig.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Container Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
+| pgEdge.initSpockJobConfig.podSecurityContext | object | `{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
 | pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
 | pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
