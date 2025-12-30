@@ -4,7 +4,7 @@ The **pgEdge Helm** chart supports deploying both pgEdge Enterprise Postgres and
 
 This chart leverages [CloudNativePG](https://cloudnative-pg.io/) to manage Postgres, providing flexible options for single-region and multi-region deployments.
 
-![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square)
 
 ## Features
 
@@ -118,7 +118,7 @@ You can run `make gen-docs` after updating the templates to generate the associa
 | pgEdge.initSpock.containerSecurityContext.runAsNonRoot | bool | `true` |  |
 | pgEdge.initSpock.containerSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
 | pgEdge.initSpock.enabled | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |
-| pgEdge.initSpock.imageName | string | `"ghcr.io/pgedge/pgedge-helm-utils:v0.1.1"` | Docker image for the init-spock job. This image contains Python and required dependencies for the job to run. This image is versioned alongside the Helm chart. |
+| pgEdge.initSpock.imageName | string | `"ghcr.io/pgedge/pgedge-helm-utils:v0.1.0"` | Docker image for the init-spock job. This image contains Python and required dependencies for the job to run. This image is versioned alongside the Helm chart. |
 | pgEdge.initSpock.podSecurityContext.allowPrivilegeEscalation | bool | `false` |  |
 | pgEdge.initSpock.podSecurityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | pgEdge.initSpock.podSecurityContext.readOnlyRootFilesystem | bool | `true` |  |
