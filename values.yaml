@@ -20,15 +20,15 @@ pgEdge:
     # This image is versioned alongside the Helm chart.
     imageName: ghcr.io/kevinpthorne/pgedge-helm-utils:v0.1.1
     podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      runAsNonRoot: true
+    containerSecurityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
       capabilities:
         drop:
           - ALL
-    containerSecurityContext:
-      seccompProfile:
-        type: RuntimeDefault
-      runAsNonRoot: true
 
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.
