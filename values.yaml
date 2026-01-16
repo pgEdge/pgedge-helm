@@ -24,8 +24,8 @@ pgEdge:
     imagePullPolicy: Always
     imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
     certificates:
-        clientCASecret: client-ca-key-pair
-        replicationTLSSecret: streaming-replica-client-cert
+      clientCASecret: client-ca-key-pair
+      replicationTLSSecret: streaming-replica-client-cert
     bootstrap:
       initdb:
         database: app
@@ -37,11 +37,11 @@ pgEdge:
         postInitTemplateSQL: []
     managed:
       roles:
-      - name: admin
-        ensure: present
-        comment: Admin role
-        login: true
-        superuser: true
+        - name: admin
+          ensure: present
+          comment: Admin role
+          login: true
+          superuser: true
     postgresql:
       parameters:
         dynamic_shared_memory_type: "posix"
@@ -77,11 +77,11 @@ pgEdge:
             items:
               - key: tls.crt
                 path: pgedge/certificates/tls.crt
-                mode: 0600 
+                mode: 0600
               - key: tls.key
                 path: pgedge/certificates/tls.key
-                mode: 0600 
+                mode: 0600
               - key: ca.crt
                 path: pgedge/certificates/ca.crt
-                mode: 0600 
+                mode: 0600
     
