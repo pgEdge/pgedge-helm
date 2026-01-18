@@ -12,17 +12,29 @@ pgEdge:
   # This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster.
   externalNodes: []
   
-  initSpock:
+  # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
+  # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
+  # This flag will be deprecated soon; move to initSpockJob.enabled instead.
+  initSpock: ~
+  # -- Docker image for the init-spock job. This image contains Python and required dependencies for the job to run.
+  # This image is versioned alongside the Helm chart.
+  # This flag will be deprecated soon; move to initSpockJob.imageName instead.
+  initSpockImageName: ~
+  initSpockJob:
     # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
     # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
     enabled: true
     # -- Docker image for the init-spock job. This image contains Python and required dependencies for the job to run.
     # This image is versioned alongside the Helm chart.
     imageName: ghcr.io/pgedge/pgedge-helm-utils:v0.1.0
+    # -- Pod Security context for the init-spock job. Set to a Restricted profile by default.
+    # Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/
     podSecurityContext:
       seccompProfile:
         type: RuntimeDefault
       runAsNonRoot: true
+    # -- Container Security context for the init-spock job. Set to a Restricted profile by default.
+    # Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/
     containerSecurityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true

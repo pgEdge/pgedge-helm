@@ -1,4 +1,4 @@
-{{- if .Values.pgEdge.initSpock.enabled }}
+{{- if (coalesce .Values.pgEdge.initSpock .Values.pgEdge.initSpockJob.enabled) }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:

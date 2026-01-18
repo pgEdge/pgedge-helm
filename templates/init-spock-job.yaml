@@ -1,4 +1,4 @@
-{{- if .Values.pgEdge.initSpock.enabled }}
+{{- if (coalesce .Values.pgEdge.initSpock .Values.pgEdge.initSpockJob.enabled) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: {{ .Values.pgEdge.appName }}-init-spock
-        image: {{ .Values.pgEdge.initSpock.imageName }}
+        image: {{ coalesce .Values.pgEdge.initSpockImageName .Values.pgEdge.initSpockJob.imageName }}
         command:
           - python
           - -u
@@ -38,7 +38,7 @@ spec:
             mountPath: /certificates/admin
             readOnly: true
         securityContext:
-          {{- with .Values.pgEdge.initSpock.containerSecurityContext }}
+          {{- with .Values.pgEdge.initSpockJob.containerSecurityContext }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
       volumes:
@@ -63,7 +63,7 @@ spec:
                 mode: 0600
       securityContext:
         fsGroup: 65532
-        {{- with .Values.pgEdge.initSpock.podSecurityContext }}
+        {{- with .Values.pgEdge.initSpockJob.podSecurityContext }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
 {{- end }}
