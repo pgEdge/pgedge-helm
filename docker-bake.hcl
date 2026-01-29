@@ -20,13 +20,26 @@ target "default" {
   dockerfile = "docker/pgedge-helm-utils/Dockerfile"
 }
 
-# Development build - tags as :dev
+# Development build - tags as :dev (local only)
 target "dev" {
   inherits = ["default"]
   tags = [
     "${IMAGE_NAME}:dev"
   ]
   output = ["type=docker"]
+}
+
+# Development build - push :dev to registry
+target "dev-push" {
+  inherits = ["default"]
+  tags = [
+    "${REGISTRY}/${IMAGE_NAME}:dev"
+  ]
+  output = ["type=registry"]
+  platforms = [
+    "linux/amd64",
+    "linux/arm64",
+  ]
 }
 
 # Push to registry - builds and pushes versioned tags
