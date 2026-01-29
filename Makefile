@@ -24,6 +24,10 @@ docs:
 docker-build-dev:
 	docker buildx bake dev
 
+.PHONY: docker-push-dev
+docker-push-dev: buildx-init
+	REGISTRY=$(REGISTRY) docker buildx bake dev-push --builder $(BUILDX_BUILDER)
+
 .PHONY: docker-release
 docker-release: buildx-init
 	CHART_VERSION=$(CHART_VERSION) BUILD_REVISION=$(BUILD_REVISION) REGISTRY=$(REGISTRY) docker buildx bake release --builder $(BUILDX_BUILDER)
