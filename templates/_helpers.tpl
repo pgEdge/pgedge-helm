@@ -1,5 +1,5 @@
 {{- define "validate.newNodes" -}}
-{{- if .Release.IsUpgrade }}
+{{- if and .Release.IsUpgrade .Values.pgEdge.initSpock }}
   {{- $cfgName := printf "%s-config" .Values.pgEdge.appName }}
   {{- $oldCfg := lookup "v1" "ConfigMap" .Release.Namespace $cfgName }}
   {{- $oldNames := dict }}
