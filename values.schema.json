@@ -15,6 +15,7 @@
             "properties": {
               "name": { "type": "string" },
               "hostname": { "type": "string" },
+              "internalHostname": { "type": "string" },
               "bootstrap": {
                 "type": "object",
                 "properties": {

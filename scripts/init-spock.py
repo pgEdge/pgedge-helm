@@ -33,6 +33,7 @@ class NodeBootstrap:
 class Node:
     name: str
     hostname: str
+    internalHostname: Optional[str] = None
     bootstrap: NodeBootstrap = field(default_factory=NodeBootstrap)
 
 
@@ -52,6 +53,7 @@ def load_nodes(path: str) -> List[Node]:
             Node(
                 name=node.get("name", ""),
                 hostname=node.get("hostname", ""),
+                internalHostname=node.get("internalHostname"),
                 bootstrap=bootstrap
             )
         )
@@ -105,10 +107,16 @@ def wait_for_clusters(namespace: str, clusters: List[str]):
 
 
 def wait_ready(node: Node, db_name: str, user: str):
-    """Wait until Postgres accepts connections."""
+    """Wait until Postgres accepts connections.
+
+    Uses internalHostname for the connection check if provided,
+    otherwise falls back to hostname. This handles cases where hostname
+    is an external IP that cannot be routed from within the cluster.
+    """
+    check_host = node.internalHostname or node.hostname
     while True:
         try:
-            conn = get_conn(node.hostname, db_name, user)
+            conn = get_conn(check_host, db_name, user)
             conn.close()
             print(f"✅ {node.hostname} is accepting connections")
             return
@@ -159,7 +167,12 @@ def run_sql(
 
 
 def create_subscription(db_name: str, admin_user: str, pgedge_user: str, src_node: Node, dst_node: Node, sync: bool):
-    """Create a spock subscription from src_node to dst_node."""
+    """Create a spock subscription from src_node to dst_node.
+
+    Uses hostname (not internalHostname) for the DSN because this connection
+    string is stored in the database and used by other nodes (potentially in
+    different clusters) to connect for replication. It must be externally routable.
+    """
     forward_origins = "{}"
     replication_sets = "{default, default_insert_only, ddl_sql}"
 
@@ -192,7 +205,13 @@ def create_subscription(db_name: str, admin_user: str, pgedge_user: str, src_nod
 
 
 def create_node(node: Node, db_name: str, admin_user: str, pgedge_user: str):
-    """Create a spock node on a given node."""
+    """Create a spock node on a given node.
+
+    Uses hostname (not internalHostname) for the DSN because this address is
+    replicated to all nodes in the cluster. Other nodes (potentially in different
+    clusters) use this DSN to connect for replication, so it must be externally
+    routable.
+    """
     ssl_settings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/projected/pgedge/certificates/tls.key sslmode=require"
     stmt = f"""
             SELECT spock.repair_mode('True');
