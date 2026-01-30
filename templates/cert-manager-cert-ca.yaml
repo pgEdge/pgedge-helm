@@ -46,12 +46,11 @@ spec:
   privateKey:
     algorithm: ECDSA
     size: 256
+    rotationPolicy: Never
   issuerRef:
     name: selfsigned-issuer
     kind: Issuer
     group: cert-manager.io
-  privateKey:
-    rotationPolicy: Never
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
