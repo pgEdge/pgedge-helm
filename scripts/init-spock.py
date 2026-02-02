@@ -10,7 +10,6 @@ from typing import Optional, List
 import psycopg2
 from psycopg2 import errors
 from psycopg2.extras import LoggingConnection
-import yaml
 
 from kubernetes import client, config
 
