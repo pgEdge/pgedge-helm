@@ -1,0 +1,18 @@
+version: 2.1
+
+# CircleCI has been replaced by GitHub Actions.
+# This file exists only to prevent build errors until CircleCI integration is disabled.
+# TODO: Disable CircleCI in repo settings and delete this file.
+
+jobs:
+  noop:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - run: echo "CI has moved to GitHub Actions"
+
+workflows:
+  version: 2
+  placeholder:
+    jobs:
+      - noop
