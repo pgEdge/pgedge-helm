@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          # Strip any RC suffix for release notes lookup
+          RELEASE_VERSION=${VERSION%-rc.*}
+          echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build and push pgedge-helm-utils image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/pgedge-helm-utils
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/pgedge/pgedge-helm-utils:${{ steps.version.outputs.version }}
+          provenance: true
+          sbom: true
+
+      - name: Install Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version v3.14.1
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --import --batch
+          # Get the key ID for signing
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+          echo "GPG_KEY_ID=${GPG_KEY_ID}" >> $GITHUB_ENV
+
+      - name: Package and sign Helm chart
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          # Create a keyring file for Helm
+          gpg --export-secret-keys > ~/.gnupg/secring.gpg
+
+          # Package and sign the chart
+          helm package . --version ${{ steps.version.outputs.version }} \
+            --sign \
+            --key "${GPG_KEY_ID}" \
+            --keyring ~/.gnupg/secring.gpg \
+            --passphrase-file <(echo "${GPG_PASSPHRASE}")
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          RELEASE_VERSION="${{ steps.version.outputs.release_version }}"
+
+          # Determine if prerelease
+          PRERELEASE_FLAG=""
+          if [[ "${VERSION}" == *"-rc"* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          # Determine release notes file
+          NOTES_FLAG=""
+          if [[ -f "changes/${RELEASE_VERSION}.md" ]]; then
+            NOTES_FLAG="--notes-file changes/${RELEASE_VERSION}.md"
+          fi
+
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            ${NOTES_FLAG} \
+            ${PRERELEASE_FLAG} \
+            "pgedge-${VERSION}.tgz" \
+            "pgedge-${VERSION}.tgz.prov"

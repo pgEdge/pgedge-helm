@@ -1,0 +1,40 @@
+name: Tag Release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  tag-release:
+    if: ${{ github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'release/') }}
+    environment: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Tag release
+        env:
+          branch_name: ${{ github.event.pull_request.head.ref }}
+        run: |
+          version=${branch_name#release/}
+
+          # Ensure release notes exist
+          if [[ ! -f changes/${version}.md ]]; then
+            echo "Error: Release notes not found at changes/${version}.md"
+            exit 1
+          fi
+
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+          git tag -a -F changes/${version}.md ${version}
+          git push origin ${version}
