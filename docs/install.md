@@ -107,7 +107,7 @@ First, install the `CloudNativePG` and `cert-manager` operators into your cluste
 
 ```shell
 kubectl apply --server-side -f \
-https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/refs/heads/main/manifests/cloudnative-pg/v1.28.0/cnpg-1.28.0.yaml
+https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
 
 kubectl apply -f \
 https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
