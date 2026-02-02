@@ -15,6 +15,7 @@ Instead, the new chart includes a few configuration mechanisms to support multi-
 1. `pgEdge.initSpock` - controls whether Spock configuration should be created and updated when deploying the chart. Defaults to true
 2. `pgEdge.provisionCerts` - controls whether or not cert-manager certs should be deployed when deploying the chart. Defaults to true
 3. `pgEdge.externalNodes` - allows configuring nodes that are part of the pgEdge Distributed Postgres deployment, but managed externally to this Helm chart. These nodes will be configured in the spock-init job when it runs.
+4. `internalHostname` - an optional property on each node that specifies a cluster-internal hostname for connectivity checks. This is useful when `hostname` is an external IP or DNS name that cannot be routed from within the Kubernetes cluster where the init-spock job runs.
 
 In order to apply these to a multi-cluster scenario, you can utilize these configuration elements across deployments in multiple clusters.
 
@@ -32,8 +33,9 @@ pgEdge:
   provisionCerts: true
   nodes:
     - name: n1
-      hostname: pgedge-n1-rw
-      clusterSpec: 
+      hostname: n1.example.com           # External hostname for replication
+      internalHostname: pgedge-n1-rw     # Cluster-local service for connectivity checks
+      clusterSpec:
         instances: 3
         postgresql:
           synchronous:
@@ -42,7 +44,7 @@ pgEdge:
             dataDurability: required
   externalNodes:
     - name: n2
-      hostname: pgedge-n2-rw
+      hostname: n2.example.com
   clusterSpec:
     storage:
       size: 1Gi
@@ -57,8 +59,9 @@ pgEdge:
   provisionCerts: false
   nodes:
     - name: n2
-      hostname: pgedge-n2-rw
-      clusterSpec: 
+      hostname: n2.example.com           # External hostname for replication
+      internalHostname: pgedge-n2-rw     # Cluster-local service for connectivity checks
+      clusterSpec:
         instances: 3
         postgresql:
           synchronous:
@@ -67,11 +70,13 @@ pgEdge:
             dataDurability: required
   externalNodes:
     - name: n1
-      hostname: pgedge-n1-rw
+      hostname: n1.example.com
   clusterSpec:
     storage:
       size: 1Gi
 ```
+
+In this example, each node uses an external hostname (e.g., `n1.example.com`) for the replication DSN that other nodes use to connect, while the `internalHostname` points to the cluster-local Kubernetes service (`pgedge-n1-rw`) that the init-spock job uses to verify the node is ready before configuring replication.
 
 !!! note
 
