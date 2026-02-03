@@ -30,12 +30,15 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          # Strip v prefix for CHART_VERSION
+          # Strip v prefix for CHART_VERSION (used for helm package)
           CHART_VERSION=${VERSION#v}
           echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
           # Strip any RC suffix for release notes lookup
           RELEASE_VERSION=${VERSION%-rc.*}
           echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+          # Strip v prefix AND RC suffix for image tag (e.g., v0.2.0-rc.1 -> 0.2.0)
+          IMAGE_VERSION=${RELEASE_VERSION#v}
+          echo "image_version=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Build and push pgedge-helm-utils image
         uses: docker/bake-action@v5
@@ -45,7 +48,7 @@ jobs:
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
         env:
-          CHART_VERSION: ${{ steps.version.outputs.chart_version }}
+          CHART_VERSION: ${{ steps.version.outputs.image_version }}
 
       - name: Install Helm
         run: |
@@ -88,8 +91,8 @@ jobs:
 
       - name: Package and sign Helm chart
         run: |
-          # Package and sign the chart
-          helm package . --version ${{ steps.version.outputs.version }} \
+          # Package and sign the chart (chart_version has no v prefix)
+          helm package . --version ${{ steps.version.outputs.chart_version }} \
             --sign \
             --key "$KEY_UID" \
             --keyring "$GNUPGHOME/secring.gpg"
@@ -99,6 +102,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          CHART_VERSION="${{ steps.version.outputs.chart_version }}"
           RELEASE_VERSION="${{ steps.version.outputs.release_version }}"
 
           # Determine if prerelease
@@ -113,9 +117,10 @@ jobs:
             NOTES_FLAG="--notes-file changes/${RELEASE_VERSION}.md"
           fi
 
+          # Note: VERSION has v prefix (for git tag), CHART_VERSION does not (for artifacts)
           gh release create "${VERSION}" \
             --title "${VERSION}" \
             ${NOTES_FLAG} \
             ${PRERELEASE_FLAG} \
-            "pgedge-${VERSION}.tgz" \
-            "pgedge-${VERSION}.tgz.prov"
+            "pgedge-${CHART_VERSION}.tgz" \
+            "pgedge-${CHART_VERSION}.tgz.prov"
