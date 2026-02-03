@@ -3,7 +3,7 @@ CHART_VERSION := $(shell grep '^version:' Chart.yaml | awk '{print $$2}')
 BUILD_REVISION ?= 1
 IMAGE_NAME := pgedge-helm-utils
 IMAGE_TAG := $(CHART_VERSION)-$(BUILD_REVISION)
-REGISTRY ?= ghcr.io/kevinpthorne
+REGISTRY ?= ghcr.io/pgedge
 BUILDX_BUILDER ?= pgedge-helm-builder 
 
 .PHONY: buildx-init
