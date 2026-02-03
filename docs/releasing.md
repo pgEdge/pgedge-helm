@@ -56,13 +56,17 @@ This command will:
 1. Batch all unreleased changelog entries into `changes/vX.Y.Z.md`
 2. Update `CHANGELOG.md`
 3. Update version in `Chart.yaml`
-4. Update image tag in `values.yaml`
-5. Regenerate documentation
-6. Create `release/vX.Y.Z` branch
-7. Commit all changes
-8. Tag `vX.Y.Z-rc.1` (release candidate)
-9. Push branch and tag
-10. Print URL to open the release PR
+4. Regenerate documentation
+5. Create `release/vX.Y.Z` branch
+6. Commit all changes
+7. Tag `vX.Y.Z-rc.1` (release candidate)
+8. Push branch and tag
+9. Print URL to open the release PR
+
+!!! note "Image versioning"
+    The `initSpockImageName` is automatically derived from the chart version at install time
+    (defaults to `ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>`), so no manual image
+    tag updates are needed during releases.
 
 ### 3. Open the Release PR
 
@@ -76,9 +80,22 @@ The RC tag triggers a GitHub Actions workflow that:
 - Creates a GitHub Release (marked as pre-release)
 - Attaches the signed Helm chart (`.tgz`) and provenance file (`.prov`)
 
-### Testing with the RC Image
+### Testing with the RC Chart
 
-To test the RC, override the image tag when installing:
+Download and install the RC chart from the GitHub release:
+
+```shell
+# Download the RC chart from GitHub releases
+gh release download vX.Y.Z-rc.1 -p 'pgedge-*.tgz'
+
+# Install with your values
+helm install pgedge ./pgedge-X.Y.Z-rc.1.tgz \
+  --values examples/configs/single/values.yaml
+```
+
+The chart automatically uses the matching `pgedge-helm-utils` image version.
+
+Alternatively, install from the release branch with an image override:
 
 ```shell
 helm install pgedge ./ \
@@ -109,8 +126,11 @@ Once testing is complete and the PR is approved:
 ## Chart Signing
 
 All released Helm charts are signed with GPG. Each release includes:
-- `pgedge-vX.Y.Z.tgz` - The packaged Helm chart
-- `pgedge-vX.Y.Z.tgz.prov` - The provenance file (GPG signature)
+- `pgedge-X.Y.Z.tgz` - The packaged Helm chart
+- `pgedge-X.Y.Z.tgz.prov` - The provenance file (GPG signature)
+
+Note: The artifact filenames use the chart version without the `v` prefix (e.g., `pgedge-0.2.0.tgz`),
+while git tags include the `v` prefix (e.g., `v0.2.0`).
 
 ### Verifying Chart Signature
 
@@ -118,7 +138,7 @@ To verify a chart's signature:
 
 ```shell
 # Download the chart and provenance file from the GitHub release
-helm verify pgedge-vX.Y.Z.tgz
+helm verify pgedge-X.Y.Z.tgz
 ```
 
 Note: You need the public key in your keyring to verify signatures.
