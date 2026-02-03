@@ -30,15 +30,12 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          # Strip v prefix for CHART_VERSION (used for helm package)
+          # Strip v prefix for CHART_VERSION (used for helm package and docker image)
           CHART_VERSION=${VERSION#v}
           echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
-          # Strip any RC suffix for release notes lookup
+          # Strip any RC suffix for release notes lookup (e.g., v0.2.0-rc.1 -> v0.2.0)
           RELEASE_VERSION=${VERSION%-rc.*}
           echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
-          # Strip v prefix AND RC suffix for image tag (e.g., v0.2.0-rc.1 -> 0.2.0)
-          IMAGE_VERSION=${RELEASE_VERSION#v}
-          echo "image_version=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Build and push pgedge-helm-utils image
         uses: docker/bake-action@v5
