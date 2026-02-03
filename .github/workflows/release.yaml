@@ -82,6 +82,10 @@ jobs:
 
           # Get the key UID (name/email) for helm signing
           KEY_UID=$(gpg --list-secret-keys --keyid-format LONG --with-colons | awk -F: '/^uid:/ {print $10; exit}')
+          if [[ -z "$KEY_UID" ]]; then
+            echo "::error::Failed to extract KEY_UID from GPG key. The key may be malformed or missing a UID field."
+            exit 1
+          fi
           echo "KEY_UID=$KEY_UID" >> $GITHUB_ENV
 
           # Export the keyring in legacy format for Helm
