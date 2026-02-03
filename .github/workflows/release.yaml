@@ -53,30 +53,46 @@ jobs:
 
       - name: Import GPG key
         run: |
-          # Configure GPG for non-interactive use
-          mkdir -p ~/.gnupg
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          gpgconf --kill gpg-agent
+          # Create GPG home directory with secure permissions
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
 
-          # Import the key
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+          # Configure GPG for non-interactive CI use
+          cat > "$GNUPGHOME/gpg.conf" << EOF
+          batch
+          no-tty
+          EOF
 
-          # Get the key ID for signing
-          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
-          echo "GPG_KEY_ID=${GPG_KEY_ID}" >> $GITHUB_ENV
+          cat > "$GNUPGHOME/gpg-agent.conf" << EOF
+          default-cache-ttl 7200
+          EOF
+
+          chmod 600 "$GNUPGHOME/gpg.conf" "$GNUPGHOME/gpg-agent.conf"
+
+          # Start gpg-agent in this new GNUPGHOME
+          gpgconf --launch gpg-agent
+
+          # Import the GPG private key
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --yes --import
+
+          # Save GNUPGHOME for subsequent steps
+          echo "GNUPGHOME=$GNUPGHOME" >> $GITHUB_ENV
+
+          # Get the key UID (name/email) for helm signing
+          KEY_UID=$(gpg --list-secret-keys --keyid-format LONG --with-colons | awk -F: '/^uid:/ {print $10; exit}')
+          echo "KEY_UID=$KEY_UID" >> $GITHUB_ENV
+
+          # Export the keyring in legacy format for Helm
+          gpg --export-secret-keys > "$GNUPGHOME/secring.gpg"
+          chmod 600 "$GNUPGHOME/secring.gpg"
 
       - name: Package and sign Helm chart
         run: |
-          # Create legacy keyring file for Helm (required for helm package --sign)
-          gpg --batch --pinentry-mode loopback --passphrase "" --export-secret-keys > ~/.gnupg/secring.gpg
-
           # Package and sign the chart
           helm package . --version ${{ steps.version.outputs.version }} \
             --sign \
-            --key "${GPG_KEY_ID}" \
-            --keyring ~/.gnupg/secring.gpg \
-            --passphrase-file <(echo "")
+            --key "$KEY_UID" \
+            --keyring "$GNUPGHOME/secring.gpg"
 
       - name: Create GitHub Release
         env:
