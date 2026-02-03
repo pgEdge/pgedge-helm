@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.2.0 - 2026-02-03
 
+### Added
+
+- Added `internalHostname` configuration option for nodes, allowing in-cluster connection checks while preserving the external hostname for spock configuration (useful when clusters prevent hairpinning)
+- Automated release workflow that builds/pushes Docker images, GPG-signs Helm charts, and creates GitHub releases with prerelease support
+- Automated tag release workflow that creates git tags when release PRs are merged to main
+- Release notes integration from `changes/<version>.md` files
+
+### Changed
+
+- init-spock job image now defaults to `ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>` when `initSpockImageName` is not set, eliminating manual version updates during releases
+- Improved Helm validation logic so `bootstrap.mode` is only required when `initSpock` is enabled
+
+### Fixed
+
+- Fixed duplicate `privateKey` key in client-ca Certificate resource
+
+
 ## v0.1.0 - 2025-12-19
 
 ### Added
