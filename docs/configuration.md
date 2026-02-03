@@ -27,16 +27,6 @@ pgEdge:
       size: 1Gi
 ```
 
-Each node in the `nodes` list supports the following properties:
-
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Unique identifier for the node (e.g., `n1`, `n2`). Used to derive Kubernetes resource names and Spock node names. |
-| `hostname` | Yes | The externally routable hostname for the node. This is stored in Spock's DSN and used by other nodes for replication connections. |
-| `internalHostname` | No | An optional cluster-internal hostname used for connectivity checks during initialization. When specified, the init-spock job uses this address to verify the node is accepting connections, while still using `hostname` for replication DSNs. Useful in multi-cluster deployments where `hostname` may be an external IP not routable from within the cluster. |
-| `ordinal` | No | Override the automatically derived node ordinal used for `snowflake.node` and `lolor.node` configuration. |
-| `clusterSpec` | No | Node-specific CloudNativePG Cluster configuration that overrides the global `clusterSpec`. |
-
 As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
 
 You can also override the `clusterSpec` for specific nodes if you require more granular control.
