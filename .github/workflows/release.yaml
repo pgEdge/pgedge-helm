@@ -48,8 +48,10 @@ jobs:
           CHART_VERSION: ${{ steps.version.outputs.chart_version }}
 
       - name: Install Helm
+        env:
+          HELM_VERSION: v3.17.0
         run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version v3.14.1
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
 
       - name: Import GPG key
         run: |
