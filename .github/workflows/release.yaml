@@ -53,22 +53,30 @@ jobs:
 
       - name: Import GPG key
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --import --batch
+          # Configure GPG for non-interactive use
+          mkdir -p ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent
+
+          # Import the key
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+
           # Get the key ID for signing
           GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
           echo "GPG_KEY_ID=${GPG_KEY_ID}" >> $GITHUB_ENV
 
       - name: Package and sign Helm chart
         run: |
-          # Create a keyring file for Helm
-          gpg --export-secret-keys > ~/.gnupg/secring.gpg
+          # Create legacy keyring file for Helm (required for helm package --sign)
+          gpg --batch --pinentry-mode loopback --passphrase "" --export-secret-keys > ~/.gnupg/secring.gpg
 
-          # Package and sign the chart (no passphrase)
+          # Package and sign the chart
           helm package . --version ${{ steps.version.outputs.version }} \
             --sign \
             --key "${GPG_KEY_ID}" \
             --keyring ~/.gnupg/secring.gpg \
-            --passphrase-file /dev/null
+            --passphrase-file <(echo "")
 
       - name: Create GitHub Release
         env:
