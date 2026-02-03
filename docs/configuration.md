@@ -27,16 +27,6 @@ pgEdge:
       size: 1Gi
 ```
 
-Each node in the `nodes` list supports the following properties:
-
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Unique identifier for the node (e.g., `n1`, `n2`). Used to derive Kubernetes resource names and Spock node names. |
-| `hostname` | Yes | The externally routable hostname for the node. This is stored in Spock's DSN and used by other nodes for replication connections. |
-| `internalHostname` | No | An optional cluster-internal hostname used for connectivity checks during initialization. When specified, the init-spock job uses this address to verify the node is accepting connections, while still using `hostname` for replication DSNs. Useful in multi-cluster deployments where `hostname` may be an external IP not routable from within the cluster. |
-| `ordinal` | No | Override the automatically derived node ordinal used for `snowflake.node` and `lolor.node` configuration. |
-| `clusterSpec` | No | Node-specific CloudNativePG Cluster configuration that overrides the global `clusterSpec`. |
-
 As shown, The default `clusterSpec` can be overridden for all nodes with specific configuration required for your Kubernetes setup.
 
 You can also override the `clusterSpec` for specific nodes if you require more granular control.
@@ -131,6 +121,6 @@ The following table lists all available options and their descriptions.
 | pgEdge.clusterSpec | object | `{"bootstrap":{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;"],"postInitSQL":[],"postInitTemplateSQL":[]}},"certificates":{"clientCASecret":"client-ca-key-pair","replicationTLSSecret":"streaming-replica-client-cert"},"imageName":"ghcr.io/pgedge/pgedge-postgres:17-spock5-standard","imagePullPolicy":"Always","instances":1,"managed":{"roles":[{"comment":"Admin role","ensure":"present","login":true,"name":"admin","superuser":true}]},"postgresql":{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"pg_hba":["hostssl app pgedge 0.0.0.0/0 cert","hostssl app admin 0.0.0.0/0 cert","hostssl app app 0.0.0.0/0 cert","hostssl all streaming_replica all cert map=cnpg_streaming_replica"],"pg_ident":["local postgres admin","local postgres app"],"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]},"projectedVolumeTemplate":{"sources":[{"secret":{"items":[{"key":"tls.crt","mode":384,"path":"pgedge/certificates/tls.crt"},{"key":"tls.key","mode":384,"path":"pgedge/certificates/tls.key"},{"key":"ca.crt","mode":384,"path":"pgedge/certificates/ca.crt"}],"name":"pgedge-client-cert"}}]}}` | Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis using the `clusterSpec` field in each node definition. |
 | pgEdge.externalNodes | list | `[]` | Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart. This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster. |
 | pgEdge.initSpock | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |
-| pgEdge.initSpockImageName | string | `"ghcr.io/pgedge/pgedge-helm-utils:v0.1.0"` | Docker image for the init-spock job. This image contains Python and required dependencies for the job to run. This image is versioned alongside the Helm chart. |
+| pgEdge.initSpockImageName | string | `""` | Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>. Override this for local development or to use a custom image. |
 | pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
 | pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
