@@ -48,7 +48,7 @@ jobs:
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
         env:
-          CHART_VERSION: ${{ steps.version.outputs.image_version }}
+          CHART_VERSION: ${{ steps.version.outputs.chart_version }}
 
       - name: Install Helm
         run: |

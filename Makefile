@@ -48,8 +48,6 @@ endif
 	$(changie) merge
 	@# Update Chart.yaml version
 	sed -i.bak 's/^version: .*/version: $(subst v,,$(VERSION))/' Chart.yaml && rm Chart.yaml.bak
-	@# Update values.yaml initSpockImageName
-	sed -i.bak 's|initSpockImageName: ghcr.io/pgedge/pgedge-helm-utils:v.*|initSpockImageName: ghcr.io/pgedge/pgedge-helm-utils:$(VERSION)|' values.yaml && rm values.yaml.bak
 	@# Update docs with hardcoded versions (handled by gen-docs for README)
 	$(MAKE) gen-docs
 	@# Copy CHANGELOG to docs for mkdocs

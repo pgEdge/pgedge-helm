@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: {{ .Values.pgEdge.appName }}-init-spock
-        image: {{ .Values.pgEdge.initSpockImageName }}
+        image: {{ .Values.pgEdge.initSpockImageName | default (printf "ghcr.io/pgedge/pgedge-helm-utils:v%s" .Chart.Version) }}
         command:
           - python
           - -u
