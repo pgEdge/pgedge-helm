@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added security context configuration for init-spock job, allowing customization of `runAsUser`, `runAsGroup`, `fsGroup`, and `runAsNonRoot` settings
 - Added `internalHostname` configuration option for nodes, allowing in-cluster connection checks while preserving the external hostname for spock configuration (useful when clusters prevent hairpinning)
-- Automated release workflow that builds/pushes Docker images, GPG-signs Helm charts, and creates GitHub releases with prerelease support
-- Automated tag release workflow that creates git tags when release PRs are merged to main
-- Release notes integration from `changes/<version>.md` files
+- Added automated release workflow which manages release notes, builds/pushes Docker images, GPG-signs Helm charts, and creates GitHub releases with prerelease support
 
 ### Changed
 
