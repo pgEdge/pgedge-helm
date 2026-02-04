@@ -12,7 +12,7 @@ single-up:
 	kubectl apply --context kind-single --server-side -f \
 		https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
 	kubectl apply --context kind-single -f \
-		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+		https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
 	kubectl --context kind-single wait --for=condition=Available deployment \
 		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
 		

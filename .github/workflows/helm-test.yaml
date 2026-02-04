@@ -1,0 +1,94 @@
+name: Helm Test
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  helm-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build pgedge-helm-utils dev image
+        run: make docker-build-dev
+
+      - name: Install tools
+        env:
+          KIND_VERSION: v0.27.0
+          HELM_VERSION: v3.17.0
+        run: |
+          # Install kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+          # Install Helm
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
+
+      - name: Helm lint
+        run: helm lint . --values examples/configs/single/values.yaml
+
+      - name: Create kind cluster
+        run: make -f examples/Makefile single-up
+
+      - name: Load image into kind
+        run: make -f examples/Makefile single-load-kind
+
+      - name: Install pgedge
+        run: make -f examples/Makefile single-install
+
+      - name: Helm test
+        run: make -f examples/Makefile single-test
+
+      - name: Collect debug artifacts on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/artifacts
+
+          # Get kind cluster logs
+          kind export logs /tmp/artifacts/kind-logs --name single || true
+
+          # Get all pods
+          kubectl get pods -A -o wide > /tmp/artifacts/pods.txt || true
+
+          # Get all events
+          kubectl get events -A --sort-by='.lastTimestamp' > /tmp/artifacts/events.txt || true
+
+          # Get helm release info
+          helm list -A > /tmp/artifacts/helm-releases.txt || true
+          helm get all pgedge -n default > /tmp/artifacts/helm-release-details.txt || true
+
+          # Get init-spock job logs
+          kubectl get jobs -n default > /tmp/artifacts/jobs.txt || true
+          kubectl describe job pgedge-init-spock -n default > /tmp/artifacts/init-spock-job.txt || true
+          kubectl logs -l job-name=pgedge-init-spock -n default --all-containers=true > /tmp/artifacts/init-spock-logs.txt || true
+
+          # Get PostgreSQL cluster info
+          kubectl get clusters.postgresql.cnpg.io -n default > /tmp/artifacts/pg-clusters.txt || true
+          kubectl describe clusters.postgresql.cnpg.io -n default > /tmp/artifacts/pg-cluster-details.txt || true
+
+          # Get PostgreSQL pod logs
+          kubectl logs -l cnpg.io/cluster -n default --all-containers=true --tail=500 > /tmp/artifacts/postgres-logs.txt || true
+
+      - name: Upload debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: debug-logs
+          path: /tmp/artifacts
+
+      - name: Teardown
+        if: always()
+        run: |
+          make -f examples/Makefile single-uninstall || true
+          make -f examples/Makefile single-down || true

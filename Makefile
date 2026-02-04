@@ -32,3 +32,62 @@ docker-push-dev: buildx-init
 docker-release: buildx-init
 	CHART_VERSION=$(CHART_VERSION) BUILD_REVISION=$(BUILD_REVISION) REGISTRY=$(REGISTRY) docker buildx bake release --builder $(BUILDX_BUILDER)
 
+# Release targets
+changie := $(shell command -v changie 2> /dev/null)
+
+.PHONY: release
+release:
+ifndef changie
+	$(error changie is not installed. Install it from https://changie.dev/guide/installation/)
+endif
+ifndef VERSION
+	$(error VERSION must be set to trigger a release)
+endif
+	@echo "Creating release $(VERSION)..."
+	$(changie) batch $(VERSION)
+	$(changie) merge
+	@# Update Chart.yaml version
+	sed -i.bak 's/^version: .*/version: $(subst v,,$(VERSION))/' Chart.yaml && rm Chart.yaml.bak
+	@# Update docs with hardcoded versions (handled by gen-docs for README)
+	$(MAKE) gen-docs
+	@# Copy CHANGELOG to docs for mkdocs
+	cp CHANGELOG.md docs/changelog.md
+	git checkout -b release/$(VERSION)
+	git add -A
+	git commit -m "build(release): bump version to $(VERSION)"
+	git push origin release/$(VERSION)
+	git tag -a -F changes/$(VERSION).md $(VERSION)-rc.1
+	git push origin $(VERSION)-rc.1
+	@echo ""
+	@echo "Release branch and RC tag created successfully!"
+	@echo "Open PR: https://github.com/pgedge/pgedge-helm/compare/release/$(VERSION)?expand=1"
+
+.PHONY: major-release
+major-release:
+ifndef changie
+	$(error changie is not installed. Install it from https://changie.dev/guide/installation/)
+endif
+	$(MAKE) release VERSION=$(shell $(changie) next major)
+
+.PHONY: minor-release
+minor-release:
+ifndef changie
+	$(error changie is not installed. Install it from https://changie.dev/guide/installation/)
+endif
+	$(MAKE) release VERSION=$(shell $(changie) next minor)
+
+.PHONY: patch-release
+patch-release:
+ifndef changie
+	$(error changie is not installed. Install it from https://changie.dev/guide/installation/)
+endif
+	$(MAKE) release VERSION=$(shell $(changie) next patch)
+
+.PHONY: print-next-versions
+print-next-versions:
+ifndef changie
+	$(error changie is not installed. Install it from https://changie.dev/guide/installation/)
+endif
+	@echo "Next major version: $(shell $(changie) next major)"
+	@echo "Next minor version: $(shell $(changie) next minor)"
+	@echo "Next patch version: $(shell $(changie) next patch)"

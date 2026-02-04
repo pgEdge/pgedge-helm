@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          # Strip v prefix for CHART_VERSION (used for helm package and docker image)
+          CHART_VERSION=${VERSION#v}
+          echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
+          # Strip any RC suffix for release notes lookup (e.g., v0.2.0-rc.1 -> v0.2.0)
+          RELEASE_VERSION=${VERSION%-rc.*}
+          echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build and push pgedge-helm-utils image
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        with:
+          targets: release
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
+        env:
+          CHART_VERSION: ${{ steps.version.outputs.chart_version }}
+
+      - name: Install Helm
+        env:
+          HELM_VERSION: v3.17.0
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
+
+      - name: Import GPG key
+        run: |
+          # Create GPG home directory with secure permissions
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+
+          # Configure GPG for non-interactive CI use
+          cat > "$GNUPGHOME/gpg.conf" << EOF
+          batch
+          no-tty
+          EOF
+
+          cat > "$GNUPGHOME/gpg-agent.conf" << EOF
+          default-cache-ttl 7200
+          EOF
+
+          chmod 600 "$GNUPGHOME/gpg.conf" "$GNUPGHOME/gpg-agent.conf"
+
+          # Start gpg-agent in this new GNUPGHOME
+          gpgconf --launch gpg-agent
+
+          # Import the GPG private key
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --yes --import
+
+          # Save GNUPGHOME for subsequent steps
+          echo "GNUPGHOME=$GNUPGHOME" >> $GITHUB_ENV
+
+          # Get the key UID (name/email) for helm signing
+          KEY_UID=$(gpg --list-secret-keys --keyid-format LONG --with-colons | awk -F: '/^uid:/ {print $10; exit}')
+          if [[ -z "$KEY_UID" ]]; then
+            echo "::error::Failed to extract KEY_UID from GPG key. The key may be malformed or missing a UID field."
+            exit 1
+          fi
+          echo "KEY_UID=$KEY_UID" >> $GITHUB_ENV
+
+          # Export the keyring in legacy format for Helm
+          gpg --export-secret-keys > "$GNUPGHOME/secring.gpg"
+          chmod 600 "$GNUPGHOME/secring.gpg"
+
+      - name: Package and sign Helm chart
+        run: |
+          # Package and sign the chart (chart_version has no v prefix)
+          helm package . --version ${{ steps.version.outputs.chart_version }} \
+            --sign \
+            --key "$KEY_UID" \
+            --keyring "$GNUPGHOME/secring.gpg"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHART_VERSION="${{ steps.version.outputs.chart_version }}"
+          RELEASE_VERSION="${{ steps.version.outputs.release_version }}"
+
+          # Determine if prerelease
+          PRERELEASE_FLAG=""
+          if [[ "${VERSION}" == *"-rc"* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          # Determine release notes file
+          NOTES_FLAG=""
+          if [[ -f "changes/${RELEASE_VERSION}.md" ]]; then
+            NOTES_FLAG="--notes-file changes/${RELEASE_VERSION}.md"
+          fi
+
+          # Note: VERSION has v prefix (for git tag), CHART_VERSION does not (for artifacts)
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            ${NOTES_FLAG} \
+            ${PRERELEASE_FLAG} \
+            "pgedge-${CHART_VERSION}.tgz" \
+            "pgedge-${CHART_VERSION}.tgz.prov"
