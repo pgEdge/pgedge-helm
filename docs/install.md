@@ -118,6 +118,9 @@ kubectl wait --for=condition=Available deployment \
 
 ## Step 3: Install the chart
 
+!!! tip "Restricted Namespaces"
+    pgEdge Helm is compatible with Kubernetes namespaces using the `restricted` Pod Security Standard. See the [Security](security.md) guide for details on security contexts and hardened deployments.
+
 Download the latest `pgedge-helm` release package from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/).  
 
 After downloading and extracting the package, run the `helm install` command from the directory containing the extracted `pgedge-helm` chart.

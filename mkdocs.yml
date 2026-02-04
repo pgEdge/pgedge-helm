@@ -62,6 +62,7 @@ nav:
       - Upgrading Postgres: usage/postgres_upgrades.md
       - Configuring Standby Instances: usage/standby.md
   - Certificate Management: certificates.md
+  - Security: security.md
   - Multi-cluster Deployments: multicluster.md
   - Testing Locally: testing-locally.md
   - Limitations: limitations.md
