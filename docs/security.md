@@ -24,6 +24,8 @@ runAsNonRoot: true
 fsGroup: 65532
 ```
 
+All defaults are explicit in `values.yaml` and can be customized or disabled.
+
 **Container Security Context:**
 ```yaml
 allowPrivilegeEscalation: false

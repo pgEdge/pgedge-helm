@@ -24,6 +24,7 @@ pgEdge:
       seccompProfile:
         type: RuntimeDefault
       runAsNonRoot: true
+      fsGroup: 65532
     # -- Container Security context for the init-spock job. Set to a Restricted profile by default.
     # Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/
     containerSecurityContext:
@@ -100,4 +101,3 @@ pgEdge:
               - key: ca.crt
                 path: pgedge/certificates/ca.crt
                 mode: 0600
-    
