@@ -37,6 +37,10 @@ spec:
           - name: admin-client-cert
             mountPath: /certificates/admin
             readOnly: true
+        {{- with .Values.pgEdge.initSpockJobConfig.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
       volumes:
         - name: {{ .Values.pgEdge.appName }}-config
           configMap:
@@ -57,6 +61,8 @@ spec:
               - key: ca.crt
                 path: ca.crt
                 mode: 0600
+      {{- with .Values.pgEdge.initSpockJobConfig.podSecurityContext }}
       securityContext:
-        fsGroup: 65532
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}
