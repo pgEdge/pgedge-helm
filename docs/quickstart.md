@@ -15,7 +15,7 @@ The guide covers basic usage of the Helm chart and its features, using either an
 - The following tools must be installed on your laptop to deploy and interact with Kubernetes and CloudNativePG:
     - [helm](https://helm.sh/docs/intro/install/): The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
     - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
-    - [kubectl cnpg plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
+    - [kubectl cnpg plugin](https://github.com/pgEdge/pgedge-cnpg-dist/releases?q=kubectl-cnpg&expanded=true): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters. Download the appropriate binary for your platform from the pgEdge distribution releases.
 
 ## Installation
 
