@@ -1,0 +1,15 @@
+{{- /*
+Extra resources to deploy alongside pgEdge.
+This template processes the extraResources array and renders each resource with template evaluation.
+Supports both string manifests and object definitions.
+*/ -}}
+{{- range $manifest := .Values.pgEdge.extraResources }}
+---
+{{- if typeIs "string" $manifest }}
+{{- /* String manifests are rendered directly with tpl */ -}}
+{{ tpl $manifest $ }}
+{{- else }}
+{{- /* Object manifests are converted to YAML first, then rendered with tpl */ -}}
+{{ tpl (toYaml $manifest) $ }}
+{{- end }}
+{{- end }}

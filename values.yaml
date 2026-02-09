@@ -101,3 +101,7 @@ pgEdge:
               - key: ca.crt
                 path: pgedge/certificates/ca.crt
                 mode: 0600
+
+  # -- Array of extra Kubernetes resources to deploy alongside pgEdge (evaluated as templates).
+  # Useful for deploying NetworkPolicies, PodMonitors, ConfigMaps, etc.
+  extraResources: []
