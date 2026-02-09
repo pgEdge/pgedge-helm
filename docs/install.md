@@ -128,30 +128,41 @@ kubectl wait --for=condition=Available deployment \
 !!! tip "Restricted Namespaces"
     pgEdge Helm is compatible with Kubernetes namespaces using the `restricted` Pod Security Standard. See the [Security](security.md) guide for details on security contexts and hardened deployments.
 
-Download the latest `pgedge-helm` release package from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/).  
+### Install from pgEdge Helm Repository
 
-After downloading and extracting the package, run the `helm install` command from the directory containing the extracted `pgedge-helm` chart.
-
-1. **Navigate to the Correct Directory**  
-   First, change your current directory to the location where you unzipped/downloaded the Helm chart.
-
-2. **Run the Helm Install Command**  
-   Once you are in the `pgedge-helm` directory, you can run the `helm install` command. The command uses relative paths, which is why changing directories first is crucial.
+The recommended method is to install directly from the pgEdge Helm repository:
 
 ```shell
-helm install \
---values examples/configs/single/values.yaml \
-	--wait \
-	pgedge ./
+helm install pgedge pgedge/pgedge \
+  --values values.yaml \
+  --wait
 ```
 
-### Command Breakdown
+You'll need to create a `values.yaml` file with your configuration. See the example configurations:
 
-- `helm install`: The main command to deploy a Helm chart.
-- `--values examples/configs/single/values.yaml`: This flag tells Helm to use a specific configuration file. The path is relative to your current directory.
-- `--wait`: This flag ensures that the command waits until all the resources in the chart are ready before marking the installation as complete.
-- `pgedge`: This is the **release name** for your Helm chart. You can name this anything you want; it's a unique identifier for your installation.
-- `./`: The dot (`.`) at the end is a relative path that tells Helm to install the chart located in the **current directory**.
+- Single region: [examples/configs/single/values.yaml](https://github.com/pgEdge/pgedge-helm/blob/main/examples/configs/single/values.yaml)
+
+### Install from Local Chart
+
+Alternatively, you can download and install from a local chart package:
+
+1. Download the latest release from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/)
+2. Extract the package and navigate to the chart directory
+3. Install using the local chart:
+
+```shell
+helm install pgedge ./ \
+  --values examples/configs/single/values.yaml \
+  --wait
+```
+
+### Command Details
+
+- `helm install`: Deploys a Helm chart
+- `pgedge`: The release name for your installation (can be customized)
+- `pgedge/pgedge` or `./`: The chart to install (from repository or local path)
+- `--values`: Path to your configuration file
+- `--wait`: Waits for all resources to be ready before completing
 
 **NOTE:** This command may take a long time to run depending on your configuration. You can monitor the progress of the Spock initialization job with this command:
 
@@ -159,14 +170,9 @@ helm install \
 kubectl logs --follow jobs/pgedge-init-spock
 ```
 
-Once the job has completed, you should see the following message which indicates the chart has been successfully installed.
+Once the installation completes, you should see output similar to:
 
 ```shell
-➜ helm install \
---values examples/configs/single/values.yaml \
-        --wait \
-        pgedge ./
-
 NAME: pgedge
 LAST DEPLOYED: Fri Oct 10 14:07:41 2025
 NAMESPACE: pgedge
@@ -174,6 +180,8 @@ STATUS: deployed
 REVISION: 1
 TEST SUITE: None
 ```
+
+This confirms the chart has been successfully installed.
 
 ## Uninstallation
 
