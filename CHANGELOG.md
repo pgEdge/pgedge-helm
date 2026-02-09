@@ -5,13 +5,15 @@ All notable changes to pgEdge Helm will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.2.0 - 2026-02-03
+## v0.2.0 - 2026-02-12
 
 ### Added
 
-- Added security context configuration for init-spock job, allowing customization of `runAsUser`, `runAsGroup`, `fsGroup`, and `runAsNonRoot` settings
+- Added security context configuration for init-spock job, allowing customization of `runAsUser`, `runAsGroup`, `fsGroup`, and `runAsNonRoot` settings (thanks @kevinpthorne)
+- Added `extraResources` field to deploy additional Kubernetes resources (NetworkPolicies, PodMonitors, ConfigMaps, etc.) alongside pgEdge with full Helm template evaluation
 - Added `internalHostname` configuration option for nodes, allowing in-cluster connection checks while preserving the external hostname for spock configuration (useful when clusters prevent hairpinning)
 - Added automated release workflow which manages release notes, builds/pushes Docker images, GPG-signs Helm charts, and creates GitHub releases with prerelease support
+- Added pgEdge Helm Repository (https://pgedge.github.io/charts) providing official Helm charts for pgEdge, CloudNativePG, and Barman Cloud plugin with updated documentation recommending this as the primary installation method
 
 ### Changed
 

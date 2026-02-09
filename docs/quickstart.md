@@ -33,17 +33,19 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
 3. Install chart dependencies.
 
-    pgEdge Helm requires the `CloudNativePG` and `cert-manager` operators to be installed into your cluster. Run the following commands to complete the required installation:
+    pgEdge Helm requires the `CloudNativePG` and `cert-manager` operators to be installed into your cluster. You can install CloudNativePG using manifests from the pgEdge distribution:
 
     ```shell
+    # Install CloudNativePG from pgEdge distribution
     kubectl apply --server-side -f \
-    https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
+      https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/main/manifests/v1.28.1/cnpg-1.28.1.yaml
 
+    # Install cert-manager
     kubectl apply -f \
-    https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
+      https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
 
     kubectl wait --for=condition=Available deployment \
-        -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
+      -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
     ```
 
 4. Customize your chart configuration (optional).

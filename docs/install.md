@@ -103,17 +103,24 @@ kubectl config use-context helm-test --namespace pgedge
 
 ## Step 2: Install chart dependencies
 
-First, install the `CloudNativePG` and `cert-manager` operators into your cluster:
+First, add the pgEdge Helm repository and install the `CloudNativePG` and `cert-manager` operators:
 
 ```shell
-kubectl apply --server-side -f \
-https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
+# Add the pgEdge Helm repository
+helm repo add pgedge https://pgedge.github.io/charts
+helm repo update
 
+# Install CloudNativePG operator
+helm install cnpg pgedge/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace
+
+# Install cert-manager
 kubectl apply -f \
-https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
+  https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
 
 kubectl wait --for=condition=Available deployment \
-	-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
+  -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
 ```
 
 ## Step 3: Install the chart
