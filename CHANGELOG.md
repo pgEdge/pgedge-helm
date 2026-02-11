@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added a [quickstart](docs/quickstart.md) to the docs
+- Added a quickstart to the docs
 
 ### Changed
 
