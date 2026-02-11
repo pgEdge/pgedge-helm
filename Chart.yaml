@@ -2,11 +2,8 @@ annotations:
   category: Database
 apiVersion: v2
 name: pgedge
-description: |
-  The **pgEdge Helm** chart supports deploying both pgEdge Enterprise Postgres and pgEdge Distributed Postgres in Kubernetes. 
-
-  This chart leverages [CloudNativePG](https://cloudnative-pg.io/) to manage Postgres, providing flexible options for single-region and multi-region deployments.
+description: The pgEdge Helm chart supports deploying both pgEdge Enterprise Postgres and pgEdge Distributed Postgres in Kubernetes. This chart leverages CloudNativePG to manage Postgres, providing flexible options for single-region and multi-region deployments.
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm
-version: 0.1.0
+version: 0.2.0

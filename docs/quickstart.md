@@ -15,13 +15,16 @@ The guide covers basic usage of the Helm chart and its features, using either an
 - The following tools must be installed on your laptop to deploy and interact with Kubernetes and CloudNativePG:
     - [helm](https://helm.sh/docs/intro/install/): The package manager for Kubernetes, used to install, upgrade, and manage Kubernetes applications via Helm charts.
     - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): The Kubernetes command-line tool, used to interact with and manage your Kubernetes clusters.
-    - [kubectl cnpg plugin](https://cloudnative-pg.io/documentation/current/kubectl-plugin/#install): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters.
+    - [kubectl cnpg plugin](https://github.com/pgEdge/pgedge-cnpg-dist/releases?q=kubectl-cnpg&expanded=true): A plugin for `kubectl` that provides additional commands for managing CloudNativePG clusters. Download the appropriate binary for your platform from the pgEdge distribution releases.
 
 ## Installation
 
-1. Download the latest `pgedge-helm` release package from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/).  
+1. Add the pgEdge Helm repository:
 
-    After downloading and extracting the package on your machine, navigate into the `pgedge-helm` directory.
+    ```sh
+    helm repo add pgedge https://pgedge.github.io/charts
+    helm repo update
+    ```
 
 2. Set your kubectl context and namespace to ensure you will deploy the chart to the correct cluster. For example:
 
@@ -33,65 +36,101 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
 3. Install chart dependencies.
 
-    pgEdge Helm requires the `CloudNativePG` and `cert-manager` operators to be installed into your cluster. Run the following commands to complete the required installation:
+    pgEdge Helm requires the `CloudNativePG` and `cert-manager` operators to be installed into your cluster:
 
     ```shell
-    kubectl apply --server-side -f \
-    https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-1.28.0.yaml
+    # Install CloudNativePG operator
+    helm install cnpg pgedge/cloudnative-pg \
+      --namespace cnpg-system \
+      --create-namespace
 
+    # Install cert-manager
     kubectl apply -f \
-    https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
+      https://github.com/cert-manager/cert-manager/releases/download/v1.19.3/cert-manager.yaml
 
     kubectl wait --for=condition=Available deployment \
-        -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
+      -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
     ```
 
 4. Customize your chart configuration (optional).
 
-    The chart includes a sample configuration file at `examples/configs/single/values.yaml` which deploys three distributed pgEdge nodes deployed into a single Kubernetes cluster.
-
-    `n1` is configured with 3 instances (1 primary, 2 standby), and nodes `n2` and `n3` are configured with a single primary instance.
-
-    You can also follow this guide to test out a single region deployment by removing the configuration for `n2` and `n3` under `nodes` in the configuration file:
+    Create a `values.yaml` file with your configuration. For a distributed setup with three nodes:
 
     ```yaml
     pgEdge:
-        appName: pgedge
-        nodes:
-            - name: n1
-            hostname: pgedge-n1-rw
-            clusterSpec:
-                instances: 3
-                postgresql:
-                synchronous:
-                    method: any
-                    number: 1
-                    dataDurability: required
-        clusterSpec:
-            storage:
-            size: 1Gi
+      appName: pgedge
+      nodes:
+        - name: n1
+          hostname: pgedge-n1-rw
+          clusterSpec:
+            instances: 3
+            postgresql:
+              synchronous:
+                method: any
+                number: 1
+                dataDurability: required
+        - name: n2
+          hostname: pgedge-n2-rw
+        - name: n3
+          hostname: pgedge-n3-rw
+      clusterSpec:
+        storage:
+          size: 1Gi
+    ```
+
+    For a single region deployment with just one node:
+
+    ```yaml
+    pgEdge:
+      appName: pgedge
+      nodes:
+        - name: n1
+          hostname: pgedge-n1-rw
+          clusterSpec:
+            instances: 3
+            postgresql:
+              synchronous:
+                method: any
+                number: 1
+                dataDurability: required
+      clusterSpec:
+        storage:
+          size: 1Gi
     ```
 
     If you want to change your configuration later to use a distributed architecture, see [Adding Nodes](usage/adding_nodes.md).
 
-5. Install the chart with the command:
+    You can also reference the example configuration at [examples/configs/single/values.yaml](https://github.com/pgEdge/pgedge-helm/blob/main/examples/configs/single/values.yaml).
+
+5. Install the chart.
+
+    **From pgEdge Helm Repository (recommended):**
 
     ```sh
-        helm install \
-        --values examples/configs/single/values.yaml \
-            --wait \
-            pgedge ./
+    helm install pgedge pgedge/pgedge \
+      --values values.yaml \
+      --wait
+    ```
+
+    **From local chart:**
+
+    Alternatively, download the latest release from [pgEdge Helm Releases](https://github.com/pgEdge/pgedge-helm/releases/), extract it, and install from the local directory:
+
+    ```sh
+    helm install pgedge ./ \
+      --values values.yaml \
+      --wait
     ```
 
     Once the deployment is complete, you should see a confirmation message, and your database is ready to use:
 
     ```sh
-        NAME: pgedge
-        LAST DEPLOYED: Thu Oct 30 10:41:07 2025
-        NAMESPACE: default
-        STATUS: deployed
-        REVISION: 1
-        TEST SUITE: None
+    NAME: pgedge
+    LAST DEPLOYED: Thu Oct 30 10:41:07 2025
+    NAMESPACE: default
+    STATUS: deployed
+    REVISION: 1
+    TEST SUITE: None
     ```
 
 ## Connecting to each Database Instance
