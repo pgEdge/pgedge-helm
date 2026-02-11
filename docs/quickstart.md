@@ -46,7 +46,7 @@ The guide covers basic usage of the Helm chart and its features, using either an
 
     # Install cert-manager
     kubectl apply -f \
-      https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml
+      https://github.com/cert-manager/cert-manager/releases/download/v1.19.3/cert-manager.yaml
 
     kubectl wait --for=condition=Available deployment \
       -n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
