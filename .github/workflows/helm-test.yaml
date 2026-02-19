@@ -38,6 +38,9 @@ jobs:
       - name: Helm lint
         run: helm lint . --values examples/configs/single/values.yaml
 
+      - name: Template tests
+        run: ./scripts/test-template.sh
+
       - name: Create kind cluster
         run: make -f examples/Makefile single-up
 
