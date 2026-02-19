@@ -33,6 +33,9 @@ jobs:
       - name: Chart lint
         run: ct lint --chart-dirs . --charts .
 
+      - name: Template tests
+        run: ./scripts/test-template.sh
+
       - name: Unit tests
         run: make test-unit
 

@@ -14,10 +14,6 @@ Adding nodes is supported by updating the `pgEdge.nodes` value and running a hel
 
 See [Adding Nodes](usage/adding_nodes.md) for more information.
 
-## App database name
-
-The app database is named "app" by default, and cannot be renamed without modifying various Helm templates and the default values.yaml file.
-
 ## Installing multiple times into the same namespace
 
 Installing the chart multiple times into the same Kubernetes namespace is not recommended. Each release expects to manage its own set of resources, and resource name conflicts or unexpected behavior may occur if multiple releases are installed in the same namespace.
