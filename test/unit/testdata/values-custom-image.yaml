@@ -1,0 +1,9 @@
+pgEdge:
+  appName: pgedge
+  initSpockImageName: my-registry.io/custom-image:v1.0.0
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    storage:
+      size: 1Gi

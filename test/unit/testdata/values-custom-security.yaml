@@ -1,0 +1,20 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  initSpockJobConfig:
+    podSecurityContext:
+      runAsNonRoot: true
+      fsGroup: 1000
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop:
+          - NET_RAW
+  clusterSpec:
+    storage:
+      size: 1Gi

@@ -91,3 +91,19 @@ endif
 	@echo "Next major version: $(shell $(changie) next major)"
 	@echo "Next minor version: $(shell $(changie) next minor)"
 	@echo "Next patch version: $(shell $(changie) next patch)"
+
+.PHONY: test-unit
+test-unit:
+	$(MAKE) -C test test-unit
+
+.PHONY: test-integration
+test-integration:
+	$(MAKE) -C test test-integration
+
+.PHONY: test-integration-kind
+test-integration-kind:
+	$(MAKE) -C test test-integration-kind
+
+.PHONY: test-all
+test-all:
+	$(MAKE) -C test test-all

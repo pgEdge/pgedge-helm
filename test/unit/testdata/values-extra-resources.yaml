@@ -1,0 +1,20 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  extraResources:
+    - apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: pgedge-deny-all
+      spec:
+        podSelector:
+          matchLabels:
+            pgedge.com/app-name: pgedge
+        policyTypes:
+          - Ingress
+          - Egress
+  clusterSpec:
+    storage:
+      size: 1Gi

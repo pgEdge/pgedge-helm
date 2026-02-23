@@ -70,6 +70,45 @@ Finally, set the `initSpockImageName` value to use the local image when installi
 		pgedge .
 ```
 
+## Testing
+
+This chart has a Go-based test framework in the `test/` directory covering both unit tests (Helm template rendering) and integration tests (full Kubernetes cluster verification).
+
+### Unit Tests
+
+Unit tests validate that `helm template` produces correct manifests for different configurations. No cluster required.
+
+```shell
+make test-unit
+```
+
+### Integration Tests
+
+Integration tests install the chart into a real Kubernetes cluster and verify cluster health, init-spock job completion, certificate provisioning, Spock replication, and node add/remove operations.
+
+**Against a local Kind cluster** (creates cluster, installs prerequisites, runs tests, tears down):
+
+```shell
+make test-integration-kind
+```
+
+**Against an existing cluster** with CNPG and cert-manager pre-installed:
+
+```shell
+KUBECONTEXT=my-cluster make test-integration
+```
+
+**With a published chart from the pgEdge Helm repository** (for cross-project testing):
+
+```shell
+KUBECONTEXT=my-cluster \
+  HELM_REPO=https://pgedge.github.io/charts \
+  CHART_REF=pgedge/pgedge \
+  CHART_VERSION=<chart-version> \
+  make test-integration
+
+See `test/Makefile` for additional targets including selective test runs (`test-install`, `test-nodes`).
+
 ## Releasing
 
 See [docs/releasing.md](docs/releasing.md) for the complete release process.
