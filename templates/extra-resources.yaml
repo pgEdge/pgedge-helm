@@ -5,11 +5,9 @@ Supports both string manifests and object definitions.
 */ -}}
 {{- range $manifest := .Values.pgEdge.extraResources }}
 ---
-{{- if typeIs "string" $manifest }}
-{{- /* String manifests are rendered directly with tpl */ -}}
+{{ if typeIs "string" $manifest -}}
 {{ tpl $manifest $ }}
-{{- else }}
-{{- /* Object manifests are converted to YAML first, then rendered with tpl */ -}}
+{{- else -}}
 {{ tpl (toYaml $manifest) $ }}
 {{- end }}
 {{- end }}
