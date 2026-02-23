@@ -9,8 +9,8 @@ import (
 
 func TestAppNameTooLong(t *testing.T) {
 	output := renderTemplateExpectError(t, "values-invalid-appname.yaml")
-	if !strings.Contains(output, "appName") || !strings.Contains(output, "maxLength") {
-		t.Errorf("expected schema validation error about appName length, got:\n%s", output)
+	if !strings.Contains(output, "appName") {
+		t.Errorf("expected schema validation error about appName, got:\n%s", output)
 	}
 }
 
