@@ -12,7 +12,7 @@ import (
 )
 
 func TestDistributedInstall(t *testing.T) {
-	installChart(t, "values-distributed-minimal.yaml")
+	installChart(t, "distributed-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
 
 	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
@@ -200,7 +200,7 @@ func TestDistributedInstall(t *testing.T) {
 	})
 
 	t.Run("idempotent_upgrade", func(t *testing.T) {
-		upgradeChart(t, "values-distributed-minimal.yaml")
+		upgradeChart(t, "distributed-minimal-values.yaml")
 
 		t.Run("clusters_healthy", func(t *testing.T) {
 			for _, name := range clusterNames {
@@ -243,7 +243,7 @@ func TestDistributedInstall(t *testing.T) {
 }
 
 func TestSingleNodeInstall(t *testing.T) {
-	installChart(t, "values-single-node-minimal.yaml")
+	installChart(t, "single-node-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
 
 	t.Run("cluster_healthy", func(t *testing.T) {

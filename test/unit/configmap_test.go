@@ -10,7 +10,7 @@ import (
 )
 
 func TestConfigMapContainsNodeConfig(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 	cm := findByKindAndName(objects, "ConfigMap", "pgedge-config")
 
 	if cm == nil {
@@ -40,7 +40,7 @@ func TestConfigMapContainsNodeConfig(t *testing.T) {
 }
 
 func TestConfigMapExternalNodes(t *testing.T) {
-	objects := renderTemplate(t, "values-external-nodes.yaml")
+	objects := renderTemplate(t, "external-nodes-values.yaml")
 	cm := findByKindAndName(objects, "ConfigMap", "pgedge-config")
 
 	if cm == nil {
@@ -71,7 +71,7 @@ func TestConfigMapExternalNodes(t *testing.T) {
 }
 
 func TestConfigMapInternalHostname(t *testing.T) {
-	objects := renderTemplate(t, "values-internal-hostname.yaml")
+	objects := renderTemplate(t, "internal-hostname-values.yaml")
 	cm := findByKindAndName(objects, "ConfigMap", "pgedge-config")
 
 	if cm == nil {

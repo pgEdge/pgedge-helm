@@ -5,7 +5,7 @@ package unit
 import "testing"
 
 func TestCertsProvisionedByDefault(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 
 	issuers := filterByKind(objects, "Issuer")
 	if len(issuers) != 2 {
@@ -20,7 +20,7 @@ func TestCertsProvisionedByDefault(t *testing.T) {
 }
 
 func TestCertsSkippedWhenDisabled(t *testing.T) {
-	objects := renderTemplate(t, "values-no-certs.yaml")
+	objects := renderTemplate(t, "no-certs-values.yaml")
 
 	issuers := filterByKind(objects, "Issuer")
 	if len(issuers) != 0 {

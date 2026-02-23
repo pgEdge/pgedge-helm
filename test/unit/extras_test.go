@@ -5,7 +5,7 @@ package unit
 import "testing"
 
 func TestExtraResourcesRendered(t *testing.T) {
-	objects := renderTemplate(t, "values-extra-resources.yaml")
+	objects := renderTemplate(t, "extra-resources-values.yaml")
 	netpols := filterByKind(objects, "NetworkPolicy")
 
 	if len(netpols) != 1 {
@@ -17,7 +17,7 @@ func TestExtraResourcesRendered(t *testing.T) {
 }
 
 func TestCustomAppNamePropagation(t *testing.T) {
-	objects := renderTemplate(t, "values-custom-appname.yaml")
+	objects := renderTemplate(t, "custom-appname-values.yaml")
 
 	// Clusters should be named myapp-n1, myapp-n2
 	clusters := filterByKind(objects, "Cluster")

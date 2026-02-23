@@ -10,7 +10,7 @@ import (
 )
 
 func TestDistributedGeneratesClusterPerNode(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 3 {
@@ -26,7 +26,7 @@ func TestDistributedGeneratesClusterPerNode(t *testing.T) {
 }
 
 func TestDistributedNodeOrdinals(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	expected := map[string]string{
@@ -52,7 +52,7 @@ func TestDistributedNodeOrdinals(t *testing.T) {
 }
 
 func TestDistributedMergesNodeClusterSpec(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 
 	n1 := findByKindAndName(objects, "Cluster", "pgedge-n1")
 	if n1 == nil {
@@ -77,7 +77,7 @@ func TestDistributedMergesNodeClusterSpec(t *testing.T) {
 }
 
 func TestSingleNodeSingleCluster(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -89,7 +89,7 @@ func TestSingleNodeSingleCluster(t *testing.T) {
 }
 
 func TestCustomOrdinal(t *testing.T) {
-	objects := renderTemplate(t, "values-custom-ordinal.yaml")
+	objects := renderTemplate(t, "custom-ordinal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	expected := map[string]string{
@@ -109,7 +109,7 @@ func TestCustomOrdinal(t *testing.T) {
 }
 
 func TestClusterDefaultPostgreSQLParameters(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -135,7 +135,7 @@ func TestClusterDefaultPostgreSQLParameters(t *testing.T) {
 }
 
 func TestClusterDefaultBootstrapConfig(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -175,7 +175,7 @@ func TestClusterDefaultBootstrapConfig(t *testing.T) {
 }
 
 func TestClusterDefaultManagedRoles(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -201,7 +201,7 @@ func TestClusterDefaultManagedRoles(t *testing.T) {
 }
 
 func TestClusterDefaultPgHBA(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -235,7 +235,7 @@ func TestClusterDefaultPgHBA(t *testing.T) {
 }
 
 func TestClusterDefaultSharedPreloadLibraries(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -263,7 +263,7 @@ func TestClusterDefaultSharedPreloadLibraries(t *testing.T) {
 }
 
 func TestClusterDefaultProjectedVolumeTemplate(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -288,7 +288,7 @@ func TestClusterDefaultProjectedVolumeTemplate(t *testing.T) {
 }
 
 func TestClusterDefaultImagePullPolicy(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {
@@ -302,7 +302,7 @@ func TestClusterDefaultImagePullPolicy(t *testing.T) {
 }
 
 func TestClusterDefaultImageName(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
 
 	if len(clusters) != 1 {

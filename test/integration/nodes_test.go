@@ -12,7 +12,7 @@ import (
 )
 
 func TestNodesAddNode(t *testing.T) {
-	installChart(t, "values-distributed-minimal.yaml")
+	installChart(t, "distributed-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2"} {
@@ -26,7 +26,7 @@ func TestNodesAddNode(t *testing.T) {
 
 	// Validation: adding a new node without bootstrap.mode should fail
 	t.Run("upgrade_rejects_new_node_without_bootstrap_mode", func(t *testing.T) {
-		err := tryUpgradeChart("values-distributed-add-n3-no-bootstrap.yaml")
+		err := tryUpgradeChart("distributed-add-n3-no-bootstrap-values.yaml")
 		if err == nil {
 			t.Fatal("expected upgrade to fail for new node without bootstrap.mode")
 		}
@@ -37,7 +37,7 @@ func TestNodesAddNode(t *testing.T) {
 
 	// Validation: re-bootstrapping an existing node should fail
 	t.Run("upgrade_rejects_rebootstrap_existing_node", func(t *testing.T) {
-		err := tryUpgradeChart("values-distributed-rebootstrap-n1.yaml")
+		err := tryUpgradeChart("distributed-rebootstrap-n1-values.yaml")
 		if err == nil {
 			t.Fatal("expected upgrade to fail for existing node with bootstrap.mode set")
 		}
@@ -57,7 +57,7 @@ func TestNodesAddNode(t *testing.T) {
 		t.Fatalf("failed to insert test data: %v", err)
 	}
 
-	upgradeChart(t, "values-distributed-add-n3.yaml")
+	upgradeChart(t, "distributed-add-n3-values.yaml")
 
 	t.Run("n3_cluster_healthy", func(t *testing.T) {
 		if err := wait.ForClusterHealthy(testKube, "pgedge-n3", timeout); err != nil {
@@ -114,7 +114,7 @@ func TestNodesAddNode(t *testing.T) {
 }
 
 func TestNodesRemoveNode(t *testing.T) {
-	installChart(t, "values-distributed-3node.yaml")
+	installChart(t, "distributed-3node-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2", "pgedge-n3"} {
@@ -126,7 +126,7 @@ func TestNodesRemoveNode(t *testing.T) {
 		t.Fatalf("init-spock job failed: %v", err)
 	}
 
-	upgradeChart(t, "values-distributed-minimal.yaml")
+	upgradeChart(t, "distributed-minimal-values.yaml")
 
 	t.Run("remaining_clusters_healthy", func(t *testing.T) {
 		for _, name := range []string{"pgedge-n1", "pgedge-n2"} {

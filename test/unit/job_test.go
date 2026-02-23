@@ -9,7 +9,7 @@ import (
 )
 
 func TestInitSpockJobGenerated(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 1 {
@@ -29,7 +29,7 @@ func TestInitSpockJobGenerated(t *testing.T) {
 }
 
 func TestInitSpockJobSkippedWhenDisabled(t *testing.T) {
-	objects := renderTemplate(t, "values-no-init-spock.yaml")
+	objects := renderTemplate(t, "no-init-spock-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 0 {
@@ -38,7 +38,7 @@ func TestInitSpockJobSkippedWhenDisabled(t *testing.T) {
 }
 
 func TestInitSpockJobDefaultImage(t *testing.T) {
-	objects := renderTemplate(t, "values-distributed.yaml")
+	objects := renderTemplate(t, "distributed-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 1 {
@@ -59,7 +59,7 @@ func TestInitSpockJobDefaultImage(t *testing.T) {
 }
 
 func TestInitSpockJobCustomImage(t *testing.T) {
-	objects := renderTemplate(t, "values-custom-image.yaml")
+	objects := renderTemplate(t, "custom-image-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 1 {
@@ -80,7 +80,7 @@ func TestInitSpockJobCustomImage(t *testing.T) {
 }
 
 func TestInitSpockJobDefaultSecurityContext(t *testing.T) {
-	objects := renderTemplate(t, "values-single-node-minimal.yaml")
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 1 {
@@ -128,7 +128,7 @@ func TestInitSpockJobDefaultSecurityContext(t *testing.T) {
 }
 
 func TestSecurityContextCustomOverride(t *testing.T) {
-	objects := renderTemplate(t, "values-custom-security.yaml")
+	objects := renderTemplate(t, "custom-security-values.yaml")
 	jobs := filterByKind(objects, "Job")
 
 	if len(jobs) != 1 {
