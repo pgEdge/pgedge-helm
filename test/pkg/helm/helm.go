@@ -19,6 +19,7 @@ type InstallOpts struct {
 	ValuesFiles []string // -f flags
 	SetValues   []string // --set key=value
 	Wait        bool
+	Timeout     string // --timeout flag (e.g. "10m"), requires Wait
 }
 
 // UpgradeOpts configures a helm upgrade (same shape as InstallOpts).
@@ -98,6 +99,9 @@ func (h *Helm) appendOpts(args []string, opts InstallOpts) []string {
 	}
 	if opts.Wait {
 		args = append(args, "--wait")
+		if opts.Timeout != "" {
+			args = append(args, "--timeout", opts.Timeout)
+		}
 	}
 	return args
 }

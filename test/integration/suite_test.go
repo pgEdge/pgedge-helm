@@ -104,6 +104,7 @@ func installChart(t *testing.T, valuesFile string) {
 		Version:     chartVersion,
 		ValuesFiles: []string{testdataPath(valuesFile)},
 		Wait:        true,
+		Timeout:     timeout.String(),
 	}
 	if initSpockImg != "" {
 		opts.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
@@ -126,6 +127,7 @@ func tryUpgradeChart(valuesFile string) error {
 		Version:     chartVersion,
 		ValuesFiles: []string{testdataPath(valuesFile)},
 		Wait:        true,
+		Timeout:     timeout.String(),
 	}
 	if initSpockImg != "" {
 		opts.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
