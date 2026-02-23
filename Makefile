@@ -6,6 +6,12 @@ IMAGE_TAG := $(CHART_VERSION)-$(BUILD_REVISION)
 REGISTRY ?= ghcr.io/pgedge
 BUILDX_BUILDER ?= pgedge-helm-builder 
 
+# ---- Setup ----
+
+.PHONY: setup
+setup:
+	brew install helm chart-testing yamllint kind go changie
+
 .PHONY: buildx-init
 buildx-init:
 	docker buildx use $(BUILDX_BUILDER) || docker buildx create --name $(BUILDX_BUILDER) --platform=linux/arm64,linux/amd64
@@ -91,6 +97,18 @@ endif
 	@echo "Next major version: $(shell $(changie) next major)"
 	@echo "Next minor version: $(shell $(changie) next minor)"
 	@echo "Next patch version: $(shell $(changie) next patch)"
+
+# ---- Chart Testing (ct) ----
+
+.PHONY: ct-lint
+ct-lint:
+	ct lint --chart-dirs . --charts .
+
+.PHONY: ct-install
+ct-install:
+	ct install --chart-dirs . --charts .
+
+# ---- Tests ----
 
 .PHONY: test-unit
 test-unit:

@@ -1,0 +1,15 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  extraResources:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: pgedge-extra-config
+      data:
+        key: value
+  clusterSpec:
+    storage:
+      size: 1Gi
