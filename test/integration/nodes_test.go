@@ -114,7 +114,7 @@ func TestNodesAddNode(t *testing.T) {
 }
 
 func TestNodesRemoveNode(t *testing.T) {
-	installChart(t, "values-distributed-add-n3.yaml")
+	installChart(t, "values-distributed-3node.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2", "pgedge-n3"} {
