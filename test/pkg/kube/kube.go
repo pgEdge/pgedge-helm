@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Kubectl wraps the kubectl CLI.
@@ -68,12 +69,21 @@ func (k *Kubectl) WaitForCondition(resource, name, condition string, timeout str
 	return err
 }
 
-// WaitForDelete runs kubectl wait --for=delete on a resource.
-func (k *Kubectl) WaitForDelete(resource, labelSelector, timeout string) error {
-	args := append(k.baseArgs(), "wait", resource,
-		"-l", labelSelector, "--for=delete", "--timeout="+timeout)
-	_, err := k.run(args...)
-	return err
+// WaitForDelete polls until no resources matching the label selector exist.
+func (k *Kubectl) WaitForDelete(resource, labelSelector string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		args := append(k.baseArgs(), "get", resource,
+			"-l", labelSelector, "-o", "name", "--no-headers")
+		out, _ := k.run(args...)
+		if out == "" {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for %s with label %s to be deleted (remaining: %s)", resource, labelSelector, out)
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 // ConnectWithCert creates a temporary pod to connect to a PostgreSQL service

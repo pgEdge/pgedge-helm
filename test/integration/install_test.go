@@ -12,8 +12,8 @@ import (
 )
 
 func TestDistributedInstall(t *testing.T) {
-	installChart(t, "distributed-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "distributed-minimal-values.yaml")
 
 	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
 
@@ -243,8 +243,8 @@ func TestDistributedInstall(t *testing.T) {
 }
 
 func TestSingleNodeInstall(t *testing.T) {
-	installChart(t, "single-node-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "single-node-minimal-values.yaml")
 
 	t.Run("cluster_healthy", func(t *testing.T) {
 		if err := wait.ForClusterHealthy(testKube, "pgedge-n1", timeout); err != nil {

@@ -140,12 +140,13 @@ func uninstallChart(t *testing.T) {
 	if err := testHelm.Uninstall(helmRelease); err != nil {
 		t.Logf("helm uninstall warning: %v", err)
 	}
-	// Wait for CNPG clusters and pods to be fully deleted before the next test
-	if err := testKube.WaitForDelete("clusters.postgresql.cnpg.io", "pgedge.com/app-name", timeout.String()); err != nil {
-		t.Logf("wait for cluster delete warning: %v", err)
-	}
-	if err := testKube.WaitForDelete("pods", "pgedge.com/app-name", timeout.String()); err != nil {
-		t.Logf("wait for pod delete warning: %v", err)
+	// Wait for all resources to be fully deleted before the next test.
+	// These must block — if cleanup is incomplete, the next test will inherit stale state.
+	label := "pgedge.com/app-name"
+	for _, resource := range []string{"jobs", "clusters.postgresql.cnpg.io", "pods", "pvc"} {
+		if err := testKube.WaitForDelete(resource, label, timeout); err != nil {
+			t.Fatalf("cleanup failed: %s with label %s not fully deleted: %v", resource, label, err)
+		}
 	}
 }
 

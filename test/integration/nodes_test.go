@@ -12,8 +12,8 @@ import (
 )
 
 func TestNodesAddNode(t *testing.T) {
-	installChart(t, "distributed-minimal-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "distributed-minimal-values.yaml")
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2"} {
 		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
@@ -114,8 +114,8 @@ func TestNodesAddNode(t *testing.T) {
 }
 
 func TestNodesRemoveNode(t *testing.T) {
-	installChart(t, "distributed-3node-values.yaml")
 	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "distributed-3node-values.yaml")
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2", "pgedge-n3"} {
 		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
