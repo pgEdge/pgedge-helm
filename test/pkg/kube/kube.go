@@ -67,6 +67,14 @@ func (k *Kubectl) WaitForCondition(resource, name, condition string, timeout str
 	return err
 }
 
+// WaitForDelete runs kubectl wait --for=delete on a resource.
+func (k *Kubectl) WaitForDelete(resource, labelSelector, timeout string) error {
+	args := append(k.baseArgs(), "wait", resource,
+		"-l", labelSelector, "--for=delete", "--timeout="+timeout)
+	_, err := k.run(args...)
+	return err
+}
+
 // ConnectWithCert creates a temporary pod to connect to a PostgreSQL service
 // using TLS client certificate authentication from a Kubernetes secret.
 // The secret must contain tls.crt and tls.key.

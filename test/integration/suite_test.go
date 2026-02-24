@@ -140,6 +140,13 @@ func uninstallChart(t *testing.T) {
 	if err := testHelm.Uninstall(helmRelease); err != nil {
 		t.Logf("helm uninstall warning: %v", err)
 	}
+	// Wait for CNPG clusters and pods to be fully deleted before the next test
+	if err := testKube.WaitForDelete("clusters.postgresql.cnpg.io", "pgedge.com/app-name", timeout.String()); err != nil {
+		t.Logf("wait for cluster delete warning: %v", err)
+	}
+	if err := testKube.WaitForDelete("pods", "pgedge.com/app-name", timeout.String()); err != nil {
+		t.Logf("wait for pod delete warning: %v", err)
+	}
 }
 
 func getPodName(clusterName string) string {
