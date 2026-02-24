@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -87,13 +88,41 @@ func (k *Kubectl) ConnectWithCert(service, certSecret, user, db, sql string) (st
 		service, db, user,
 	)
 
-	overrides := fmt.Sprintf(
-		`{"spec":{"volumes":[{"name":"certs","secret":{"secretName":"%s","defaultMode":384}}],"containers":[{"name":"%s","image":"postgres:17","command":["psql","%s","-tAc","%s"],"volumeMounts":[{"name":"certs","mountPath":"/certs","readOnly":true}]}]}}`,
-		certSecret, podName, connStr, sql,
-	)
+	overrides := map[string]any{
+		"spec": map[string]any{
+			"volumes": []map[string]any{
+				{
+					"name": "certs",
+					"secret": map[string]any{
+						"secretName":  certSecret,
+						"defaultMode": 384,
+					},
+				},
+			},
+			"containers": []map[string]any{
+				{
+					"name":    podName,
+					"image":   "postgres:17",
+					"command": []string{"psql", connStr, "-tAc", sql},
+					"volumeMounts": []map[string]any{
+						{
+							"name":      "certs",
+							"mountPath": "/certs",
+							"readOnly":  true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	overridesJSON, err := json.Marshal(overrides)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal overrides: %w", err)
+	}
 
 	args := append(k.baseArgs(), "run", podName, "--rm", "-i", "--restart=Never",
-		"--image=postgres:17", "--overrides", overrides)
+		"--image=postgres:17", "--overrides", string(overridesJSON))
 
 	return k.run(args...)
 }
