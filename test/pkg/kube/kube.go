@@ -75,7 +75,10 @@ func (k *Kubectl) WaitForDelete(resource, labelSelector string, timeout time.Dur
 	for {
 		args := append(k.baseArgs(), "get", resource,
 			"-l", labelSelector, "-o", "name", "--no-headers")
-		out, _ := k.run(args...)
+		out, err := k.run(args...)
+		if err != nil {
+			return fmt.Errorf("failed checking %s with label %s: %w", resource, labelSelector, err)
+		}
 		if out == "" {
 			return nil
 		}
