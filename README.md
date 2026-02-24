@@ -44,6 +44,16 @@ For complete installation instructions, see the [Installation Guide](docs/instal
 
 ## Local Development
 
+### Setup
+
+Install all development dependencies (Helm, Go, Kind, chart-testing, changie, etc.):
+
+```shell
+make setup
+```
+
+### pgedge-helm-utils Image
+
 The `pgedge-helm-utils` image is a lightweight Python container that runs the init-spock job during Helm installation and upgrades.
 
 For local development and testing, you must build the image and load it into your local Kubernetes cluster (e.g., kind, minikube) prior to installing or upgrading the chart:
@@ -106,8 +116,25 @@ KUBECONTEXT=my-cluster \
   CHART_REF=pgedge/pgedge \
   CHART_VERSION=<chart-version> \
   make test-integration
+```
 
 See `test/Makefile` for additional targets including selective test runs (`test-install`, `test-nodes`).
+
+### Chart Testing (ct)
+
+This chart supports [chart-testing](https://github.com/helm/chart-testing) (`ct`), the standard Helm chart linting and installation testing tool used across the Helm ecosystem. If you're pulling this chart into your own project and want to validate it with your own values files, `ct` is the standard way to do that. Test values files are in the `ci/` directory.
+
+**Lint** (no cluster required):
+
+```shell
+make ct-lint
+```
+
+**Install test** against the current kubecontext (installs and uninstalls the chart with each `ci/*-values.yaml`):
+
+```shell
+make ct-install
+```
 
 ## Releasing
 

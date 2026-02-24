@@ -98,17 +98,13 @@ endif
 	@echo "Next minor version: $(shell $(changie) next minor)"
 	@echo "Next patch version: $(shell $(changie) next patch)"
 
-# ---- Chart Testing (ct) ----
-
 .PHONY: ct-lint
 ct-lint:
 	ct lint --chart-dirs . --charts .
 
 .PHONY: ct-install
 ct-install:
-	ct install --chart-dirs . --charts .
-
-# ---- Tests ----
+	ct install --chart-dirs . --charts . --upgrade --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
 
 .PHONY: test-unit
 test-unit:
