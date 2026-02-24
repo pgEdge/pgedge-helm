@@ -39,6 +39,8 @@ kind-up:
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f \
 		https://github.com/cert-manager/cert-manager/releases/download/v1.19.3/cert-manager.yaml
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
+		-n cnpg-system cnpg-controller-manager --timeout=120s
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
 		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
 
 .PHONY: kind-down
