@@ -104,7 +104,7 @@ ct-lint:
 
 .PHONY: ct-install
 ct-install:
-	ct install --chart-dirs . --charts . --target-branch main --upgrade --skip-missing-values --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+	ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
 
 .PHONY: test-unit
 test-unit:

@@ -76,7 +76,7 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Chart install test
-        run: ct install --chart-dirs . --charts . --target-branch main --upgrade --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
 
       - name: Teardown
         if: always()
