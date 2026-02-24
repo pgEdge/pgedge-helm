@@ -23,10 +23,9 @@ jobs:
           cache-dependency-path: test/go.sum
 
       - name: Install Helm
-        env:
-          HELM_VERSION: v3.17.0
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.17.0
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@e6669bcd63d7cb57cb4380c33043eebe5d111992 # v2
@@ -47,10 +46,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install Helm
-        env:
-          HELM_VERSION: v3.17.0
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.17.0
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@e6669bcd63d7cb57cb4380c33043eebe5d111992 # v2
@@ -101,18 +99,18 @@ jobs:
       - name: Build pgedge-helm-utils dev image
         run: make docker-build-dev
 
-      - name: Install tools
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.17.0
+
+      - name: Install Kind
         env:
           KIND_VERSION: v0.27.0
-          HELM_VERSION: v3.17.0
         run: |
-          # Install kind
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
-
-          # Install Helm
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
 
       - name: Create Kind cluster and install prerequisites
         run: make -C test kind-up

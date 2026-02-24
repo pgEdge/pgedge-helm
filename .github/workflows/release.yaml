@@ -48,10 +48,9 @@ jobs:
           CHART_VERSION: ${{ steps.version.outputs.chart_version }}
 
       - name: Install Helm
-        env:
-          HELM_VERSION: v3.17.0
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- --version ${HELM_VERSION}
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.17.0
 
       - name: Import GPG key
         run: |
