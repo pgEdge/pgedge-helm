@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Install Helm
         env:
@@ -74,7 +76,7 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Chart install test
-        run: ct install --chart-dirs . --charts . --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+        run: ct install --chart-dirs . --charts . --upgrade --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
 
       - name: Teardown
         if: always()
