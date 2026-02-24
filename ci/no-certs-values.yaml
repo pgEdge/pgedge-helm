@@ -1,6 +1,7 @@
 pgEdge:
   appName: pgedge
   provisionCerts: false
+  initSpock: false
   nodes:
     - name: n1
       hostname: pgedge-n1-rw
