@@ -1,0 +1,15 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+    - name: n3
+      hostname: pgedge-n3-rw
+      bootstrap:
+        mode: spock
+        sourceNode: n1
+  clusterSpec:
+    storage:
+      size: 1Gi

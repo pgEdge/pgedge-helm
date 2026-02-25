@@ -1,0 +1,10 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      bootstrap:
+        mode: invalid
+  clusterSpec:
+    storage:
+      size: 1Gi

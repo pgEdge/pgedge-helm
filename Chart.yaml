@@ -6,4 +6,7 @@ description: The pgEdge Helm chart supports deploying both pgEdge Enterprise Pos
 home: https://pgedge.com
 sources:
 - https://github.com/pgEdge/pgedge-helm
+maintainers:
+  - name: pgEdge
+    url: https://github.com/pgEdge
 version: 0.2.0

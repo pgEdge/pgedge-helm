@@ -1,0 +1,13 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  externalNodes:
+    - name: n3
+      hostname: external-n3.example.com
+  clusterSpec:
+    storage:
+      size: 1Gi

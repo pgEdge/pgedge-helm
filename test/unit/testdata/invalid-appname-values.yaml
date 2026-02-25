@@ -1,0 +1,8 @@
+pgEdge:
+  appName: this-app-name-is-way-too-long-for-pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    storage:
+      size: 1Gi

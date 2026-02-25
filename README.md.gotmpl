@@ -44,6 +44,16 @@ For complete installation instructions, see the [Installation Guide](docs/instal
 
 ## Local Development
 
+### Setup
+
+Install all development dependencies (Helm, Go, Kind, chart-testing, changie, etc.):
+
+```shell
+make setup
+```
+
+### pgedge-helm-utils Image
+
 The `pgedge-helm-utils` image is a lightweight Python container that runs the init-spock job during Helm installation and upgrades.
 
 For local development and testing, you must build the image and load it into your local Kubernetes cluster (e.g., kind, minikube) prior to installing or upgrading the chart:
@@ -68,6 +78,62 @@ Finally, set the `initSpockImageName` value to use the local image when installi
 		--set pgEdge.initSpockImageName=pgedge-helm-utils:dev \
 		--wait \
 		pgedge .
+```
+
+## Testing
+
+This chart has a Go-based test framework in the `test/` directory covering both unit tests (Helm template rendering) and integration tests (full Kubernetes cluster verification).
+
+### Unit Tests
+
+Unit tests validate that `helm template` produces correct manifests for different configurations. No cluster required.
+
+```shell
+make test-unit
+```
+
+### Integration Tests
+
+Integration tests install the chart into a real Kubernetes cluster and verify cluster health, init-spock job completion, certificate provisioning, Spock replication, and node add/remove operations.
+
+**Against a local Kind cluster** (creates cluster, installs prerequisites, runs tests, tears down):
+
+```shell
+make test-integration-kind
+```
+
+**Against an existing cluster** with CNPG and cert-manager pre-installed:
+
+```shell
+KUBECONTEXT=my-cluster make test-integration
+```
+
+**With a published chart from the pgEdge Helm repository** (for cross-project testing):
+
+```shell
+KUBECONTEXT=my-cluster \
+  HELM_REPO=https://pgedge.github.io/charts \
+  CHART_REF=pgedge/pgedge \
+  CHART_VERSION=<chart-version> \
+  make test-integration
+```
+
+See `test/Makefile` for additional targets including selective test runs (`test-install`, `test-nodes`).
+
+### Chart Testing (ct)
+
+This chart supports [chart-testing](https://github.com/helm/chart-testing) (`ct`), the standard Helm chart linting and installation testing tool used across the Helm ecosystem. If you're pulling this chart into your own project and want to validate it with your own values files, `ct` is the standard way to do that. Test values files are in the `ci/` directory.
+
+**Lint** (no cluster required):
+
+```shell
+make ct-lint
+```
+
+**Install test** against the current kubecontext (installs and uninstalls the chart with each `ci/*-values.yaml`):
+
+```shell
+make ct-install
 ```
 
 ## Releasing
