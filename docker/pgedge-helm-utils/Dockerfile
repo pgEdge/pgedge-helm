@@ -3,9 +3,9 @@ FROM python:3.11-slim AS builder
 
 # Install build dependencies and compile Python packages
 RUN pip install --no-cache-dir --prefix=/install \
-    psycopg2-binary==2.9.9 \
-    kubernetes==28.1.0 \
-    PyYAML==6.0.1
+    psycopg2-binary==2.9.11 \
+    kubernetes==35.0.0 \
+    PyYAML==6.0.3
 
 # Stage 2: Runtime image using distroless
 FROM gcr.io/distroless/python3-debian12:nonroot
