@@ -1,0 +1,24 @@
+# Step 2: Add Read Replicas
+# --------------------------
+# Upgrades the single primary to a 2-instance cluster (1 primary + 1 read replica)
+# with synchronous replication enabled for data durability.
+#
+# Upgrade from Step 1:
+#   helm upgrade pgedge pgedge/pgedge -f values/step2-with-replicas.yaml
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+  clusterSpec:
+    instances: 1
+    storage:
+      size: 1Gi

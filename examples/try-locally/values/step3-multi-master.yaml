@@ -1,0 +1,30 @@
+# Step 3: Multi-Master with Spock Active-Active Replication
+# ----------------------------------------------------------
+# Adds a second node (n2) to enable Spock active-active replication
+# between n1 and n2. Node n1 retains its read replica (2 instances);
+# n2 starts with 1 instance.
+#
+# Upgrade from Step 2:
+#   helm upgrade pgedge pgedge/pgedge -f values/step3-multi-master.yaml
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+    - name: n2
+      hostname: pgedge-n2-rw
+      bootstrap:
+        mode: spock
+        sourceNode: n1
+  clusterSpec:
+    instances: 1
+    storage:
+      size: 1Gi
