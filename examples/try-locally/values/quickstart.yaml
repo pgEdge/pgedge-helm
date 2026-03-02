@@ -1,0 +1,22 @@
+# pgEdge Quickstart — 2-Node Multi-Master
+# -----------------------------------------
+# Deploys two pgEdge nodes with Spock active-active replication.
+# Both nodes accept reads and writes. Changes replicate bidirectionally.
+#
+# Install:
+#   helm install pgedge pgedge/pgedge -f values/quickstart.yaml
+#
+# For more topologies, see helm-examples/
+
+pgEdge:
+  appName: pgedge
+  initSpock: true
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    instances: 1
+    storage:
+      size: 1Gi
