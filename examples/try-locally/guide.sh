@@ -156,7 +156,12 @@ prompt_run "helm install pgedge pgedge/pgedge -f ${VALUES_DIR}/step1-single-prim
 explain "The CNPG operator is now creating a PostgreSQL pod."
 echo ""
 start_spinner "Waiting for pod to be ready..."
-kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null || true
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+  stop_spinner
+  echo ""
+  echo "  Timed out waiting for pgedge-n1 pods."
+  exit 1
+fi
 stop_spinner
 echo ""
 
@@ -192,7 +197,12 @@ prompt_run "helm upgrade pgedge pgedge/pgedge -f ${VALUES_DIR}/step2-with-replic
 explain "A second pod is spinning up as a synchronous replica..."
 echo ""
 start_spinner "Waiting for replica to be ready..."
-kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null || true
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+  stop_spinner
+  echo ""
+  echo "  Timed out waiting for pgedge-n1 replica pods."
+  exit 1
+fi
 stop_spinner
 echo ""
 
@@ -230,10 +240,20 @@ explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job will wire up Spock subscriptions..."
 echo ""
 start_spinner "Waiting for n1 pods..."
-kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null || true
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+  stop_spinner
+  echo ""
+  echo "  Timed out waiting for pgedge-n1 pods."
+  exit 1
+fi
 stop_spinner
 start_spinner "Waiting for n2 pods..."
-kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n2 --timeout=180s 2>/dev/null || true
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n2 --timeout=180s 2>/dev/null; then
+  stop_spinner
+  echo ""
+  echo "  Timed out waiting for pgedge-n2 pods."
+  exit 1
+fi
 stop_spinner
 echo ""
 
@@ -246,6 +266,7 @@ explain "Now let's verify Spock subscriptions are active. Each node"
 explain "subscribes to the other — that's what makes it active-active:"
 
 prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c 'SELECT * FROM spock.sub_show_status();'"
+prompt_run "kubectl cnpg psql pgedge-n2 -- -d app -c 'SELECT * FROM spock.sub_show_status();'"
 
 info "Multi-master cluster running — both nodes accept reads and writes."
 prompt_continue
