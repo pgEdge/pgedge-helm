@@ -8,7 +8,7 @@
     },
     "ghcr.io/devcontainers/features/go:1": {}
   },
-  "postCreateCommand": "helm dependency update 2>/dev/null || true",
+  "postCreateCommand": "if [ -f Chart.yaml ]; then helm dependency update; else echo 'No Chart.yaml in workspace root; skipping helm dependency update.'; fi",
   "customizations": {
     "vscode": {
       "settings": {

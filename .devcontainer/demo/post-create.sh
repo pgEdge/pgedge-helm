@@ -14,7 +14,7 @@ sudo mv /tmp/kind /usr/local/bin/kind
 echo "Installing cnpg kubectl plugin..."
 ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 curl -sSfL "https://github.com/pgEdge/pgedge-cnpg-dist/releases/download/v1.28.0/kubectl-cnpg-linux-${ARCH}.tar.gz" \
-  | tar xz -C /usr/local/bin
+  | sudo tar xz -C /usr/local/bin
 
 # Add pgEdge Helm repo
 echo "Adding pgEdge Helm repo..."
