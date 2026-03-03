@@ -27,6 +27,26 @@
 {{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
+{{- /* generate pg_hba and pg_ident from database name so they stay in sync */ -}}
+{{- $dbName := dig "bootstrap" "initdb" "database" "app" $merged -}}
+{{- $dbOwner := dig "bootstrap" "initdb" "owner" $dbName $merged -}}
+{{- $generatedHba := list
+    (printf "hostssl %s pgedge 0.0.0.0/0 cert" $dbName)
+    (printf "hostssl %s admin 0.0.0.0/0 cert" $dbName)
+-}}
+{{- if and (ne $dbOwner "pgedge") (ne $dbOwner "admin") -}}
+  {{- $generatedHba = append $generatedHba (printf "hostssl %s %s 0.0.0.0/0 cert" $dbName $dbOwner) -}}
+{{- end -}}
+{{- $generatedHba = append $generatedHba "hostssl all streaming_replica all cert map=cnpg_streaming_replica" -}}
+{{- $existingHba := $merged.postgresql.pg_hba | default list -}}
+{{- $_ := set $merged.postgresql "pg_hba" (concat $generatedHba $existingHba) -}}
+{{- $generatedIdent := list "local postgres admin" -}}
+{{- if ne $dbOwner "admin" -}}
+  {{- $generatedIdent = append $generatedIdent (printf "local postgres %s" $dbOwner) -}}
+{{- end -}}
+{{- $existingIdent := $merged.postgresql.pg_ident | default list -}}
+{{- $_ := set $merged.postgresql "pg_ident" (concat $generatedIdent $existingIdent) -}}
+
 {{- if gt $i 0 }}
 ---
 {{- end }}

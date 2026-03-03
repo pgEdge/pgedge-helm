@@ -25,7 +25,7 @@ spec:
           - name: APP_NAME
             value: {{ .Values.pgEdge.appName | quote }}
           - name: DB_NAME
-            value: app
+            value: {{ dig "bootstrap" "initdb" "database" "app" .Values.pgEdge.clusterSpec | quote }}
           - name: NAMESPACE
             valueFrom:
               fieldRef:
