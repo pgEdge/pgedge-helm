@@ -51,38 +51,47 @@ kubectl wait --for=condition=Available deployment \
 ### Install the cnpg kubectl plugin
 
 ```bash
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
-curl -sSfL \
-  "https://github.com/pgEdge/pgedge-cnpg-dist/releases/download/v1.28.0/kubectl-cnpg-${OS}-${ARCH}.tar.gz" \
-  -o /tmp/cnpg.tar.gz
-sudo tar xzf /tmp/cnpg.tar.gz -C /usr/local/bin
+kubectl krew index add pgedge https://github.com/pgEdge/krew-index.git
+kubectl krew install pgedge/cnpg
 ```
 
 ## Deploy
 
-Install a 2-node multi-master cluster. Both nodes accept reads and
-writes via Spock active-active replication:
+Install a 2-node multi-master deployment. Both nodes accept reads and
+writes via Spock active-active replication.
 
-```bash
-helm install pgedge pgedge/pgedge \
-  -f examples/try-locally/values/quickstart.yaml
+The values file configures two pgEdge nodes with Spock enabled:
+
+```yaml
+pgEdge:
+  appName: pgedge
+  initSpock: true          # wire up Spock subscriptions between nodes
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    instances: 1            # 1 instance per node (add replicas for HA)
+    storage:
+      size: 1Gi
 ```
 
-Wait for both nodes to be ready:
+Save this as `values.yaml` (or use the one at
+`examples/try-locally/values/quickstart.yaml`), then install:
+
+```bash
+helm install pgedge pgedge/pgedge -f values.yaml
+```
+
+Wait for pods and Spock wiring to complete:
 
 ```bash
 kubectl wait --for=condition=Ready pod \
   -l cnpg.io/cluster=pgedge-n1 --timeout=300s
 kubectl wait --for=condition=Ready pod \
   -l cnpg.io/cluster=pgedge-n2 --timeout=300s
-```
-
-Check Spock subscriptions are active:
-
-```bash
-kubectl cnpg psql pgedge-n1 -- -d app \
-  -c "SELECT subscription_name, status FROM spock.sub_show_status();"
+kubectl wait --for=condition=Complete job/pgedge-init-spock --timeout=300s
 ```
 
 ## Verify replication
@@ -114,20 +123,6 @@ Want to see how the architecture evolves from a single primary through
 HA to multi-master? See
 [examples/try-locally/WALKTHROUGH.md](../examples/try-locally/WALKTHROUGH.md)
 for the progressive guide.
-
-### Helm chart documentation
-
-| Topic | Description |
-|---|---|
-| [Configuration](configuration.md) | Full values reference, cluster spec options |
-| [Installation](install.md) | Detailed installation and prerequisites |
-| [Upgrading Postgres](usage/postgres_upgrades.md) | Minor/major version upgrades, image pinning |
-| [Adding Nodes](usage/adding_nodes.md) | Scale out with Spock or CNPG bootstrap |
-| [Backups](usage/backups.md) | Barman Cloud backups to S3, Azure, GCS |
-| [Monitoring](usage/monitoring.md) | Health checks and observability |
-| [Standby Instances](usage/standby.md) | Read replicas with automatic failover |
-| [Multi-cluster](multicluster.md) | Cross-region deployments, external nodes |
-| [Security](security.md) | Pod security standards, TLS certificates |
 
 - [pgEdge Documentation](https://docs.pgedge.com) — Spock replication,
   conflict resolution, tuning
