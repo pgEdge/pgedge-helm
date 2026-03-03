@@ -150,7 +150,7 @@ echo -e "        hostname: pgedge-n1-rw"
 echo -e "    clusterSpec:"
 echo -e "      instances: 1${RESET}"
 
-prompt_run "helm install pgedge pgedge/pgedge -f ${VALUES_DIR}/step1-single-primary.yaml"
+prompt_run "helm install pgedge pgedge/pgedge -f \"${VALUES_DIR}/step1-single-primary.yaml\""
 
 explain "The CNPG operator is now creating a PostgreSQL pod."
 echo ""
@@ -191,7 +191,7 @@ echo ""
 echo -e "  ${DIM}instances: 1  →  instances: 2"
 echo -e "  + synchronous replication with dataDurability: required${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f ${VALUES_DIR}/step2-with-replicas.yaml"
+prompt_run "helm upgrade pgedge pgedge/pgedge -f \"${VALUES_DIR}/step2-with-replicas.yaml\""
 
 explain "A second pod is spinning up as a synchronous replica..."
 echo ""
@@ -233,7 +233,7 @@ echo -e "  ${DIM}nodes:"
 echo -e "    - name: n1    # existing, keeps its replica"
 echo -e "    - name: n2    # new, bootstraps from n1 via Spock${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f ${VALUES_DIR}/step3-multi-master.yaml"
+prompt_run "helm upgrade pgedge pgedge/pgedge -f \"${VALUES_DIR}/step3-multi-master.yaml\""
 
 explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job will wire up Spock subscriptions..."
