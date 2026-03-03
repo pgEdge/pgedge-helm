@@ -5,7 +5,7 @@ Deploy distributed, active-active PostgreSQL on Kubernetes in under
 
 > Want a guided walkthrough instead?
 > [Codespaces](https://codespaces.new/pgEdge/pgedge-helm?devcontainer_path=.devcontainer/demo/devcontainer.json) (VS Code)
-> | [Local guide](examples/try-locally/) (Docker + kind)
+> | [Local guide](../examples/try-locally/) (Docker + kind)
 
 This guide uses pgEdge's curated distribution of the
 [CloudNativePG](https://cloudnative-pg.io/) operator — rebuilt from
