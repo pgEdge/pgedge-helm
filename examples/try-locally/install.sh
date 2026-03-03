@@ -31,22 +31,6 @@ if ! command -v git &>/dev/null; then
   exit 1
 fi
 
-if [ "$EXISTING_CLUSTER" = false ]; then
-  if ! command -v docker &>/dev/null; then
-    echo "Error: Docker is not installed and no existing Kubernetes cluster was detected."
-    echo "  Either install Docker: https://docs.docker.com/get-docker/"
-    echo "  Or configure kubectl to connect to an existing cluster."
-    exit 1
-  fi
-
-  # Check Docker is actually running
-  if ! docker info &>/dev/null; then
-    echo "Error: Docker is installed but not running."
-    echo "  Please start Docker and try again."
-    exit 1
-  fi
-fi
-
 # Auto-install missing Kubernetes tooling
 install_kind() {
   echo "Installing kind..."
@@ -98,6 +82,30 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     "install_${cmd}"
   done
   echo ""
+fi
+
+# Re-detect existing cluster after possible tool installation
+if [ "$EXISTING_CLUSTER" = false ] && command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1; then
+  EXISTING_CLUSTER=true
+  echo "Detected existing Kubernetes cluster — Docker and kind are not required."
+  echo ""
+fi
+
+# Only require Docker if we still need to create a local kind cluster
+if [ "$EXISTING_CLUSTER" = false ]; then
+  if ! command -v docker &>/dev/null; then
+    echo "Error: Docker is not installed and no existing Kubernetes cluster was detected."
+    echo "  Either install Docker: https://docs.docker.com/get-docker/"
+    echo "  Or configure kubectl to connect to an existing cluster."
+    exit 1
+  fi
+
+  # Check Docker is actually running
+  if ! docker info &>/dev/null; then
+    echo "Error: Docker is installed but not running."
+    echo "  Please start Docker and try again."
+    exit 1
+  fi
 fi
 
 # Clone or update
