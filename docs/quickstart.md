@@ -22,7 +22,9 @@ Foundation.
 
 ## Prerequisites
 
-A Kubernetes cluster with kubectl and Helm installed.
+A Kubernetes cluster with kubectl, Helm, and
+[Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/) (kubectl
+plugin manager) installed.
 
 ### Add the pgEdge Helm repo
 
