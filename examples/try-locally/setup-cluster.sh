@@ -6,7 +6,7 @@ set -euo pipefail
 # skips kind entirely and installs operators on the current cluster.
 
 CLUSTER_NAME="${1:-pgedge-demo}"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 # --- Detect existing Kubernetes cluster ---
 USE_EXISTING=false
