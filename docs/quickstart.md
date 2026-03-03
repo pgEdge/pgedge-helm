@@ -79,8 +79,7 @@ pgEdge:
       size: 1Gi
 ```
 
-Save this as `values.yaml` (or use the one at
-`examples/try-locally/values/quickstart.yaml`), then install:
+Save this as `values.yaml`, then install:
 
 ```bash
 helm install pgedge pgedge/pgedge -f values.yaml
