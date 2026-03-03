@@ -6,7 +6,7 @@
 # Install:
 #   helm install pgedge pgedge/pgedge -f values/quickstart.yaml
 #
-# For more topologies, see helm-examples/
+# For more topologies, see examples/configs/
 
 pgEdge:
   appName: pgedge
