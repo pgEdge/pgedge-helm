@@ -11,6 +11,7 @@ trap 'rm -f "$STDERR_LOG"' EXIT
 PASS=0
 FAIL=0
 
+# Assert that haystack contains needle, printing PASS/FAIL with the given label.
 assert_contains() {
   local label="$1"
   local haystack="$2"
@@ -25,6 +26,7 @@ assert_contains() {
   fi
 }
 
+# Assert that haystack does NOT contain needle, printing PASS/FAIL with the given label.
 assert_not_contains() {
   local label="$1"
   local haystack="$2"
