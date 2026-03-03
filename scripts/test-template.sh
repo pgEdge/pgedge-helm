@@ -41,6 +41,25 @@ assert_not_contains() {
   fi
 }
 
+# Assert that 'second' appears after 'first' in the haystack (by line number).
+assert_after() {
+  local label="$1"
+  local haystack="$2"
+  local first="$3"
+  local second="$4"
+  local first_line second_line
+  first_line=$(printf '%s\n' "$haystack" | grep -nF "$first" | head -n1 | cut -d: -f1 || true)
+  second_line=$(printf '%s\n' "$haystack" | grep -nF "$second" | head -n1 | cut -d: -f1 || true)
+  if [[ -n "$first_line" && -n "$second_line" && "$second_line" -gt "$first_line" ]]; then
+    echo "  PASS: $label"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $label"
+    echo "    expected '$second' after '$first' (lines: ${first_line:-?}, ${second_line:-?})"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 # --- Test: default database name ---
 echo "=== Default database name (app) ==="
 DEFAULT=$(helm template pgedge "$CHART_DIR" -f "$VALUES" 2>"$STDERR_LOG") || {
@@ -120,6 +139,32 @@ assert_contains "pg_ident references myuser owner" \
 assert_not_contains "pg_ident does not reference old app owner" \
   "$(echo "$CUSTOM_OWNER" | grep -F 'local postgres' | grep -vF admin || true)" \
   "local postgres app"
+
+# --- Test: user-supplied pg_hba/pg_ident appear after generated entries ---
+echo ""
+echo "=== User-supplied rules ordering ==="
+CUSTOM_ORDER=$(helm template pgedge "$CHART_DIR" -f "$VALUES" \
+  --set 'pgEdge.clusterSpec.postgresql.pg_hba[0]=hostssl app custom_user 0.0.0.0/0 cert' \
+  --set 'pgEdge.clusterSpec.postgresql.pg_ident[0]=local postgres custom_user' 2>"$STDERR_LOG") || {
+  echo "FAIL: helm template (custom order) failed"; cat "$STDERR_LOG"; exit 1; }
+
+assert_contains "user-supplied pg_hba entry is present" \
+  "$CUSTOM_ORDER" \
+  "hostssl app custom_user 0.0.0.0/0 cert"
+
+assert_contains "user-supplied pg_ident entry is present" \
+  "$CUSTOM_ORDER" \
+  "local postgres custom_user"
+
+assert_after "user-supplied pg_hba appears after generated streaming_replica rule" \
+  "$CUSTOM_ORDER" \
+  "hostssl all streaming_replica all cert map=cnpg_streaming_replica" \
+  "hostssl app custom_user 0.0.0.0/0 cert"
+
+assert_after "user-supplied pg_ident appears after generated admin rule" \
+  "$CUSTOM_ORDER" \
+  "local postgres admin" \
+  "local postgres custom_user"
 
 # --- Summary ---
 echo ""
