@@ -105,8 +105,7 @@ CLUSTER_MODE_FILE="$(cd "$(dirname "$0")" && pwd)/.cluster-mode"
 
 # Detect if we'll be using an existing cluster (before setup-cluster.sh writes the marker)
 if [ "${EXISTING_CLUSTER:-}" = "true" ] || \
-   (command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1 && \
-    ! command -v kind &>/dev/null); then
+   (command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1); then
   explain "Your Kubernetes cluster is already running. We'll install two operators:"
   echo ""
   explain "  - ${BOLD}cert-manager${RESET}     Manages TLS certificates for secure replication"
@@ -123,7 +122,7 @@ explain "This takes about 2 minutes. The script handles it automatically."
 
 prompt_continue
 
-bash "$(dirname "$0")/scripts/setup-cluster.sh"
+bash "$(dirname "$0")/setup-cluster.sh"
 
 # Read cluster mode from marker file written by setup-cluster.sh
 CLUSTER_MODE="kind"
@@ -280,6 +279,10 @@ explain "read on n1. If all data shows up everywhere, active-active"
 explain "replication is working."
 echo ""
 explain "First, create a table on n1:"
+
+# Clean up any leftover data from a previous run
+kubectl cnpg psql pgedge-n1 -- -d app -c "DROP TABLE IF EXISTS cities;" >/dev/null 2>&1 || true
+kubectl cnpg psql pgedge-n2 -- -d app -c "DROP TABLE IF EXISTS cities;" >/dev/null 2>&1 || true
 
 prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c \"
 CREATE TABLE cities (

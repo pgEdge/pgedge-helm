@@ -132,7 +132,7 @@ wait_for_deployment "cert-manager" "--all" "cert-manager"
 
 echo ""
 echo "Adding pgEdge Helm repo..."
-helm repo add pgedge https://pgedge.github.io/charts 2>/dev/null || true
+helm repo add pgedge https://pgedge.github.io/charts --force-update
 helm repo update
 
 echo ""
