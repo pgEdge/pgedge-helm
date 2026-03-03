@@ -23,9 +23,16 @@ wait_for_deployment() {
   local namespace="$1"
   local selector="$2"
   local label="$3"
+  local -a selector_args
+
+  if [ "$selector" = "--all" ]; then
+    selector_args=(--all)
+  else
+    selector_args=(-l "$selector")
+  fi
 
   while true; do
-    if kubectl wait --for=condition=Available deployment "${selector}" -n "$namespace" --timeout=120s 2>/dev/null; then
+    if kubectl wait --for=condition=Available deployment "${selector_args[@]}" -n "$namespace" --timeout=120s 2>/dev/null; then
       return 0
     fi
 
@@ -130,9 +137,9 @@ helm repo update
 
 echo ""
 echo "Installing pgEdge CloudNativePG operator..."
-helm install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace 2>/dev/null || true
+helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace
 echo "Waiting for CNPG operator..."
-wait_for_deployment "cnpg-system" "-l app.kubernetes.io/name=cloudnative-pg" "CNPG operator"
+wait_for_deployment "cnpg-system" "app.kubernetes.io/name=cloudnative-pg" "CNPG operator"
 
 # Install pgEdge cnpg kubectl plugin if missing
 if ! kubectl cnpg version &>/dev/null; then
