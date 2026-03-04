@@ -13,7 +13,7 @@ from upstream source.
 For this, you need access to a Kubernetes cluster running a
 [supported version](https://docs.pgedge.com/kubernetes/#version-support-matrix).
 
-For local testing, see [Setting Up Local Kubernetes Environments](https://kubernetes.io/docs/setup/learning-environment/#setting-up-local-kubernetes-environments){:target="_blank"} in the official Kubernetes documentation.
+For local testing, see [Setting Up Local Kubernetes Environments](https://kubernetes.io/docs/setup/learning-environment/#setting-up-local-kubernetes-environments) in the official Kubernetes documentation.
 
 Install the following tools to deploy and interact with
 Kubernetes and CloudNativePG:

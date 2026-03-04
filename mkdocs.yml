@@ -5,7 +5,6 @@ extra_css:
 
 markdown_extensions:
   - admonition
-  - attr_list
   - pymdownx.details
   - pymdownx.superfences
 
