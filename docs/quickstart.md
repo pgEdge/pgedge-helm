@@ -13,7 +13,7 @@ from upstream source.
 For this, you need access to a Kubernetes cluster running a
 [supported version](https://docs.pgedge.com/kubernetes/#version-support-matrix).
 
-If you want to quickly run a Kubernetes cluster locally for testing, we recommend installing [kind](https://kind.sigs.k8s.io/docs/user/quick-start#installation). Once installed, run `kind create cluster` to get started.
+For local testing, see [Setting Up Local Kubernetes Environments](https://kubernetes.io/docs/setup/learning-environment/#setting-up-local-kubernetes-environments){:target="_blank"} in the official Kubernetes documentation.
 
 Install the following tools to deploy and interact with
 Kubernetes and CloudNativePG:
@@ -24,6 +24,8 @@ Kubernetes and CloudNativePG:
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) — the
   Kubernetes command-line tool; used to interact with and manage
   your clusters.
+- [Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
+  — the kubectl plugin manager; used to install the cnpg plugin.
 
 ### Add the pgEdge Helm Repository
 
@@ -47,7 +49,7 @@ kubectl wait --for=condition=Available deployment \
   --all -n cert-manager --timeout=120s
 ```
 
-### Install the CloudNativePG operator
+### Install the CloudNativePG operator via Krew
 
 Install the operator from the pgEdge Helm repository:
 
@@ -61,18 +63,12 @@ kubectl wait --for=condition=Available deployment \
 
 ### Install the cnpg kubectl plugin
 
-Install the plugin via
-[Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
-(the kubectl plugin manager):
+Add the pgEdge Krew index and install the plugin:
 
 ```bash
 kubectl krew index add pgedge https://github.com/pgEdge/krew-index.git
 kubectl krew install pgedge/cnpg
 ```
-
-Or download the binary directly from the
-[pgEdge Enterprise Postgres Releases](https://github.com/pgEdge/pgedge-cnpg-dist/releases?q=kubectl-cnpg&expanded=true)
-and follow the install instructions in the release notes.
 
 ## Deploy
 
@@ -135,6 +131,19 @@ kubectl cnpg psql pgedge-n1 -- -d app \
 If the row appears on n1, active-active replication is
 working as expected.
 
+## What's next
+
+Now that you have a running cluster, explore the guides below
+to connect your application(s), customize the deployment, and
+scale to your desired topology:
+
+- [Connecting To Postgres](usage/connecting.md)
+- [Configuration](configuration.md)
+- [Configuring Standby Instances](usage/standby.md)
+- [Configuring Backups](usage/backups.md)
+- [Adding Nodes](usage/adding_nodes.md)
+- [Removing Nodes](usage/removing_nodes.md)
+
 ## Cleanup
 
 Uninstall the pgEdge Helm chart:
@@ -149,7 +158,7 @@ manually:
 
 ```bash
 kubectl delete secret admin-client-cert app-client-cert \
-  client-ca-key-pair pgedge-client-cert
+  client-ca-key-pair pgedge-client-cert streaming-replica-client-cert
 ```
 
 Remove the CloudNativePG operator:
@@ -164,8 +173,3 @@ Remove cert-manager:
 kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 ```
 
-If you used kind, delete the cluster:
-
-```bash
-kind delete cluster
-```
