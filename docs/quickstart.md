@@ -1,46 +1,55 @@
-# pgEdge Quickstart
+# Quickstart
 
-Deploy distributed, active-active PostgreSQL on Kubernetes in under
-5 minutes.
-
-> Want a guided walkthrough instead?
-> [Codespaces](https://codespaces.new/pgEdge/pgedge-helm?devcontainer_path=.devcontainer/demo/devcontainer.json) (VS Code)
-> | [Local guide](../examples/try-locally/) (Docker + kind)
-
-This guide uses pgEdge's curated distribution of the
-[CloudNativePG](https://cloudnative-pg.io/) operator — rebuilt from
-upstream source and published to the pgEdge registry
-(`ghcr.io/pgedge/cloudnative-pg`). The operator, Helm charts, kubectl
-plugin, and backup plugins are all installable from the pgEdge Helm
-repo. See
-[pgEdge/pgedge-cnpg-dist](https://github.com/pgEdge/pgedge-cnpg-dist)
-for details.
-
-The pgEdge distribution is not affiliated with, endorsed by, or
-sponsored by the CloudNativePG project or the Cloud Native Computing
-Foundation.
+This guide shows you how to install the pgEdge Helm chart
+to deploy distributed, active-active PostgreSQL on
+Kubernetes in under 5 minutes.
 
 ## Prerequisites
 
-A Kubernetes cluster with kubectl, Helm, and
-[Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/) (kubectl
-plugin manager) installed.
+This guide deploys pgEdge's supported distribution of the
+[CloudNativePG](https://cloudnative-pg.io/) operator, rebuilt
+from upstream source.
 
-### Add the pgEdge Helm repo
+For this, you need access to a Kubernetes cluster running a
+[supported version](https://docs.pgedge.com/kubernetes/#version-support-matrix).
+
+If you want to quickly run a Kubernetes cluster locally for testing, we recommend installing [kind](https://kind.sigs.k8s.io/docs/user/quick-start#installation). Once installed, run `kind create cluster` to get started.
+
+Install the following tools to deploy and interact with
+Kubernetes and CloudNativePG:
+
+- [helm](https://helm.sh/) — the package manager for
+  Kubernetes; used to install, upgrade, and manage applications
+  via Helm charts.
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) — the
+  Kubernetes command-line tool; used to interact with and manage
+  your clusters.
+
+### Add the pgEdge Helm Repository
+
+Use the `helm repo add` command to register the pgEdge Helm
+Repository:
 
 ```bash
 helm repo add pgedge https://pgedge.github.io/charts
 helm repo update
 ```
 
-### Install cert-manager
+### Install the cert-manager operator
+
+Apply the cert-manager manifests and wait for the deployment
+to become available:
 
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s
+kubectl apply -f \
+  https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+kubectl wait --for=condition=Available deployment \
+  --all -n cert-manager --timeout=120s
 ```
 
-### Install the pgEdge CloudNativePG operator
+### Install the CloudNativePG operator
+
+Install the operator from the pgEdge Helm repository:
 
 ```bash
 helm install cnpg pgedge/cloudnative-pg \
@@ -52,52 +61,67 @@ kubectl wait --for=condition=Available deployment \
 
 ### Install the cnpg kubectl plugin
 
+Install the plugin via
+[Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
+(the kubectl plugin manager):
+
 ```bash
 kubectl krew index add pgedge https://github.com/pgEdge/krew-index.git
 kubectl krew install pgedge/cnpg
 ```
 
+Or download the binary directly from the
+[pgEdge Enterprise Postgres Releases](https://github.com/pgEdge/pgedge-cnpg-dist/releases?q=kubectl-cnpg&expanded=true)
+and follow the install instructions in the release notes.
+
 ## Deploy
 
-Install a 2-node multi-master deployment. Both nodes accept reads and
-writes via Spock active-active replication.
+Each pgEdge node is a separate CloudNativePG Cluster that
+participates in Spock active-active replication. Every node
+accepts both reads and writes.
 
-The values file configures two pgEdge nodes with Spock enabled:
+The following values file configures two nodes with Spock
+enabled:
 
 ```yaml
 pgEdge:
   appName: pgedge
-  initSpock: true          # wire up Spock subscriptions between nodes
+  initSpock: true
   nodes:
     - name: n1
       hostname: pgedge-n1-rw
     - name: n2
       hostname: pgedge-n2-rw
   clusterSpec:
-    instances: 1            # 1 instance per node (add replicas for HA)
+    instances: 1
     storage:
       size: 1Gi
 ```
 
-Save this as `values.yaml`, then install:
+Save this as `values.yaml`, then install the chart:
 
 ```bash
-helm install pgedge pgedge/pgedge -f values.yaml
+helm install pgedge pgedge/pgedge -f values.yaml --wait --timeout 5m
 ```
 
-Wait for pods and Spock wiring to complete:
-
-```bash
-kubectl wait --for=condition=Ready pod \
-  -l cnpg.io/cluster=pgedge-n1 --timeout=300s
-kubectl wait --for=condition=Ready pod \
-  -l cnpg.io/cluster=pgedge-n2 --timeout=300s
-kubectl wait --for=condition=Complete job/pgedge-init-spock --timeout=300s
-```
+!!! note
+    Each node runs a single primary instance in this example.
+    Increase `instances` to add streaming replicas with
+    automatic failover within a node. See
+    [Configuring Standby Instances](usage/standby.md)
+    for details.
 
 ## Verify replication
 
-Create a table on n1, insert on n2, read back on n1:
+The install created two independent PostgreSQL nodes —
+`pgedge-n1` and `pgedge-n2` — each running as its own
+CloudNativePG Cluster with a single primary instance.
+Spock connects them with bidirectional logical replication;
+a write to either node is automatically replicated to the
+other.
+
+Create a table on n1, insert a row on n2, then read the row
+back from n1:
 
 ```bash
 kubectl cnpg psql pgedge-n1 -- -d app \
@@ -108,30 +132,40 @@ kubectl cnpg psql pgedge-n1 -- -d app \
   -c "SELECT * FROM test;"
 ```
 
-If you see the row on n1, active-active replication is working.
-
-## What's next
-
-### Example configurations
-
-The [`examples/configs/single/`](../examples/configs/single/) directory
-has a ready-to-deploy values file for a single-region deployment with
-3 nodes and 3 instances. More topology examples are coming soon.
-
-### Step-by-step walkthrough
-
-Want to see how the architecture evolves from a single primary through
-HA to multi-master? See
-[examples/try-locally/WALKTHROUGH.md](../examples/try-locally/WALKTHROUGH.md)
-for the progressive guide.
-
-- [pgEdge Documentation](https://docs.pgedge.com) — Spock replication,
-  conflict resolution, tuning
-- [pgEdge Cloud](https://www.pgedge.com) — managed distributed
-  PostgreSQL
+If the row appears on n1, active-active replication is
+working as expected.
 
 ## Cleanup
 
+Uninstall the pgEdge Helm chart:
+
 ```bash
 helm uninstall pgedge
+```
+
+Helm removes all managed resources except secrets created by
+cert-manager for client certificates. Delete those secrets
+manually:
+
+```bash
+kubectl delete secret admin-client-cert app-client-cert \
+  client-ca-key-pair pgedge-client-cert
+```
+
+Remove the CloudNativePG operator:
+
+```bash
+helm uninstall cnpg -n cnpg-system
+```
+
+Remove cert-manager:
+
+```bash
+kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+```
+
+If you used kind, delete the cluster:
+
+```bash
+kind delete cluster
 ```
