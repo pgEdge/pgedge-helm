@@ -116,14 +116,23 @@ Spock connects them with bidirectional logical replication;
 a write to either node is automatically replicated to the
 other.
 
-Create a table on n1, insert a row on n2, then read the row
-back from n1:
+Create a table on n1:
 
 ```bash
 kubectl cnpg psql pgedge-n1 -- -d app \
   -c "CREATE TABLE test (id int primary key, data text);"
+```
+
+Insert a row on n2:
+
+```bash
 kubectl cnpg psql pgedge-n2 -- -d app \
   -c "INSERT INTO test VALUES (1, 'written on n2');"
+```
+
+Read the row back from n1:
+
+```bash
 kubectl cnpg psql pgedge-n1 -- -d app \
   -c "SELECT * FROM test;"
 ```
