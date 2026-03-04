@@ -49,7 +49,7 @@ kubectl wait --for=condition=Available deployment \
   --all -n cert-manager --timeout=120s
 ```
 
-### Install the CloudNativePG operator via Krew
+### Install the CloudNativePG operator
 
 Install the operator from the pgEdge Helm repository:
 
