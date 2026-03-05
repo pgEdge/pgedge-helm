@@ -1,5 +1,5 @@
 ---
-cwd: ./
+cwd: ../
 ---
 
 # Guided Walkthrough
