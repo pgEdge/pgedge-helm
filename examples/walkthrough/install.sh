@@ -41,6 +41,7 @@ cd "$WORK_DIR"
 
 # --- Run setup (tools + cluster only, no operators) ---
 
+export PATH="$(pwd)/examples/walkthrough/bin:$PATH"
 echo ""
 bash examples/walkthrough/setup.sh
 
