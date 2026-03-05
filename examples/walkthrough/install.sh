@@ -5,7 +5,7 @@ set -euo pipefail
 #   curl -fsSL https://raw.githubusercontent.com/pgEdge/pgedge-helm/main/examples/walkthrough/install.sh | bash
 
 WORK_DIR="${WALKTHROUGH_DIR:-pgedge-walkthrough}"
-BRANCH="${WALKTHROUGH_BRANCH:-feature/walkthroughs}"
+BRANCH="${WALKTHROUGH_BRANCH:-main}"
 BASE_URL="https://raw.githubusercontent.com/pgEdge/pgedge-helm/${BRANCH}"
 
 # --- Header ---
@@ -14,17 +14,6 @@ echo ""
 echo "  pgEdge Helm Walkthrough"
 echo "  ======================="
 echo ""
-
-# --- OS / architecture detection ---
-
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)        ARCH="amd64" ;;
-  aarch64|arm64) ARCH="arm64" ;;
-  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-esac
-echo "  Detected ${OS}/${ARCH}"
 
 # --- Download walkthrough files (mirrors repo layout) ---
 
@@ -55,15 +44,25 @@ cd "$WORK_DIR"
 echo ""
 bash examples/walkthrough/setup.sh
 
-# --- Present choices ---
+# --- Choose how to continue ---
 
 echo ""
-echo "  Setup complete! Next, run:"
+echo "  Setup complete! How would you like to continue?"
 echo ""
-echo "    cd $WORK_DIR"
+echo "    1) Interactive Guide — step-by-step in this terminal"
+echo "    2) Exit — I'll open the walkthrough in my editor"
 echo ""
-echo "  Then choose how to continue:"
-echo ""
-echo "    Interactive Guide (terminal):  cd examples/walkthrough && ./guide.sh"
-echo "    Walkthrough (VS Code + Runme): code docs/walkthrough.md"
-echo ""
+read -rp "  Choose [1/2]: " choice </dev/tty
+
+case "$choice" in
+  2)
+    echo ""
+    echo "  Open this file in your editor and run the commands in this terminal:"
+    echo "    $(pwd)/docs/walkthrough.md"
+    echo ""
+    ;;
+  *)
+    echo ""
+    bash examples/walkthrough/guide.sh
+    ;;
+esac

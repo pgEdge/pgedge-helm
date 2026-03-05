@@ -262,8 +262,8 @@ echo ""
 explain "First, create a table on n1:"
 
 # Clean up any leftover data from a previous run
-kubectl cnpg psql pgedge-n1 -- -d app -c "DROP TABLE IF EXISTS cities;" >/dev/null 2>&1 || true
-kubectl cnpg psql pgedge-n2 -- -d app -c "DROP TABLE IF EXISTS cities;" >/dev/null 2>&1 || true
+kubectl cnpg psql pgedge-n1 -- -d app -c "DROP TABLE IF EXISTS cities;" </dev/null >/dev/null 2>&1 || true
+kubectl cnpg psql pgedge-n2 -- -d app -c "DROP TABLE IF EXISTS cities;" </dev/null >/dev/null 2>&1 || true
 
 prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c \"
 CREATE TABLE cities (
