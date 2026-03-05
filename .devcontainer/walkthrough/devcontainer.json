@@ -1,5 +1,5 @@
 {
-  "name": "pgEdge Kubernetes Demo",
+  "name": "pgEdge Guided Walkthrough",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -7,7 +7,7 @@
       "minikube": "none"
     }
   },
-  "postCreateCommand": "bash .devcontainer/demo/post-create.sh",
+  "postCreateCommand": "bash .devcontainer/walkthrough/post-create.sh",
   "customizations": {
     "vscode": {
       "settings": {
@@ -19,5 +19,5 @@
       ]
     }
   },
-  "postAttachCommand": "code examples/try-locally/WALKTHROUGH.md 2>/dev/null || true"
+  "postAttachCommand": "code docs/walkthrough.md 2>/dev/null || true"
 }

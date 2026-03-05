@@ -2,94 +2,26 @@
 set -euo pipefail
 
 # Interactive CLI guide for pgEdge Kubernetes demo.
-# Walks through the same progressive journey as the Killercoda scenario.
+# Walks through the same progressive journey as the walkthrough documentation.
 
-# --- Colors and formatting ---
-BOLD='\033[1m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-DIM='\033[2m'
-RESET='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VALUES_DIR="$SCRIPT_DIR/values"
 
-header() {
-  echo ""
-  echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e "${BOLD}${BLUE}  $1${RESET}"
-  echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo ""
-}
-
-explain() {
-  echo -e "  $1"
-}
-
-show_cmd() {
-  echo ""
-  echo -e "  ${YELLOW}\$ $1${RESET}"
-}
-
-prompt_run() {
-  local cmd="$1"
-  show_cmd "$cmd"
-  echo ""
-  read -rp "  Press Enter to run..." </dev/tty
-  echo -e "  ${CYAN}⏳ Running...${RESET}"
-  echo ""
-  eval "$cmd" 2> >(grep -v "Unable to use a TTY" >&2)
-  echo ""
-}
-
-prompt_continue() {
-  echo ""
-  read -rp "  Press Enter to continue..." </dev/tty
-  echo ""
-}
-
-SPINNER_PID=""
-start_spinner() {
-  local msg="$1"
-  local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-  (
-    while true; do
-      for (( i=0; i<${#chars}; i++ )); do
-        printf "\r  \033[0;36m%s\033[0m %s" "${chars:$i:1}" "$msg"
-        sleep 0.1
-      done
-    done
-  ) &
-  SPINNER_PID=$!
-}
-
-stop_spinner() {
-  if [ -n "$SPINNER_PID" ]; then
-    kill "$SPINNER_PID" 2>/dev/null
-    wait "$SPINNER_PID" 2>/dev/null || true
-    printf "\r\033[K"
-    SPINNER_PID=""
-  fi
-}
-
-info() {
-  echo -e "  ${GREEN}$1${RESET}"
-}
-
+# Source terminal framework
+source "$SCRIPT_DIR/runner.sh"
 trap 'stop_spinner' EXIT
 
-VALUES_DIR="$(cd "$(dirname "$0")" && pwd)/values"
+# === Intro ===
 
-# ============================================================
 header "pgEdge Distributed Postgres on Kubernetes"
-# ============================================================
 
 echo "  This guide walks you through building a distributed PostgreSQL"
 echo "  cluster, one step at a time:"
 echo ""
 echo "    1. Set up a Kubernetes cluster with the required operators"
 echo "    2. Deploy a single PostgreSQL primary"
-echo "    3. Add a synchronous read replica for HA"
-echo "    4. Add a second node for multi-master replication"
+echo "    3. Add a synchronous standby instance for HA"
+echo "    4. Add a second node for active-active replication"
 echo "    5. Prove active-active replication works"
 echo ""
 echo "  Each step is a helm install or upgrade — you'll see the cluster"
@@ -97,46 +29,95 @@ echo "  evolve from a single database to a distributed system."
 
 prompt_continue
 
-# ============================================================
-header "Step 1: Set Up Kubernetes Cluster"
-# ============================================================
+# === Step 1: Set Up the Cluster ===
 
-CLUSTER_MODE_FILE="$(cd "$(dirname "$0")" && pwd)/.cluster-mode"
+header "Step 1: Set Up the Cluster"
 
-# Detect if we'll be using an existing cluster (before setup-cluster.sh writes the marker)
-if [ "${EXISTING_CLUSTER:-}" = "true" ] || \
-   (command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1); then
-  explain "Your Kubernetes cluster is already running. We'll install two operators:"
-  echo ""
-  explain "  - ${BOLD}cert-manager${RESET}     Manages TLS certificates for secure replication"
-  explain "  - ${BOLD}CloudNativePG${RESET}    Operator that manages PostgreSQL as K8s resources"
-else
-  explain "First we need a Kubernetes cluster with three components:"
-  echo ""
-  explain "  - ${BOLD}kind${RESET}             Local K8s cluster running in Docker"
-  explain "  - ${BOLD}cert-manager${RESET}     Manages TLS certificates for secure replication"
-  explain "  - ${BOLD}CloudNativePG${RESET}    Operator that manages PostgreSQL as K8s resources"
-fi
+CLUSTER_MODE_FILE="$SCRIPT_DIR/.cluster-mode"
+
+explain "Before deploying pgEdge, we need a Kubernetes cluster and two operators:"
 echo ""
-explain "This takes about 2 minutes. The script handles it automatically."
+explain "  - ${BOLD}cert-manager${RESET}     Manages TLS certificates for secure replication"
+explain "  - ${BOLD}CloudNativePG${RESET}    Operator that manages PostgreSQL as Kubernetes resources"
 
-prompt_continue
+# --- Tools and cluster ---
 
-bash "$(dirname "$0")/setup-cluster.sh"
+if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1; then
+  echo ""
+  info "Kubernetes cluster is already running."
+  if [ ! -f "$CLUSTER_MODE_FILE" ]; then
+    echo "existing" > "$CLUSTER_MODE_FILE"
+  fi
+else
+  echo ""
+  explain "First, let's get a Kubernetes cluster running. The setup script"
+  explain "installs any missing tools and creates a local kind cluster."
+  prompt_continue
+  bash "$SCRIPT_DIR/setup.sh"
+fi
 
-# Read cluster mode from marker file written by setup-cluster.sh
+# Read cluster mode from marker file written by setup.sh
 CLUSTER_MODE="kind"
 if [ -f "$CLUSTER_MODE_FILE" ]; then
   CLUSTER_MODE=$(cat "$CLUSTER_MODE_FILE")
+fi
+
+# --- cert-manager ---
+
+echo ""
+if kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=5s &>/dev/null 2>&1; then
+  info "cert-manager is already installed."
+else
+  explain "Installing cert-manager — handles TLS certificates so database"
+  explain "nodes communicate securely:"
+
+  prompt_run "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml"
+
+  start_spinner "Waiting for cert-manager..."
+  if ! kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s 2>/dev/null; then
+    stop_spinner
+    echo ""
+    echo "  Timed out waiting for cert-manager."
+    exit 1
+  fi
+  stop_spinner
+fi
+
+# --- Helm repo ---
+
+echo ""
+explain "Adding the pgEdge Helm repository:"
+
+prompt_run "helm repo add pgedge https://pgedge.github.io/charts --force-update && helm repo update"
+
+# --- CNPG operator ---
+
+echo ""
+if kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=5s &>/dev/null 2>&1; then
+  info "CloudNativePG operator is already installed."
+else
+  explain "Installing the pgEdge CloudNativePG operator — manages PostgreSQL"
+  explain "clusters as native Kubernetes resources:"
+
+  prompt_run "helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace"
+
+  start_spinner "Waiting for CNPG operator..."
+  if ! kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s 2>/dev/null; then
+    stop_spinner
+    echo ""
+    echo "  Timed out waiting for CNPG operator."
+    exit 1
+  fi
+  stop_spinner
 fi
 
 echo ""
 info "Cluster is ready with all operators installed."
 prompt_continue
 
-# ============================================================
+# === Step 2: Deploy a Single Primary ===
+
 header "Step 2: Deploy a Single Primary"
-# ============================================================
 
 explain "Let's start with the simplest possible deployment: one pgEdge"
 explain "node running a single PostgreSQL instance."
@@ -150,7 +131,7 @@ echo -e "        hostname: pgedge-n1-rw"
 echo -e "    clusterSpec:"
 echo -e "      instances: 1${RESET}"
 
-prompt_run "helm install pgedge pgedge/pgedge -f \"${VALUES_DIR}/step1-single-primary.yaml\""
+prompt_run "helm install pgedge pgedge/pgedge -f $VALUES_DIR/step1-single-primary.yaml"
 
 explain "The CNPG operator is now creating a PostgreSQL pod."
 echo ""
@@ -177,12 +158,12 @@ prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c 'SELECT version();'"
 info "Single primary is running — one node, one instance, no replication yet."
 prompt_continue
 
-# ============================================================
-header "Step 3: Scale with Read Replicas"
-# ============================================================
+# === Step 3: Add Standby Instances ===
 
-explain "Now we'll upgrade the deployment to add a ${BOLD}synchronous read replica${RESET}."
-explain "This gives you HA — if the primary fails, the replica takes over"
+header "Step 3: Add Standby Instances"
+
+explain "Now we'll upgrade the deployment to add a ${BOLD}synchronous standby instance${RESET}."
+explain "This gives you HA — if the primary fails, the standby takes over"
 explain "with zero data loss."
 echo ""
 explain "The change is a helm upgrade with an updated values file."
@@ -191,22 +172,22 @@ echo ""
 echo -e "  ${DIM}instances: 1  →  instances: 2"
 echo -e "  + synchronous replication with dataDurability: required${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f \"${VALUES_DIR}/step2-with-replicas.yaml\""
+prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step2-with-replicas.yaml"
 
-explain "A second pod is spinning up as a synchronous replica..."
+explain "A second pod is spinning up as a synchronous standby..."
 echo ""
-start_spinner "Waiting for replica to be ready..."
+start_spinner "Waiting for standby to be ready..."
 if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
   stop_spinner
   echo ""
-  echo "  Timed out waiting for pgedge-n1 replica pods."
+  echo "  Timed out waiting for pgedge-n1 standby pods."
   exit 1
 fi
 stop_spinner
 echo ""
 
 explain "Let's check the status — you should see 2 instances now,"
-explain "with the replica in 'Standby (sync)' role:"
+explain "with the standby in 'Standby (sync)' role:"
 
 prompt_run "kubectl cnpg status pgedge-n1"
 
@@ -215,12 +196,12 @@ explain "Look for sync_state = 'sync' or 'quorum':"
 
 prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c 'SELECT client_addr, state, sync_state FROM pg_stat_replication;'"
 
-info "HA cluster running — primary + synchronous replica, zero data loss on failover."
+info "HA cluster running — primary + synchronous standby, zero data loss on failover."
 prompt_continue
 
-# ============================================================
-header "Step 4: Go Multi-Master"
-# ============================================================
+# === Step 4: Active-Active Replication ===
+
+header "Step 4: Active-Active Replication"
 
 explain "This is where pgEdge shines. We'll add a ${BOLD}second pgEdge node${RESET} (n2)"
 explain "with ${BOLD}Spock active-active replication${RESET}. Both nodes will accept writes,"
@@ -230,10 +211,10 @@ explain "The values file adds n2 to the nodes list. The chart automatically"
 explain "configures Spock logical replication between n1 and n2:"
 echo ""
 echo -e "  ${DIM}nodes:"
-echo -e "    - name: n1    # existing, keeps its replica"
+echo -e "    - name: n1    # existing, keeps its standby"
 echo -e "    - name: n2    # new, bootstraps from n1 via Spock${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f \"${VALUES_DIR}/step3-multi-master.yaml\""
+prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step3-multi-master.yaml"
 
 explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job will wire up Spock subscriptions..."
@@ -267,12 +248,12 @@ explain "subscribes to the other — that's what makes it active-active:"
 prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c 'SELECT * FROM spock.sub_show_status();'"
 prompt_run "kubectl cnpg psql pgedge-n2 -- -d app -c 'SELECT * FROM spock.sub_show_status();'"
 
-info "Multi-master cluster running — both nodes accept reads and writes."
+info "Active-active cluster running — both nodes accept reads and writes."
 prompt_continue
 
-# ============================================================
+# === Step 5: Prove Replication ===
+
 header "Step 5: Prove Replication"
-# ============================================================
 
 explain "Let's prove it works: write on n1, read on n2, write on n2,"
 explain "read on n1. If all data shows up everywhere, active-active"
@@ -318,19 +299,19 @@ prompt_run "kubectl cnpg psql pgedge-n1 -- -d app -c 'SELECT * FROM cities ORDER
 
 info "All 5 cities on both nodes — bidirectional active-active replication confirmed!"
 
-# ============================================================
+# === Done + Cleanup ===
+
 header "Done!"
-# ============================================================
 
 echo "  You've built a distributed, active-active PostgreSQL cluster"
 echo "  on Kubernetes using pgEdge — starting from a single instance"
 echo "  and evolving it step by step."
 echo ""
 echo -e "  ${BOLD}What you built:${RESET}"
-echo "    1. Single Primary        one node, one instance"
-echo "    2. HA with Replicas      synchronous read replica"
-echo "    3. Multi-Master          Spock active-active replication"
-echo "    4. Proved Replication    bidirectional writes confirmed"
+echo "    1. Single Primary           one node, one instance"
+echo "    2. HA with Standby Instances synchronous standby instance"
+echo "    3. Active-Active            Spock active-active replication"
+echo "    4. Proved Replication       bidirectional writes confirmed"
 echo ""
 echo -e "  ${BOLD}Useful commands:${RESET}"
 echo "    kubectl cnpg status pgedge-n1        # n1 cluster health"

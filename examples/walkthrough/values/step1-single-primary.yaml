@@ -1,7 +1,7 @@
 # Step 1: Single Primary Node
 # ----------------------------
 # Starting point of the progressive tutorial.
-# Deploys a single CNPG cluster (n1) with 1 instance and 1Gi storage.
+# Deploys a single CloudNativePG cluster (n1) with 1 instance and 1Gi storage.
 # This is the simplest possible pgEdge deployment.
 #
 # Install:

@@ -1,4 +1,4 @@
-# pgEdge Distributed Postgres on Kubernetes
+# Guided Walkthrough
 
 In this walkthrough you'll progressively build a **distributed PostgreSQL cluster** using pgEdge on Kubernetes. Instead of deploying everything at once, you'll evolve the architecture step-by-step:
 
@@ -6,41 +6,41 @@ In this walkthrough you'll progressively build a **distributed PostgreSQL cluste
 |------|---------------|
 | **Set Up Cluster** | Install the operators that manage PostgreSQL on Kubernetes |
 | **Single Primary** | Deploy one pgEdge node with a single Postgres instance |
-| **HA with Replicas** | Add a synchronous read replica for high availability |
-| **Multi-Master** | Add a second pgEdge node with Spock active-active replication |
+| **HA with Standby Instances** | Add a synchronous standby instance for high availability |
+| **Active-Active** | Add a second pgEdge node with Spock active-active replication |
 | **Prove It Works** | Write data on one node, read it on the other |
 
 Each deployment step uses Helm (`install` or `upgrade`), so you'll see the cluster evolve in real time.
 
-Click the **Run** button on any code block to execute it directly in the terminal.
-
-> **Prefer a guided terminal experience?** Instead of clicking through
-> Runme, run the interactive guide script:
->
-> ```bash
-> ./guide.sh
-> ```
->
-> It walks you through the same steps with explanations and prompts.
+!!! tip "Run the commands as you read"
+    Every code block in this walkthrough is executable. Open it in [GitHub Codespaces](https://github.com/codespaces/new?repo=pgEdge/pgedge-helm&devcontainer_path=.devcontainer/walkthrough/devcontainer.json) for a ready-to-go environment, or install the [Runme extension](https://marketplace.visualstudio.com/items?itemName=stateful.runme) in VS Code to run commands directly from the markdown.
 
 ---
 
 ## Step 1: Set Up the Cluster
 
-Before deploying pgEdge, we need two Kubernetes operators:
+Before deploying pgEdge, we need a Kubernetes cluster and two operators:
 
 - **cert-manager** — handles TLS certificates so that database nodes communicate securely
 - **CloudNativePG (CNPG)** — manages PostgreSQL clusters as native Kubernetes resources, handling pod creation, failover, replication, and backups
 
-The setup script creates a local kind cluster (if needed) and installs both operators. This takes about 2 minutes:
+### Get a Kubernetes cluster
+
+**If you're in Codespaces**, the environment is already set up — skip to [Install cert-manager](#install-cert-manager) below.
+
+**If you're on your own machine**, run the installer to download the walkthrough files, install any missing tools, and create a local kind cluster:
 
 ```bash
-bash setup-cluster.sh
+curl -fsSL https://raw.githubusercontent.com/pgEdge/pgedge-helm/main/examples/walkthrough/install.sh | bash
 ```
 
-### Verify the environment
+Once it completes, `cd` into the walkthrough directory:
 
-Check that the Kubernetes cluster is running:
+```bash
+cd pgedge-walkthrough
+```
+
+Check that the cluster is running:
 
 ```bash
 kubectl get nodes
@@ -48,17 +48,40 @@ kubectl get nodes
 
 You should see one node in `Ready` state.
 
-Check the CNPG operator is running — this is what will manage our PostgreSQL pods:
+> **Prefer a guided terminal experience?** Run `./guide.sh` instead — it walks you through the same steps with prompts and explanations.
+
+### Install cert-manager
 
 ```bash
-kubectl get deployment -n cnpg-system
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 ```
 
-Check cert-manager — all three pods should be `Running`:
+Wait for it to be ready — all three pods should become `Running`:
 
 ```bash
-kubectl get pods -n cert-manager
+kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s
 ```
+
+### Add the pgEdge Helm repository
+
+```bash
+helm repo add pgedge https://pgedge.github.io/charts --force-update
+helm repo update
+```
+
+### Install the CloudNativePG operator
+
+```bash
+helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace
+```
+
+Wait for the operator to be ready:
+
+```bash
+kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s
+```
+
+### Verify the environment
 
 Check the cnpg kubectl plugin — this gives us `cnpg status` and `cnpg psql` commands:
 
@@ -133,15 +156,15 @@ You now have a single PostgreSQL primary running in Kubernetes, managed by the C
 
 ---
 
-## Step 3: Scale with Read Replicas
+## Step 3: Add Standby Instances
 
-Now let's upgrade the deployment to add a **synchronous read replica**. This gives you high availability — if the primary fails, the replica takes over with **zero data loss**.
+Now let's upgrade the deployment to add a **synchronous standby instance**. This gives you high availability — if the primary fails, the standby instance takes over with **zero data loss**.
 
 ### What's changing
 
 The key differences from step 2:
 
-- `instances: 1` becomes `instances: 2` — adds a replica to node n1
+- `instances: 1` becomes `instances: 2` — adds a standby instance to node n1
 - Synchronous replication is configured with `dataDurability: required` — every write is confirmed on both instances before the transaction completes
 
 ```yaml
@@ -159,7 +182,7 @@ nodes:
 
 ### Upgrade the release
 
-This is a `helm upgrade`, not a new install. The existing primary stays running while the replica is added:
+This is a `helm upgrade`, not a new install. The existing primary stays running while the standby instance is added:
 
 ```bash
 helm upgrade pgedge pgedge/pgedge -f values/step2-with-replicas.yaml
@@ -173,7 +196,7 @@ kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=18
 
 ### Check the cluster status
 
-You should now see 2 instances — one primary and one replica with the `(sync)` role:
+You should now see 2 instances — one primary and one standby instance with the `(sync)` role:
 
 ```bash
 kubectl cnpg status pgedge-n1
@@ -187,15 +210,15 @@ This query shows the replication connection from the primary's perspective. Look
 kubectl cnpg psql pgedge-n1 -- -d app -c "SELECT client_addr, state, sync_state FROM pg_stat_replication;"
 ```
 
-The replica is receiving all changes synchronously — every committed write is guaranteed to be on both instances before the transaction completes.
+The standby instance is receiving all changes synchronously — every committed write is guaranteed to be on both instances before the transaction completes.
 
 ---
 
-## Step 4: Go Multi-Master
+## Step 4: Active-Active Replication
 
 This is where pgEdge shines. You'll add a **second pgEdge node** (`n2`) with **Spock active-active replication**. Both nodes will accept writes, and changes replicate bidirectionally.
 
-Unlike the read replica in the previous step (which only accepts reads), both n1 and n2 are **full read-write nodes**.
+Unlike the standby instance in the previous step (which only accepts reads), both n1 and n2 are **full read-write nodes**.
 
 ### What's changing
 
@@ -203,7 +226,7 @@ A second node `n2` is added to the `nodes` list. The key setting is `bootstrap.m
 
 ```yaml
 nodes:
-  - name: n1              # existing — keeps its replica
+  - name: n1              # existing — keeps its standby instance
     hostname: pgedge-n1-rw
     clusterSpec:
       instances: 2
@@ -384,6 +407,7 @@ kind delete cluster --name pgedge-demo
 
 ## Learn More
 
+- [Quickstart](https://pgedge.github.io/pgedge-helm/quickstart/) — Deploy a 2-node cluster in 5 minutes
 - [pgEdge Helm Chart](https://github.com/pgedge/pgedge-helm) — Full chart documentation
 - [pgEdge Documentation](https://docs.pgedge.com) — Spock replication, conflict resolution, and more
 - [pgEdge Cloud](https://www.pgedge.com) — Managed distributed PostgreSQL

@@ -1,7 +1,7 @@
-# Step 3: Multi-Master with Spock Active-Active Replication
-# ----------------------------------------------------------
+# Step 3: Active-Active with Spock Replication
+# ----------------------------------------------
 # Adds a second node (n2) to enable Spock active-active replication
-# between n1 and n2. Node n1 retains its read replica (2 instances);
+# between n1 and n2. Node n1 retains its standby instance (2 instances);
 # n2 starts with 1 instance.
 #
 # Upgrade from Step 2:

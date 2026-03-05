@@ -1,6 +1,6 @@
-# Step 2: Add Read Replicas
-# --------------------------
-# Upgrades the single primary to a 2-instance cluster (1 primary + 1 read replica)
+# Step 2: Add Standby Instances
+# ------------------------------
+# Upgrades the single primary to a 2-instance cluster (1 primary + 1 standby)
 # with synchronous replication enabled for data durability.
 #
 # Upgrade from Step 1:
