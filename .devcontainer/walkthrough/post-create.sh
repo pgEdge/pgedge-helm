@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== pgEdge Guided Walkthrough — Codespaces Setup ==="
+echo "=== pgEdge Helm Walkthrough — Codespaces Setup ==="
 
 ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
