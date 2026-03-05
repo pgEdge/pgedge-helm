@@ -26,10 +26,11 @@ case "$ARCH" in
 esac
 echo "  Detected ${OS}/${ARCH}"
 
-# --- Download walkthrough files ---
+# --- Download walkthrough files (mirrors repo layout) ---
 
 echo "  Downloading walkthrough files..."
-mkdir -p "$WORK_DIR/values"
+mkdir -p "$WORK_DIR/examples/walkthrough/values"
+mkdir -p "$WORK_DIR/docs"
 
 FILES=(
   examples/walkthrough/guide.sh
@@ -42,28 +43,27 @@ FILES=(
 )
 
 for file in "${FILES[@]}"; do
-  dest="$WORK_DIR/$(basename "$file")"
-  # Preserve values/ subdirectory
-  if [[ "$file" == */values/* ]]; then
-    dest="$WORK_DIR/values/$(basename "$file")"
-  fi
-  curl -fsSL "$BASE_URL/$file" -o "$dest"
+  curl -fsSL "$BASE_URL/$file" -o "$WORK_DIR/$file"
 done
 
-chmod +x "$WORK_DIR/guide.sh" "$WORK_DIR/setup.sh"
+chmod +x "$WORK_DIR/examples/walkthrough/guide.sh" "$WORK_DIR/examples/walkthrough/setup.sh"
 
 cd "$WORK_DIR"
 
 # --- Run setup (tools + cluster only, no operators) ---
 
 echo ""
-bash ./setup.sh
+bash examples/walkthrough/setup.sh
 
 # --- Present choices ---
 
 echo ""
-echo "  Choose how to continue:"
+echo "  Setup complete! Next, run:"
 echo ""
-echo "    Interactive Guide (terminal):  ./guide.sh"
-echo "    Walkthrough (VS Code + Runme): code walkthrough.md"
+echo "    cd $WORK_DIR"
+echo ""
+echo "  Then choose how to continue:"
+echo ""
+echo "    Interactive Guide (terminal):  cd examples/walkthrough && ./guide.sh"
+echo "    Walkthrough (VS Code + Runme): code docs/walkthrough.md"
 echo ""

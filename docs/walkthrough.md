@@ -1,3 +1,7 @@
+---
+cwd: ../examples/walkthrough
+---
+
 # Guided Walkthrough
 
 In this walkthrough you'll progressively build a **distributed PostgreSQL cluster** using pgEdge on Kubernetes. Instead of deploying everything at once, you'll evolve the architecture step-by-step:
@@ -48,7 +52,11 @@ kubectl get nodes
 
 You should see one node in `Ready` state.
 
-> **Prefer a guided terminal experience?** Run `./guide.sh` instead — it walks you through the same steps with prompts and explanations.
+**Prefer a guided terminal experience?** Run the Interactive Guide to walk through the same steps with prompts and explanations:
+
+```bash
+bash examples/walkthrough/guide.sh
+```
 
 ### Install cert-manager
 

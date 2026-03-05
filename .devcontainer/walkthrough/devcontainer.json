@@ -12,7 +12,6 @@
     "vscode": {
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",
-        "terminal.integrated.cwd": "${containerWorkspaceFolder}/examples/walkthrough",
         "workbench.startupEditor": "none"
       },
       "extensions": [
