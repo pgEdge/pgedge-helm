@@ -1,5 +1,5 @@
 ---
-cwd: ../examples/walkthrough
+cwd: ./
 ---
 
 # Guided Walkthrough
@@ -130,7 +130,7 @@ pgEdge:
 ### Install the chart
 
 ```bash
-helm install pgedge pgedge/pgedge -f values/step1-single-primary.yaml
+helm install pgedge pgedge/pgedge -f examples/walkthrough/values/step1-single-primary.yaml
 ```
 
 The CNPG operator is now creating a PostgreSQL pod. Wait for it to be ready:
@@ -193,7 +193,7 @@ nodes:
 This is a `helm upgrade`, not a new install. The existing primary stays running while the standby instance is added:
 
 ```bash
-helm upgrade pgedge pgedge/pgedge -f values/step2-with-replicas.yaml
+helm upgrade pgedge pgedge/pgedge -f examples/walkthrough/values/step2-with-replicas.yaml
 ```
 
 Wait for both pods to be ready:
@@ -249,7 +249,7 @@ nodes:
 ### Upgrade the release
 
 ```bash
-helm upgrade pgedge pgedge/pgedge -f values/step3-multi-master.yaml
+helm upgrade pgedge pgedge/pgedge -f examples/walkthrough/values/step3-multi-master.yaml
 ```
 
 This takes a bit longer — the CNPG operator creates a new cluster for n2, and the pgEdge init-spock job wires up Spock subscriptions between the nodes.
