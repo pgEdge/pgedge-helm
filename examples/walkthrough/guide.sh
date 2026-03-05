@@ -71,7 +71,7 @@ else
   explain "Installing cert-manager — handles TLS certificates so database"
   explain "nodes communicate securely:"
 
-  prompt_run "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml"
+  prompt_run "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml" "Installing cert-manager..."
 
   start_spinner "Waiting for cert-manager..."
   if ! kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s &>/dev/null; then
@@ -88,7 +88,7 @@ fi
 echo ""
 explain "Adding the pgEdge Helm repository:"
 
-prompt_run "helm repo add pgedge https://pgedge.github.io/charts --force-update && helm repo update"
+prompt_run "helm repo add pgedge https://pgedge.github.io/charts --force-update && helm repo update" "Adding Helm repo..."
 
 # --- CNPG operator ---
 
@@ -99,7 +99,7 @@ else
   explain "Installing the pgEdge CloudNativePG operator — manages PostgreSQL"
   explain "clusters as native Kubernetes resources:"
 
-  prompt_run "helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace"
+  prompt_run "helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace" "Installing CNPG operator..."
 
   start_spinner "Waiting for CNPG operator..."
   if ! kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s &>/dev/null; then
@@ -131,7 +131,7 @@ echo -e "      hostname: pgedge-n1-rw"
 echo -e "  clusterSpec:"
 echo -e "    instances: 1${RESET}"
 
-prompt_run "helm install pgedge pgedge/pgedge -f $VALUES_DIR/step1-single-primary.yaml"
+prompt_run "helm install pgedge pgedge/pgedge -f $VALUES_DIR/step1-single-primary.yaml" "Deploying single primary..."
 
 explain "The CNPG operator is now creating a PostgreSQL pod."
 echo ""
@@ -172,7 +172,7 @@ echo ""
 echo -e "${DIM}instances: 1  →  instances: 2"
 echo -e "+ synchronous replication with dataDurability: required${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step2-with-replicas.yaml"
+prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step2-with-replicas.yaml" "Adding standby instance..."
 
 explain "A second pod is spinning up as a synchronous standby..."
 echo ""
@@ -214,7 +214,7 @@ echo -e "${DIM}nodes:"
 echo -e "  - name: n1    # existing, keeps its standby"
 echo -e "  - name: n2    # new, bootstraps from n1 via Spock${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step3-multi-master.yaml"
+prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step3-multi-master.yaml" "Enabling active-active replication..."
 
 explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job will wire up Spock subscriptions..."
@@ -333,15 +333,15 @@ if [ "${CLUSTER_MODE:-kind}" = "existing" ]; then
   case "${answer:-n}" in
     [yY]*)
       echo ""
-      echo -e "${CYAN}Uninstalling Helm release...${RESET}"
+      echo -e "${TEAL}Uninstalling Helm release...${RESET}"
       helm uninstall pgedge 2>/dev/null || true
       echo ""
       read -rp "Also remove CNPG operator and cert-manager? [y/N] " answer2 </dev/tty
       case "${answer2:-n}" in
         [yY]*)
-          echo -e "${CYAN}Removing CloudNativePG operator...${RESET}"
+          echo -e "${TEAL}Removing CloudNativePG operator...${RESET}"
           helm uninstall cnpg --namespace cnpg-system 2>/dev/null || true
-          echo -e "${CYAN}Removing cert-manager...${RESET}"
+          echo -e "${TEAL}Removing cert-manager...${RESET}"
           kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml 2>/dev/null || true
           ;;
       esac
@@ -362,9 +362,9 @@ else
   case "${answer:-n}" in
     [yY]*)
       echo ""
-      echo -e "${CYAN}Uninstalling Helm release...${RESET}"
+      echo -e "${TEAL}Uninstalling Helm release...${RESET}"
       helm uninstall pgedge 2>/dev/null || true
-      echo -e "${CYAN}Deleting kind cluster...${RESET}"
+      echo -e "${TEAL}Deleting kind cluster...${RESET}"
       kind delete cluster --name pgedge-demo 2>/dev/null || true
       rm -f "$CLUSTER_MODE_FILE"
       echo ""

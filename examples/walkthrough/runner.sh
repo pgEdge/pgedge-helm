@@ -7,12 +7,11 @@
 # Usage:
 #   source "$(dirname "$0")/runner.sh"
 
-# --- Colors and formatting ---
+# --- Colors and formatting (pgEdge brand: #449cbf teal, #eba96c orange) ---
 BOLD='\033[1m'
+TEAL='\033[38;5;73m'
+ORANGE='\033[38;5;215m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
 DIM='\033[2m'
 RESET='\033[0m'
 
@@ -20,9 +19,9 @@ RESET='\033[0m'
 
 header() {
   echo ""
-  echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e "${BOLD}${BLUE}$1${RESET}"
-  echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
+  echo -e "${BOLD}${TEAL}══════════════════════════════════════════════════════════════${RESET}"
+  echo -e "${BOLD}${TEAL}$1${RESET}"
+  echo -e "${BOLD}${TEAL}══════════════════════════════════════════════════════════════${RESET}"
   echo ""
 }
 
@@ -36,19 +35,33 @@ info() {
 
 show_cmd() {
   echo ""
-  echo -e "${YELLOW}\$ $1${RESET}"
+  echo -e "${ORANGE}\$ $1${RESET}"
 }
 
 # --- Interactive prompts ---
 
 prompt_run() {
   local cmd="$1"
+  local slow="${2:-}"
   show_cmd "$cmd"
   echo ""
   read -rp "Press Enter to run..." </dev/tty
-  echo -e "${CYAN}⏳ Running...${RESET}"
   echo ""
-  eval "$cmd" 2> >(grep -v "Unable to use a TTY" >&2)
+  if [ -n "$slow" ]; then
+    local tmpfile
+    tmpfile=$(mktemp)
+    start_spinner "$slow"
+    eval "$cmd" > "$tmpfile" 2> >(grep -v "Unable to use a TTY" >&2)
+    stop_spinner
+    echo -e "${DIM}─── Output ─────────────────────────────────────────────────${RESET}"
+    cat "$tmpfile"
+    echo -e "${DIM}────────────────────────────────────────────────────────────${RESET}"
+    rm -f "$tmpfile"
+  else
+    echo -e "${DIM}─── Output ─────────────────────────────────────────────────${RESET}"
+    eval "$cmd" 2> >(grep -v "Unable to use a TTY" >&2)
+    echo -e "${DIM}────────────────────────────────────────────────────────────${RESET}"
+  fi
   echo ""
 }
 
@@ -68,7 +81,7 @@ start_spinner() {
   (
     while true; do
       for (( i=0; i<${#chars}; i++ )); do
-        printf "\r\033[0;36m%s\033[0m %s" "${chars:$i:1}" "$msg"
+        printf "\r\033[38;5;73m%s\033[0m %s" "${chars:$i:1}" "$msg"
         sleep 0.1
       done
     done

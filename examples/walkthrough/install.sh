@@ -4,6 +4,16 @@ set -euo pipefail
 # Entrypoint for curl-pipe installation:
 #   curl -fsSL https://raw.githubusercontent.com/pgEdge/pgedge-helm/main/examples/walkthrough/install.sh | bash
 
+# --- Codespaces check ---
+
+if [ -n "${CODESPACES:-}" ]; then
+  echo ""
+  echo "Running in Codespaces — everything is already set up."
+  echo "Continue with the walkthrough or run: bash examples/walkthrough/guide.sh"
+  echo ""
+  exit 0
+fi
+
 WORK_DIR="${WALKTHROUGH_DIR:-pgedge-walkthrough}"
 BRANCH="${WALKTHROUGH_BRANCH:-main}"
 BASE_URL="https://raw.githubusercontent.com/pgEdge/pgedge-helm/${BRANCH}"
