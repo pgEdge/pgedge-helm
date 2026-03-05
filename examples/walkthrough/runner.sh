@@ -21,22 +21,22 @@ RESET='\033[0m'
 header() {
   echo ""
   echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e "${BOLD}${BLUE}  $1${RESET}"
+  echo -e "${BOLD}${BLUE}$1${RESET}"
   echo -e "${BOLD}${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo ""
 }
 
 explain() {
-  echo -e "  $1"
+  echo -e "$1"
 }
 
 info() {
-  echo -e "  ${GREEN}$1${RESET}"
+  echo -e "${GREEN}$1${RESET}"
 }
 
 show_cmd() {
   echo ""
-  echo -e "  ${YELLOW}\$ $1${RESET}"
+  echo -e "${YELLOW}\$ $1${RESET}"
 }
 
 # --- Interactive prompts ---
@@ -45,8 +45,8 @@ prompt_run() {
   local cmd="$1"
   show_cmd "$cmd"
   echo ""
-  read -rp "  Press Enter to run..." </dev/tty
-  echo -e "  ${CYAN}⏳ Running...${RESET}"
+  read -rp "Press Enter to run..." </dev/tty
+  echo -e "${CYAN}⏳ Running...${RESET}"
   echo ""
   eval "$cmd" 2> >(grep -v "Unable to use a TTY" >&2)
   echo ""
@@ -54,7 +54,7 @@ prompt_run() {
 
 prompt_continue() {
   echo ""
-  read -rp "  Press Enter to continue..." </dev/tty
+  read -rp "Press Enter to continue..." </dev/tty
   echo ""
 }
 
@@ -68,7 +68,7 @@ start_spinner() {
   (
     while true; do
       for (( i=0; i<${#chars}; i++ )); do
-        printf "\r  \033[0;36m%s\033[0m %s" "${chars:$i:1}" "$msg"
+        printf "\r\033[0;36m%s\033[0m %s" "${chars:$i:1}" "$msg"
         sleep 0.1
       done
     done

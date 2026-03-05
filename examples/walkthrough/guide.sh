@@ -15,17 +15,17 @@ trap 'stop_spinner' EXIT
 
 header "pgEdge Distributed Postgres on Kubernetes"
 
-echo "  This guide walks you through building a distributed PostgreSQL"
-echo "  cluster, one step at a time:"
+echo "This guide walks you through building a distributed PostgreSQL"
+echo "cluster, one step at a time:"
 echo ""
-echo "    1. Set up a Kubernetes cluster with the required operators"
-echo "    2. Deploy a single PostgreSQL primary"
-echo "    3. Add a synchronous standby instance for HA"
-echo "    4. Add a second node for active-active replication"
-echo "    5. Prove active-active replication works"
+echo "  1. Set up a Kubernetes cluster with the required operators"
+echo "  2. Deploy a single PostgreSQL primary"
+echo "  3. Add a synchronous standby instance for HA"
+echo "  4. Add a second node for active-active replication"
+echo "  5. Prove active-active replication works"
 echo ""
-echo "  Each step is a helm install or upgrade — you'll see the cluster"
-echo "  evolve from a single database to a distributed system."
+echo "Each step is a helm install or upgrade — you'll see the cluster"
+echo "evolve from a single database to a distributed system."
 
 prompt_continue
 
@@ -74,7 +74,7 @@ else
   prompt_run "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml"
 
   start_spinner "Waiting for cert-manager..."
-  if ! kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s 2>/dev/null; then
+  if ! kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=120s &>/dev/null; then
     stop_spinner
     echo ""
     echo "  Timed out waiting for cert-manager."
@@ -102,7 +102,7 @@ else
   prompt_run "helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace"
 
   start_spinner "Waiting for CNPG operator..."
-  if ! kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s 2>/dev/null; then
+  if ! kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s &>/dev/null; then
     stop_spinner
     echo ""
     echo "  Timed out waiting for CNPG operator."
@@ -124,19 +124,19 @@ explain "node running a single PostgreSQL instance."
 echo ""
 explain "The values file defines just one node (n1) with 1 instance:"
 echo ""
-echo -e "  ${DIM}pgEdge:"
-echo -e "    nodes:"
-echo -e "      - name: n1"
-echo -e "        hostname: pgedge-n1-rw"
-echo -e "    clusterSpec:"
-echo -e "      instances: 1${RESET}"
+echo -e "${DIM}pgEdge:"
+echo -e "  nodes:"
+echo -e "    - name: n1"
+echo -e "      hostname: pgedge-n1-rw"
+echo -e "  clusterSpec:"
+echo -e "    instances: 1${RESET}"
 
 prompt_run "helm install pgedge pgedge/pgedge -f $VALUES_DIR/step1-single-primary.yaml"
 
 explain "The CNPG operator is now creating a PostgreSQL pod."
 echo ""
 start_spinner "Waiting for pod to be ready..."
-if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s &>/dev/null; then
   stop_spinner
   echo ""
   echo "  Timed out waiting for pgedge-n1 pods."
@@ -169,15 +169,15 @@ echo ""
 explain "The change is a helm upgrade with an updated values file."
 explain "Key difference from step 1:"
 echo ""
-echo -e "  ${DIM}instances: 1  →  instances: 2"
-echo -e "  + synchronous replication with dataDurability: required${RESET}"
+echo -e "${DIM}instances: 1  →  instances: 2"
+echo -e "+ synchronous replication with dataDurability: required${RESET}"
 
 prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step2-with-replicas.yaml"
 
 explain "A second pod is spinning up as a synchronous standby..."
 echo ""
 start_spinner "Waiting for standby to be ready..."
-if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s &>/dev/null; then
   stop_spinner
   echo ""
   echo "  Timed out waiting for pgedge-n1 standby pods."
@@ -210,9 +210,9 @@ echo ""
 explain "The values file adds n2 to the nodes list. The chart automatically"
 explain "configures Spock logical replication between n1 and n2:"
 echo ""
-echo -e "  ${DIM}nodes:"
-echo -e "    - name: n1    # existing, keeps its standby"
-echo -e "    - name: n2    # new, bootstraps from n1 via Spock${RESET}"
+echo -e "${DIM}nodes:"
+echo -e "  - name: n1    # existing, keeps its standby"
+echo -e "  - name: n2    # new, bootstraps from n1 via Spock${RESET}"
 
 prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step3-multi-master.yaml"
 
@@ -220,7 +220,7 @@ explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job will wire up Spock subscriptions..."
 echo ""
 start_spinner "Waiting for n1 pods..."
-if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s 2>/dev/null; then
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s &>/dev/null; then
   stop_spinner
   echo ""
   echo "  Timed out waiting for pgedge-n1 pods."
@@ -228,7 +228,7 @@ if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeo
 fi
 stop_spinner
 start_spinner "Waiting for n2 pods..."
-if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n2 --timeout=180s 2>/dev/null; then
+if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n2 --timeout=180s &>/dev/null; then
   stop_spinner
   echo ""
   echo "  Timed out waiting for pgedge-n2 pods."
@@ -303,45 +303,45 @@ info "All 5 cities on both nodes — bidirectional active-active replication con
 
 header "Done!"
 
-echo "  You've built a distributed, active-active PostgreSQL cluster"
-echo "  on Kubernetes using pgEdge — starting from a single instance"
-echo "  and evolving it step by step."
+echo "You've built a distributed, active-active PostgreSQL cluster"
+echo "on Kubernetes using pgEdge — starting from a single instance"
+echo "and evolving it step by step."
 echo ""
-echo -e "  ${BOLD}What you built:${RESET}"
-echo "    1. Single Primary           one node, one instance"
-echo "    2. HA with Standby Instances synchronous standby instance"
-echo "    3. Active-Active            Spock active-active replication"
-echo "    4. Proved Replication       bidirectional writes confirmed"
+echo -e "${BOLD}What you built:${RESET}"
+echo "  1. Single Primary           one node, one instance"
+echo "  2. HA with Standby Instances synchronous standby instance"
+echo "  3. Active-Active            Spock active-active replication"
+echo "  4. Proved Replication       bidirectional writes confirmed"
 echo ""
-echo -e "  ${BOLD}Useful commands:${RESET}"
-echo "    kubectl cnpg status pgedge-n1        # n1 cluster health"
-echo "    kubectl cnpg status pgedge-n2        # n2 cluster health"
-echo "    kubectl cnpg psql pgedge-n1 -- -d app  # psql shell to n1"
-echo "    kubectl cnpg psql pgedge-n2 -- -d app  # psql shell to n2"
-echo "    kubectl get pods -o wide             # all pods"
-echo "    helm get values pgedge               # current helm values"
+echo -e "${BOLD}Useful commands:${RESET}"
+echo "  kubectl cnpg status pgedge-n1        # n1 cluster health"
+echo "  kubectl cnpg status pgedge-n2        # n2 cluster health"
+echo "  kubectl cnpg psql pgedge-n1 -- -d app  # psql shell to n1"
+echo "  kubectl cnpg psql pgedge-n2 -- -d app  # psql shell to n2"
+echo "  kubectl get pods -o wide             # all pods"
+echo "  helm get values pgedge               # current helm values"
 echo ""
-echo -e "  ${BOLD}Learn more:${RESET}"
-echo "    https://github.com/pgedge/pgedge-helm"
-echo "    https://docs.pgedge.com"
-echo "    https://www.pgedge.com"
+echo -e "${BOLD}Learn more:${RESET}"
+echo "  https://github.com/pgedge/pgedge-helm"
+echo "  https://docs.pgedge.com"
+echo "  https://www.pgedge.com"
 echo ""
 
 echo ""
 if [ "${CLUSTER_MODE:-kind}" = "existing" ]; then
-  read -rp "  Would you like to clean up the demo resources? [y/N] " answer </dev/tty
+  read -rp "Would you like to clean up the demo resources? [y/N] " answer </dev/tty
   case "${answer:-n}" in
     [yY]*)
       echo ""
-      echo -e "  ${CYAN}Uninstalling Helm release...${RESET}"
+      echo -e "${CYAN}Uninstalling Helm release...${RESET}"
       helm uninstall pgedge 2>/dev/null || true
       echo ""
-      read -rp "  Also remove CNPG operator and cert-manager? [y/N] " answer2 </dev/tty
+      read -rp "Also remove CNPG operator and cert-manager? [y/N] " answer2 </dev/tty
       case "${answer2:-n}" in
         [yY]*)
-          echo -e "  ${CYAN}Removing CloudNativePG operator...${RESET}"
+          echo -e "${CYAN}Removing CloudNativePG operator...${RESET}"
           helm uninstall cnpg --namespace cnpg-system 2>/dev/null || true
-          echo -e "  ${CYAN}Removing cert-manager...${RESET}"
+          echo -e "${CYAN}Removing cert-manager...${RESET}"
           kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml 2>/dev/null || true
           ;;
       esac
@@ -351,20 +351,20 @@ if [ "${CLUSTER_MODE:-kind}" = "existing" ]; then
       ;;
     *)
       echo ""
-      echo -e "  ${BOLD}To clean up later:${RESET}"
-      echo "    helm uninstall pgedge"
-      echo "    helm uninstall cnpg --namespace cnpg-system"
-      echo "    kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml"
+      echo -e "${BOLD}To clean up later:${RESET}"
+      echo "  helm uninstall pgedge"
+      echo "  helm uninstall cnpg --namespace cnpg-system"
+      echo "  kubectl delete -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml"
       ;;
   esac
 else
-  read -rp "  Would you like to clean up the demo environment? [y/N] " answer </dev/tty
+  read -rp "Would you like to clean up the demo environment? [y/N] " answer </dev/tty
   case "${answer:-n}" in
     [yY]*)
       echo ""
-      echo -e "  ${CYAN}Uninstalling Helm release...${RESET}"
+      echo -e "${CYAN}Uninstalling Helm release...${RESET}"
       helm uninstall pgedge 2>/dev/null || true
-      echo -e "  ${CYAN}Deleting kind cluster...${RESET}"
+      echo -e "${CYAN}Deleting kind cluster...${RESET}"
       kind delete cluster --name pgedge-demo 2>/dev/null || true
       rm -f "$CLUSTER_MODE_FILE"
       echo ""
@@ -372,9 +372,9 @@ else
       ;;
     *)
       echo ""
-      echo -e "  ${BOLD}To clean up later:${RESET}"
-      echo "    helm uninstall pgedge"
-      echo "    kind delete cluster --name pgedge-demo"
+      echo -e "${BOLD}To clean up later:${RESET}"
+      echo "  helm uninstall pgedge"
+      echo "  kind delete cluster --name pgedge-demo"
       ;;
   esac
 fi

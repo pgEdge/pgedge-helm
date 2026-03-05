@@ -48,14 +48,14 @@ if ! kubectl cnpg version &>/dev/null 2>&1; then
 fi
 
 if [ "$NEED_INSTALL" = true ]; then
-  echo "  The following tools are missing and will be installed to ${BIN_DIR}:"
-  echo "    ${MISSING[*]}"
+  echo "The following tools are missing and will be installed to ${BIN_DIR}:"
+  echo "  ${MISSING[*]}"
   echo ""
-  echo "  No sudo is required — everything stays inside this directory."
+  echo "No sudo is required — everything stays inside this directory."
   echo ""
-  read -rp "  Continue? [Y/n] " answer </dev/tty
+  read -rp "Continue? [Y/n] " answer </dev/tty
   case "${answer:-y}" in
-    [nN]*) echo "  Aborted."; exit 1 ;;
+    [nN]*) echo "Aborted."; exit 1 ;;
   esac
   echo ""
 
@@ -65,38 +65,38 @@ if [ "$NEED_INSTALL" = true ]; then
   for cmd in "${MISSING[@]}"; do
     case "$cmd" in
       kind)
-        echo "  Installing kind..."
+        echo "Installing kind..."
         version=$(curl -fsSL https://api.github.com/repos/kubernetes-sigs/kind/releases/latest \
           | grep '"tag_name"' | cut -d'"' -f4)
         curl -fsSLo "$BIN_DIR/kind" "https://kind.sigs.k8s.io/dl/${version}/kind-${OS}-${ARCH}"
         chmod +x "$BIN_DIR/kind"
-        echo "    Installed kind ${version}"
+        echo "  ✓ kind ${version}"
         ;;
       kubectl)
-        echo "  Installing kubectl..."
+        echo "Installing kubectl..."
         version=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
         curl -fsSLo "$BIN_DIR/kubectl" "https://dl.k8s.io/release/${version}/bin/${OS}/${ARCH}/kubectl"
         chmod +x "$BIN_DIR/kubectl"
-        echo "    Installed kubectl ${version}"
+        echo "  ✓ kubectl ${version}"
         ;;
       helm)
-        echo "  Installing Helm..."
+        echo "Installing Helm..."
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
           | HELM_INSTALL_DIR="$BIN_DIR" USE_SUDO=false bash
-        echo "    Installed Helm $(helm version --short)"
+        echo "  ✓ Helm $(helm version --short)"
         ;;
       kubectl-cnpg)
-        echo "  Installing cnpg kubectl plugin..."
+        echo "Installing cnpg kubectl plugin..."
         curl -fsSL "https://github.com/pgEdge/pgedge-cnpg-dist/releases/download/v1.28.0/kubectl-cnpg-${OS}-${ARCH}.tar.gz" \
           | tar xz -C "$BIN_DIR"
-        echo "    Installed kubectl-cnpg"
+        echo "  ✓ kubectl-cnpg"
         ;;
     esac
   done
 
   echo ""
 else
-  echo "  All required tools are already on PATH."
+  echo "All required tools are already on PATH."
   echo ""
 fi
 
@@ -109,44 +109,44 @@ fi
 create_kind_cluster() {
   # Only require Docker when creating a local kind cluster
   if ! command -v docker &>/dev/null; then
-    echo "  Error: Docker is not installed and no existing Kubernetes cluster was detected."
-    echo "    Either install Docker: https://docs.docker.com/get-docker/"
-    echo "    Or configure kubectl to connect to an existing cluster."
+    echo "Error: Docker is not installed and no existing Kubernetes cluster was detected."
+    echo "  Either install Docker: https://docs.docker.com/get-docker/"
+    echo "  Or configure kubectl to connect to an existing cluster."
     exit 1
   fi
 
   if ! docker info &>/dev/null; then
-    echo "  Error: Docker is installed but not running."
-    echo "    Please start Docker and try again."
+    echo "Error: Docker is installed but not running."
+    echo "  Please start Docker and try again."
     exit 1
   fi
 
   if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
-    echo "  Kind cluster '${CLUSTER_NAME}' already exists, reusing it."
+    echo "Kind cluster '${CLUSTER_NAME}' already exists, reusing it."
   else
-    echo "  Creating kind cluster '${CLUSTER_NAME}'..."
+    echo "Creating kind cluster '${CLUSTER_NAME}'..."
     kind create cluster --name "$CLUSTER_NAME" --wait 60s
   fi
   echo "kind" > "$SCRIPT_DIR/.cluster-mode"
 }
 
-echo "  Kubernetes Cluster"
-echo "  ──────────────────"
+echo "Kubernetes Cluster"
+echo "──────────────────"
 echo ""
 
 if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1; then
   CONTEXT=$(kubectl config current-context 2>/dev/null)
   SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null)
-  echo "  Detected existing cluster:"
-  echo "    Context:  $CONTEXT"
-  echo "    Server:   $SERVER"
+  echo "Detected existing cluster:"
+  echo "  Context:  $CONTEXT"
+  echo "  Server:   $SERVER"
   echo ""
-  echo "  The walkthrough will install cert-manager and CloudNativePG on this cluster."
+  echo "The walkthrough will install cert-manager and CloudNativePG on this cluster."
   echo ""
-  echo "    1) Use this cluster"
-  echo "    2) Create a new kind cluster instead"
+  echo "  1) Use this cluster"
+  echo "  2) Create a new kind cluster instead"
   echo ""
-  read -rp "  Choose [1/2]: " answer </dev/tty
+  read -rp "Choose [1/2]: " answer </dev/tty
   case "$answer" in
     2)
       echo ""
@@ -161,6 +161,6 @@ else
 fi
 
 echo ""
-echo "  Cluster is ready!"
+echo "Cluster is ready!"
 echo ""
-  kubectl get nodes
+kubectl get nodes
