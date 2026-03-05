@@ -9,8 +9,8 @@
 
 # --- Colors and formatting (pgEdge brand: #449cbf teal, #eba96c orange) ---
 BOLD='\033[1m'
-TEAL='\033[38;5;73m'
-ORANGE='\033[38;5;215m'
+TEAL='\033[38;5;30m'
+ORANGE='\033[38;5;172m'
 GREEN='\033[0;32m'
 DIM='\033[2m'
 RESET='\033[0m'
@@ -81,7 +81,7 @@ start_spinner() {
   (
     while true; do
       for (( i=0; i<${#chars}; i++ )); do
-        printf "\r\033[38;5;73m%s\033[0m %s" "${chars:$i:1}" "$msg"
+        printf "\r\033[38;5;30m%s\033[0m %s" "${chars:$i:1}" "$msg"
         sleep 0.1
       done
     done
