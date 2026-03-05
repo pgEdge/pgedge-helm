@@ -1,11 +1,7 @@
-# Step 3: Active-Active with Spock Replication
-# ----------------------------------------------
-# Adds a second node (n2) to enable Spock active-active replication
-# between n1 and n2. Node n1 retains its standby instance (2 instances);
-# n2 starts with 1 instance.
-#
-# Upgrade from Step 2:
-#   helm upgrade pgedge pgedge/pgedge -f values/step3-multi-master.yaml
+# Add a Second Node
+# Adds node n2 with Spock active-active replication.
+# Data is cloned from n1 and bidirectional replication is configured.
+# Node n1 retains its synchronous standby instance.
 
 pgEdge:
   appName: pgedge
@@ -21,10 +17,11 @@ pgEdge:
             dataDurability: required
     - name: n2
       hostname: pgedge-n2-rw
+      clusterSpec:
+        instances: 1
       bootstrap:
         mode: spock
         sourceNode: n1
   clusterSpec:
-    instances: 1
     storage:
       size: 1Gi

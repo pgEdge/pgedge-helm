@@ -13,7 +13,7 @@ evolves step-by-step:
 | Set Up Kubernetes | Install the operators that manage PostgreSQL on Kubernetes |
 | Deploy a Single Primary Instance | Deploy one pgEdge node with a single Postgres instance |
 | Add Standby Instances | Add a synchronous standby instance for high availability |
-| Add a Node | Add a second pgEdge node with Spock active-active replication |
+| Add a Second Node | Add a second pgEdge node with Spock active-active replication |
 | Verify Replication | Write data on one node, read it on the other |
 
 Each deployment step uses Helm (`install` or `upgrade`),
@@ -136,8 +136,9 @@ pgEdge:
   nodes:
     - name: n1
       hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 1
   clusterSpec:
-    instances: 1
     storage:
       size: 1Gi
 ```
@@ -234,16 +235,21 @@ The key differences from step 2:
   both instances before the transaction completes.
 
 ```yaml
-nodes:
-  - name: n1
-    hostname: pgedge-n1-rw
-    clusterSpec:
-      instances: 2
-      postgresql:
-        synchronous:
-          method: any
-          number: 1
-          dataDurability: required
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+  clusterSpec:
+    storage:
+      size: 1Gi
 ```
 
 ### Upgrade the release
@@ -288,7 +294,7 @@ Every committed write is guaranteed to exist on both
 instances before the transaction completes.
 
 
-## Step 4: Add a Node
+## Step 4: Add a Second Node
 
 This is where pgEdge shines. This step adds a second
 pgEdge node (`n2`) with Spock active-active replication.
@@ -307,16 +313,28 @@ to clone data from n1 and set up Spock logical replication
 between the two nodes:
 
 ```yaml
-nodes:
-  - name: n1
-    hostname: pgedge-n1-rw
-    clusterSpec:
-      instances: 2
-  - name: n2
-    hostname: pgedge-n2-rw
-    bootstrap:
-      mode: spock
-      sourceNode: n1
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        instances: 1
+      bootstrap:
+        mode: spock
+        sourceNode: n1
+  clusterSpec:
+    storage:
+      size: 1Gi
 ```
 
 ### Upgrade the release
@@ -498,18 +516,26 @@ kubectl cnpg psql pgedge-n1 -- -d app \
 
 ## Cleanup
 
-The following commands tear down the demo environment.
-
 Uninstall the pgEdge Helm release:
 
 ```shell
 helm uninstall pgedge
 ```
 
-Delete the kind cluster:
+If using a local kind cluster, delete the cluster. This
+removes everything including the operators:
 
 ```shell
 kind delete cluster --name pgedge-demo
+```
+
+If using an existing cluster, remove the operators
+separately:
+
+```shell
+helm uninstall cnpg --namespace cnpg-system
+kubectl delete -f \
+  https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 ```
 
 

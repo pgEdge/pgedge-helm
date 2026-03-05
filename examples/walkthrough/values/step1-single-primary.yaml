@@ -1,18 +1,13 @@
-# Step 1: Single Primary Node
-# ----------------------------
-# Starting point of the progressive tutorial.
-# Deploys a single CloudNativePG cluster (n1) with 1 instance and 1Gi storage.
-# This is the simplest possible pgEdge deployment.
-#
-# Install:
-#   helm install pgedge pgedge/pgedge -f values/step1-single-primary.yaml
+# Single Primary Instance
+# One pgEdge node (n1) with a single Postgres instance.
 
 pgEdge:
   appName: pgedge
   nodes:
     - name: n1
       hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 1
   clusterSpec:
-    instances: 1
     storage:
       size: 1Gi
