@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # runner.sh — Reusable terminal UX framework for interactive walkthrough guides.
 #
 # This file is SOURCED by guide scripts (not executed directly).

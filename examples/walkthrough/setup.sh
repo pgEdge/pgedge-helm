@@ -127,6 +127,7 @@ create_kind_cluster() {
     echo "Creating kind cluster '${CLUSTER_NAME}'..."
     kind create cluster --name "$CLUSTER_NAME" --wait 60s
   fi
+  kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
   echo "kind" > "$SCRIPT_DIR/.cluster-mode"
 }
 

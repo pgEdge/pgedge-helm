@@ -6,6 +6,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VALUES_DIR="$SCRIPT_DIR/values"
+CLUSTER_NAME="${CLUSTER_NAME:-pgedge-demo}"
+
+# Add local bin to PATH (tools installed by setup.sh)
+export PATH="$SCRIPT_DIR/bin:$PATH"
 
 # Source terminal framework
 source "$SCRIPT_DIR/runner.sh"
@@ -44,8 +48,19 @@ explain "  - ${BOLD}CloudNativePG${RESET}    Manages PostgreSQL as native Kubern
 # --- Tools and cluster ---
 
 if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null 2>&1; then
+  CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "unknown")
   echo ""
-  info "Kubernetes cluster is already running."
+  info "Kubernetes cluster detected (context: $CURRENT_CONTEXT)."
+  echo ""
+  read -rp "Use this cluster for the walkthrough? [Y/n] " answer </dev/tty
+  case "${answer:-y}" in
+    [nN]*)
+      echo ""
+      echo "To use a different cluster, switch context and re-run the guide:"
+      echo "  kubectl config use-context <your-context>"
+      exit 0
+      ;;
+  esac
   if [ ! -f "$CLUSTER_MODE_FILE" ]; then
     echo "existing" > "$CLUSTER_MODE_FILE"
   fi
@@ -100,7 +115,7 @@ else
   explain "Installing the pgEdge CloudNativePG operator — manages PostgreSQL"
   explain "clusters as native Kubernetes resources:"
 
-  prompt_run "helm install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace" "Installing CNPG operator..."
+  prompt_run "helm upgrade --install cnpg pgedge/cloudnative-pg --namespace cnpg-system --create-namespace" "Installing CNPG operator..."
 
   start_spinner "Waiting for CNPG operator..."
   if ! kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=cloudnative-pg -n cnpg-system --timeout=120s &>/dev/null; then
@@ -407,7 +422,7 @@ else
       echo -e "${TEAL}Uninstalling Helm release...${RESET}"
       helm uninstall pgedge 2>/dev/null || true
       echo -e "${TEAL}Deleting kind cluster...${RESET}"
-      kind delete cluster --name pgedge-demo 2>/dev/null || true
+      kind delete cluster --name "$CLUSTER_NAME" 2>/dev/null || true
       rm -f "$CLUSTER_MODE_FILE"
       echo ""
       info "All cleaned up."
@@ -416,7 +431,7 @@ else
       echo ""
       echo -e "${BOLD}To clean up later:${RESET}"
       echo "  helm uninstall pgedge"
-      echo "  kind delete cluster --name pgedge-demo"
+      echo "  kind delete cluster --name $CLUSTER_NAME"
       ;;
   esac
 fi
