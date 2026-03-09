@@ -82,7 +82,7 @@ if [ "$NEED_INSTALL" = true ]; then
       helm)
         echo "Installing Helm..."
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
-          | HELM_INSTALL_DIR="$BIN_DIR" USE_SUDO=false bash
+          | HELM_INSTALL_DIR="$BIN_DIR" USE_SUDO=false bash >/dev/null 2>&1
         echo "  ✓ Helm $(helm version --short)"
         ;;
       kubectl-cnpg)
@@ -125,7 +125,7 @@ create_kind_cluster() {
     echo "Kind cluster '${CLUSTER_NAME}' already exists, reusing it."
   else
     echo "Creating kind cluster '${CLUSTER_NAME}'..."
-    kind create cluster --name "$CLUSTER_NAME" --wait 60s
+    kind create cluster --name "$CLUSTER_NAME" --wait 60s >/dev/null 2>&1
   fi
   kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
   echo "kind" > "$SCRIPT_DIR/.cluster-mode"
@@ -163,5 +163,3 @@ fi
 
 echo ""
 echo "Cluster is ready!"
-echo ""
-kubectl get nodes
