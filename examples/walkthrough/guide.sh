@@ -151,7 +151,7 @@ echo -e "  clusterSpec:"
 echo -e "    storage:"
 echo -e "      size: 1Gi${RESET}"
 
-prompt_run "helm install pgedge pgedge/pgedge -f $VALUES_DIR/step1-single-primary.yaml" "Deploying single primary..."
+prompt_run "helm install pgedge pgedge/pgedge -f \"$VALUES_DIR/step1-single-primary.yaml\"" "Deploying single primary..."
 
 start_spinner "Waiting for instance to be ready..."
 if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s &>/dev/null; then
@@ -221,7 +221,7 @@ echo -e "  clusterSpec:"
 echo -e "    storage:"
 echo -e "      size: 1Gi${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step2-with-replicas.yaml" "Adding standby instance..."
+prompt_run "helm upgrade pgedge pgedge/pgedge -f \"$VALUES_DIR/step2-with-replicas.yaml\"" "Adding standby instance..."
 
 start_spinner "Waiting for both instances to be ready..."
 if ! kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=pgedge-n1 --timeout=180s &>/dev/null; then
@@ -283,7 +283,7 @@ echo -e "  clusterSpec:"
 echo -e "    storage:"
 echo -e "      size: 1Gi${RESET}"
 
-prompt_run "helm upgrade pgedge pgedge/pgedge -f $VALUES_DIR/step3-multi-master.yaml" "Adding node n2..."
+prompt_run "helm upgrade pgedge pgedge/pgedge -f \"$VALUES_DIR/step3-multi-master.yaml\"" "Adding node n2..."
 
 explain "The CNPG operator is creating a new cluster for n2, and the"
 explain "pgEdge init-spock job wires up Spock subscriptions..."
