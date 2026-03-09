@@ -4,6 +4,9 @@ This guide shows you how to install the pgEdge Helm chart
 to deploy distributed, active-active PostgreSQL on
 Kubernetes in under 5 minutes.
 
+!!! tip "New to pgEdge on Kubernetes?"
+    The [Guided Walkthrough](walkthrough.md) builds a cluster step-by-step, starting from a single primary and evolving to active-active replication. It's a great way to understand what each component does.
+
 ## Prerequisites
 
 This guide deploys pgEdge's supported distribution of the

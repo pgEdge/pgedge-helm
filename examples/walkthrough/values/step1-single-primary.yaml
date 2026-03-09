@@ -1,0 +1,13 @@
+# Single Primary Instance
+# One pgEdge node (n1) with a single Postgres instance.
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 1
+  clusterSpec:
+    storage:
+      size: 1Gi

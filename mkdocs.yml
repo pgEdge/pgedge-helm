@@ -50,7 +50,9 @@ repo_url: https://github.com/pgEdge/pgedge-helm
 
 nav:
   - Introduction: index.md
-  - Quickstart: quickstart.md
+  - Getting Started:
+      - Quickstart: quickstart.md
+      - Walkthrough: walkthrough.md
   - Installation: install.md
   - Configuration: configuration.md
   - Usage Guides:

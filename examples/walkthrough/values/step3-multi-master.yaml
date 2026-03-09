@@ -1,0 +1,27 @@
+# Add a Second Node
+# Adds node n2 with Spock active-active replication.
+# Data is cloned from n1 and bidirectional replication is configured.
+# Node n1 retains its synchronous standby instance.
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        instances: 1
+      bootstrap:
+        mode: spock
+        sourceNode: n1
+  clusterSpec:
+    storage:
+      size: 1Gi

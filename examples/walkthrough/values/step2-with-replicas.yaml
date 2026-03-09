@@ -1,0 +1,19 @@
+# Add Standby Instances
+# Adds a synchronous standby instance to n1 for high availability.
+# If the primary fails, the standby takes over with zero data loss.
+
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        instances: 2
+        postgresql:
+          synchronous:
+            method: any
+            number: 1
+            dataDurability: required
+  clusterSpec:
+    storage:
+      size: 1Gi
