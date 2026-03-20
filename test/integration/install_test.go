@@ -150,6 +150,21 @@ func TestDistributedInstall(t *testing.T) {
 		}
 	})
 
+	t.Run("replication_slots_exist", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod,
+					"SELECT count(*) FROM pg_replication_slots rs JOIN spock.subscription sub ON sub.sub_slot_name = rs.slot_name;")
+				if err != nil {
+					t.Fatalf("failed to query replication slots on %s: %v", pod, err)
+				}
+				if strings.TrimSpace(out) != "1" {
+					t.Errorf("pod %s: expected 1 logical replication slot for subscription, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
 	t.Run("data_replicates", func(t *testing.T) {
 		_, err := testKube.ExecSQL("pgedge-n1-1",
 			"CREATE TABLE test_repl (id int PRIMARY KEY, val text);")
@@ -237,6 +252,129 @@ func TestDistributedInstall(t *testing.T) {
 			})
 			if err != nil {
 				t.Error("replication broken after idempotent upgrade")
+			}
+		})
+	})
+}
+
+func TestDistributedHAInstall(t *testing.T) {
+	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "distributed-ha-values.yaml")
+
+	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
+
+	t.Run("clusters_healthy", func(t *testing.T) {
+		for _, name := range clusterNames {
+			if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
+				t.Errorf("cluster %s not healthy: %v", name, err)
+			}
+		}
+	})
+
+	t.Run("init_spock_job_succeeds", func(t *testing.T) {
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
+		}
+	})
+
+	t.Run("spock_nodes_exist", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod, "SELECT node_name FROM spock.node ORDER BY node_name;")
+				if err != nil {
+					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
+				}
+				for _, expected := range []string{"n1", "n2"} {
+					if !strings.Contains(out, expected) {
+						t.Errorf("pod %s: spock.node missing %s, got: %s", pod, expected, out)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("subscriptions_established", func(t *testing.T) {
+		for _, tc := range []struct {
+			pod  string
+			peer string
+		}{
+			{"pgedge-n1-1", "n2"},
+			{"pgedge-n2-1", "n1"},
+		} {
+			t.Run(tc.pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(tc.pod,
+					"SELECT count(*) FROM spock.subscription;")
+				if err != nil {
+					t.Fatalf("failed to query subscription count on %s: %v", tc.pod, err)
+				}
+				if strings.TrimSpace(out) != "1" {
+					t.Errorf("pod %s: expected 1 subscription, got: %s", tc.pod, out)
+				}
+			})
+		}
+	})
+
+	t.Run("replication_slots_exist", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod,
+					"SELECT count(*) FROM pg_replication_slots rs JOIN spock.subscription sub ON sub.sub_slot_name = rs.slot_name;")
+				if err != nil {
+					t.Fatalf("failed to query replication slots on %s: %v", pod, err)
+				}
+				if strings.TrimSpace(out) != "1" {
+					t.Errorf("pod %s: expected 1 logical replication slot for subscription, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
+	t.Run("data_replicates_with_replicas", func(t *testing.T) {
+		_, err := testKube.ExecSQL("pgedge-n1-1",
+			"CREATE TABLE test_ha (id int PRIMARY KEY, val text);")
+		if err != nil {
+			t.Fatalf("failed to create test table: %v", err)
+		}
+
+		_, err = testKube.ExecSQL("pgedge-n1-1",
+			"INSERT INTO test_ha VALUES (1, 'from-n1');")
+		if err != nil {
+			t.Fatalf("failed to insert on n1: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		t.Run("replicate_to_n2", func(t *testing.T) {
+			err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
+				out, err := testKube.ExecSQL("pgedge-n2-1", "SELECT val FROM test_ha WHERE id = 1;")
+				if err != nil {
+					return false, nil
+				}
+				return strings.Contains(out, "from-n1"), nil
+			})
+			if err != nil {
+				t.Error("row did not replicate to n2 within timeout")
+			}
+		})
+
+		_, err = testKube.ExecSQL("pgedge-n2-1",
+			"INSERT INTO test_ha VALUES (2, 'from-n2');")
+		if err != nil {
+			t.Fatalf("failed to insert on n2: %v", err)
+		}
+
+		t.Run("active_active_n1", func(t *testing.T) {
+			err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
+				out, err := testKube.ExecSQL("pgedge-n1-1", "SELECT val FROM test_ha WHERE id = 2;")
+				if err != nil {
+					return false, nil
+				}
+				return strings.Contains(out, "from-n2"), nil
+			})
+			if err != nil {
+				t.Error("active-active row did not replicate to n1")
 			}
 		})
 	})

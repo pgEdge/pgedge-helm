@@ -14,12 +14,13 @@ type Helm struct {
 
 // InstallOpts configures a helm install or upgrade.
 type InstallOpts struct {
-	ChartRef    string   // local path, OCI URI, or repo/chart
-	Version     string   // --version flag (empty = omit)
-	ValuesFiles []string // -f flags
-	SetValues   []string // --set key=value
-	Wait        bool
-	Timeout     string // --timeout flag (e.g. "10m"), requires Wait
+	ChartRef        string   // local path, OCI URI, or repo/chart
+	Version         string   // --version flag (empty = omit)
+	ValuesFiles     []string // -f flags
+	SetValues       []string // --set key=value
+	Wait            bool
+	Timeout         string // --timeout flag (e.g. "10m"), requires Wait
+	CreateNamespace bool   // --create-namespace flag
 }
 
 // UpgradeOpts configures a helm upgrade (same shape as InstallOpts).
@@ -96,6 +97,9 @@ func (h *Helm) appendOpts(args []string, opts InstallOpts) []string {
 	}
 	for _, s := range opts.SetValues {
 		args = append(args, "--set", s)
+	}
+	if opts.CreateNamespace {
+		args = append(args, "--create-namespace")
 	}
 	if opts.Wait {
 		args = append(args, "--wait")
