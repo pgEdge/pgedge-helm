@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	helmRepo = os.Getenv("HELM_REPO")
 	initSpockImg = os.Getenv("INIT_SPOCK_IMAGE")
 
-	timeoutStr := envOrDefault("TIMEOUT", "300s")
+	timeoutStr := envOrDefault("TIMEOUT", "10m")
 	var err error
 	timeout, err = time.ParseDuration(timeoutStr)
 	if err != nil {

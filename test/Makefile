@@ -8,8 +8,8 @@ NAMESPACE ?= default
 CHART_REF ?= $(root_dir)
 CHART_VERSION ?=
 HELM_REPO ?=
-INIT_SPOCK_IMAGE ?=
-TIMEOUT ?= 300s
+INIT_SPOCK_IMAGE ?= pgedge-helm-utils:dev
+TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
 
@@ -26,7 +26,7 @@ export TIMEOUT
 
 .PHONY: test-unit
 test-unit:
-	cd $(test_dir) && go test -tags unit -v ./unit/...
+	cd $(root_dir) && go test -tags unit -v ./test/unit/...
 
 # ---- Kind Cluster Management ----
 
@@ -56,7 +56,7 @@ kind-load-image:
 
 .PHONY: test-integration
 test-integration:
-	cd $(test_dir) && go test -tags integration -v -timeout 30m ./integration/...
+	cd $(root_dir) && go test -tags integration -v -timeout 30m ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -64,14 +64,28 @@ test-integration-kind: kind-up kind-load-image
 	$(MAKE) kind-down
 
 # ---- Selective Test Runs ----
+# Usage: make test-run RUN=TestSlotLossRecovery
+#        make test-run RUN="TestSlotLoss|TestNodesRemoveNode"
+
+.PHONY: test-run
+test-run: kind-load-image
+	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+		-run "$(RUN)" ./test/integration/...
 
 .PHONY: test-install
-test-install:
-	cd $(test_dir) && go test -tags integration -v -timeout 30m -run "TestDistributedInstall|TestSingleNodeInstall" ./integration/...
+test-install: kind-load-image
+	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+		-run "TestDistributedInstall|TestSingleNodeInstall" ./test/integration/...
 
 .PHONY: test-nodes
-test-nodes:
-	cd $(test_dir) && go test -tags integration -v -timeout 30m -run "TestNodes" ./integration/...
+test-nodes: kind-load-image
+	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+		-run "TestNodes" ./test/integration/...
+
+.PHONY: test-recovery
+test-recovery: kind-load-image
+	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+		-run "TestSlotLoss|TestOrphanSlot|TestCNPGBootstrap|TestIdempotent" ./test/integration/...
 
 # ---- All ----
 

@@ -8,3 +8,11 @@ broker-info.subm*
 kubeconfig
 README.md.gotmpl
 .venv
+init-spock
+cmd/
+internal/
+go.mod
+go.sum
+.codacy/
+docs/
+test/
