@@ -315,6 +315,24 @@ func TestDistributedHAInstall(t *testing.T) {
 		}
 	})
 
+	t.Run("debug_replication_state", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, _ := testKube.ExecSQL(pod, "SELECT pg_is_in_recovery();")
+				t.Logf("pod %s pg_is_in_recovery: %s", pod, out)
+
+				out, _ = testKube.ExecSQL(pod, "SELECT slot_name, slot_type, active, plugin FROM pg_replication_slots;")
+				t.Logf("pod %s pg_replication_slots:\n%s", pod, out)
+
+				out, _ = testKube.ExecSQL(pod, "SELECT sub_name, sub_slot_name, sub_enabled FROM spock.subscription;")
+				t.Logf("pod %s spock.subscription:\n%s", pod, out)
+
+				out, _ = testKube.ExecSQL(pod, "SELECT node_name FROM spock.node_local;")
+				t.Logf("pod %s spock.node_local: %s", pod, out)
+			})
+		}
+	})
+
 	t.Run("replication_slots_exist", func(t *testing.T) {
 		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
 			t.Run(pod, func(t *testing.T) {
