@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -89,11 +90,85 @@ func TestNodesAddNode(t *testing.T) {
 		}
 	})
 
-	t.Run("n3_replicates_new_data", func(t *testing.T) {
+	t.Run("full_mesh_replication", func(t *testing.T) {
+		// Insert a row on each node and verify it reaches all others
+		writes := map[string]int{
+			"pgedge-n1-1": 10,
+			"pgedge-n2-1": 11,
+			"pgedge-n3-1": 12,
+		}
+		for pod, id := range writes {
+			_, err := testKube.ExecSQL(pod,
+				fmt.Sprintf("INSERT INTO test_add_node VALUES (%d, 'from-%s');", id, pod))
+			if err != nil {
+				t.Fatalf("failed to insert on %s: %v", pod, err)
+			}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		for srcPod, id := range writes {
+			for _, dstPod := range []string{"pgedge-n1-1", "pgedge-n2-1", "pgedge-n3-1"} {
+				if dstPod == srcPod {
+					continue
+				}
+				t.Run(fmt.Sprintf("%s_to_%s", srcPod, dstPod), func(t *testing.T) {
+					expected := fmt.Sprintf("from-%s", srcPod)
+					err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
+						out, err := testKube.ExecSQL(dstPod,
+							fmt.Sprintf("SELECT val FROM test_add_node WHERE id = %d;", id))
+						if err != nil {
+							return false, nil
+						}
+						return strings.Contains(out, expected), nil
+					})
+					if err != nil {
+						t.Errorf("data from %s (id=%d) did not replicate to %s", srcPod, id, dstPod)
+					}
+				})
+			}
+		}
+	})
+
+	t.Run("idempotent_rerun_on_3_nodes", func(t *testing.T) {
+		// Record subscription IDs before re-run
+		subsBefore := map[string]string{}
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1", "pgedge-n3-1"} {
+			out, err := testKube.ExecSQL(pod,
+				"SELECT sub_id, sub_name FROM spock.subscription ORDER BY sub_name;")
+			if err != nil {
+				t.Fatalf("failed to query subscriptions on %s: %v", pod, err)
+			}
+			subsBefore[pod] = strings.TrimSpace(out)
+		}
+
+		// Re-run init-spock on the 3-node cluster (steady-state values, no bootstrap)
+		upgradeChart(t, "distributed-3node-values.yaml")
+
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock re-run failed: %v\nlogs:\n%s", err, logs)
+		}
+
+		// Verify subscriptions were not recreated
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1", "pgedge-n3-1"} {
+			out, err := testKube.ExecSQL(pod,
+				"SELECT sub_id, sub_name FROM spock.subscription ORDER BY sub_name;")
+			if err != nil {
+				t.Fatalf("failed to query subscriptions on %s after re-run: %v", pod, err)
+			}
+			if strings.TrimSpace(out) != subsBefore[pod] {
+				t.Errorf("%s: subscriptions changed after re-run\nbefore: %s\nafter:  %s",
+					pod, subsBefore[pod], strings.TrimSpace(out))
+			}
+		}
+
+		// Verify replication still works
 		_, err := testKube.ExecSQL("pgedge-n3-1",
-			"INSERT INTO test_add_node VALUES (2, 'from-n3');")
+			"INSERT INTO test_add_node VALUES (20, 'after-rerun');")
 		if err != nil {
-			t.Fatalf("failed to insert on n3: %v", err)
+			t.Fatalf("failed to insert after re-run: %v", err)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -101,14 +176,14 @@ func TestNodesAddNode(t *testing.T) {
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
 			out, err := testKube.ExecSQL("pgedge-n1-1",
-				"SELECT val FROM test_add_node WHERE id = 2;")
+				"SELECT val FROM test_add_node WHERE id = 20;")
 			if err != nil {
 				return false, nil
 			}
-			return strings.Contains(out, "from-n3"), nil
+			return strings.Contains(out, "after-rerun"), nil
 		})
 		if err != nil {
-			t.Error("new data from n3 did not replicate to n1")
+			t.Error("replication broken after idempotent re-run")
 		}
 	})
 }
