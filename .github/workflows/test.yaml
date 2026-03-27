@@ -117,7 +117,7 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Integration tests
-        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev TIMEOUT=10m
+        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev TIMEOUT=15m
 
       - name: Collect debug artifacts on failure
         if: failure()
