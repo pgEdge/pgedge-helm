@@ -1,0 +1,11 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    instances: 3
+    storage:
+      size: 1Gi

@@ -140,6 +140,38 @@ func (k *Kubectl) ConnectWithCert(service, certSecret, user, db, sql string) (st
 	return k.run(args...)
 }
 
+// CreateNamespace creates a Kubernetes namespace.
+func (k *Kubectl) CreateNamespace(name string) error {
+	args := []string{"create", "namespace", name}
+	if k.Context != "" {
+		args = append([]string{"--context", k.Context}, args...)
+	}
+	_, err := k.run(args...)
+	return err
+}
+
+// DeleteNamespace deletes a Kubernetes namespace.
+func (k *Kubectl) DeleteNamespace(name string) error {
+	args := []string{"delete", "namespace", name, "--ignore-not-found"}
+	if k.Context != "" {
+		args = append([]string{"--context", k.Context}, args...)
+	}
+	_, err := k.run(args...)
+	return err
+}
+
+// Apply pipes input to kubectl apply -f -.
+func (k *Kubectl) Apply(input string) error {
+	args := append(k.baseArgs(), "apply", "-f", "-")
+	cmd := exec.Command("kubectl", args...)
+	cmd.Stdin = strings.NewReader(input)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("kubectl apply failed: %w\n%s", err, string(out))
+	}
+	return nil
+}
+
 func (k *Kubectl) run(args ...string) (string, error) {
 	cmd := exec.Command("kubectl", args...)
 	out, err := cmd.CombinedOutput()

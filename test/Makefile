@@ -56,7 +56,7 @@ kind-load-image:
 
 .PHONY: test-integration
 test-integration:
-	cd $(test_dir) && go test -tags integration -v -timeout 20m ./integration/...
+	cd $(test_dir) && go test -tags integration -v -timeout 30m ./integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -67,11 +67,11 @@ test-integration-kind: kind-up kind-load-image
 
 .PHONY: test-install
 test-install:
-	cd $(test_dir) && go test -tags integration -v -timeout 20m -run "TestDistributedInstall|TestSingleNodeInstall" ./integration/...
+	cd $(test_dir) && go test -tags integration -v -timeout 30m -run "TestDistributedInstall|TestSingleNodeInstall" ./integration/...
 
 .PHONY: test-nodes
 test-nodes:
-	cd $(test_dir) && go test -tags integration -v -timeout 20m -run "TestNodes" ./integration/...
+	cd $(test_dir) && go test -tags integration -v -timeout 30m -run "TestNodes" ./integration/...
 
 # ---- All ----
 
