@@ -24,6 +24,22 @@ func ResetSpock(ctx context.Context, cfg *config.Config, conns map[string]*pgxpo
 	return nil
 }
 
+// ResetBootstrappedNodes resets Spock on nodes bootstrapped via CNPG restore.
+// These nodes have stale spock catalog state from the backup source.
+func ResetBootstrappedNodes(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) error {
+	for _, node := range cfg.Nodes {
+		if node.Bootstrap.Mode != "cnpg" {
+			continue
+		}
+		slog.Info("resetting CNPG-bootstrapped node", "node", node.Name)
+		conn := conns[node.Name]
+		if err := resetNode(ctx, conn, node, cfg.DBName, cfg.PgEdgeUser); err != nil {
+			return fmt.Errorf("reset bootstrapped node %s: %w", node.Name, err)
+		}
+	}
+	return nil
+}
+
 func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, dbName, pgedgeUser string) error {
 	var spockExists bool
 	err := conn.QueryRow(ctx,
@@ -35,7 +51,7 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, dbName
 
 	if spockExists {
 		if err := BackupRepsets(ctx, conn, node.Name); err != nil {
-			slog.Warn("backup repsets failed (continuing with reset)", "node", node.Name, "error", err)
+			return fmt.Errorf("backup repsets on %s: %w", node.Name, err)
 		}
 	}
 

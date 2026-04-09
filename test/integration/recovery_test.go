@@ -334,232 +334,6 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 	})
 }
 
-// TestCNPGBootstrapRecovery simulates a cross-node CNPG restore where n2 is
-// restored from n1's backup. After restore, n2's spock.node_local returns "n1"
-// instead of "n2". Init-spock should detect the mismatch, run deleteAll (backup
-// repsets, drop all subs/nodes), then recreate everything on n2.
-func TestCNPGBootstrapRecovery(t *testing.T) {
-	t.Cleanup(func() { uninstallChart(t) })
-	installChart(t, "distributed-minimal-values.yaml")
-
-	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
-
-	for _, name := range clusterNames {
-		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
-			t.Fatalf("cluster %s not healthy: %v", name, err)
-		}
-	}
-	if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
-		logs, _ := testKube.Logs("job/pgedge-init-spock")
-		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
-	}
-
-	// Verify initial replication works.
-	_, err := testKube.ExecSQL("pgedge-n1-1",
-		"CREATE TABLE test_bootstrap (id int PRIMARY KEY, val text);")
-	if err != nil {
-		t.Fatalf("failed to create test table: %v", err)
-	}
-	_, err = testKube.ExecSQL("pgedge-n1-1",
-		"INSERT INTO test_bootstrap VALUES (1, 'before-restore');")
-	if err != nil {
-		t.Fatalf("failed to insert: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
-		out, err := testKube.ExecSQL("pgedge-n2-1",
-			"SELECT val FROM test_bootstrap WHERE id = 1;")
-		if err != nil {
-			return false, nil
-		}
-		return strings.Contains(out, "before-restore"), nil
-	})
-	if err != nil {
-		t.Fatalf("initial replication failed: row did not reach n2")
-	}
-
-	// Simulate cross-node restore on n2. A real pg_basebackup restore would:
-	// 1. Copy n1's data (including spock metadata) to n2
-	// 2. NOT copy replication slots (they're instance-level state)
-	// So n2 ends up with n1's spock identity and no replication slots.
-	t.Run("simulate_restore", func(t *testing.T) {
-		// Drop replication slots on n2 (pg_basebackup doesn't copy them).
-		_, err := testKube.ExecSQL("pgedge-n2-1", dropSlotsSQL)
-		if err != nil {
-			t.Fatalf("failed to drop slots on n2: %v", err)
-		}
-
-		// Swap local_node to point to n1's identity.
-		_, err = testKube.ExecSQL("pgedge-n2-1", `DO $body$
-DECLARE
-  remote_node_id oid;
-  remote_if_id oid;
-  local_name text;
-BEGIN
-  PERFORM spock.repair_mode('True');
-
-  -- Find n1's node_id and interface_id (the "source" of the restore)
-  SELECT n.node_id, ni.if_id INTO remote_node_id, remote_if_id
-    FROM spock.node n
-    JOIN spock.node_interface ni ON ni.if_nodeid = n.node_id
-    WHERE n.node_id NOT IN (SELECT node_id FROM spock.local_node);
-
-  -- Point local_node to n1's node AND interface (simulates restore from n1 backup)
-  UPDATE spock.local_node SET node_id = remote_node_id, node_local_interface = remote_if_id;
-
-  -- Verify: local node should now resolve to 'n1'
-  SELECT n.node_name INTO local_name
-    FROM spock.node n JOIN spock.local_node ln ON n.node_id = ln.node_id;
-  IF local_name != 'n1' THEN
-    RAISE EXCEPTION 'simulation failed: local node should be n1, got %', local_name;
-  END IF;
-END $body$;`)
-		if err != nil {
-			t.Fatalf("failed to simulate restore on n2: %v", err)
-		}
-
-		// Verify the simulation worked.
-		out, err := testKube.ExecSQL("pgedge-n2-1",
-			"SELECT n.node_name FROM spock.node n JOIN spock.local_node ln ON n.node_id = ln.node_id;")
-		if err != nil {
-			t.Fatalf("failed to query local node: %v", err)
-		}
-		if strings.TrimSpace(out) != "n1" {
-			t.Fatalf("expected local node=n1 after simulation, got: %s", out)
-		}
-	})
-
-	// Re-run init-spock — should detect node_local mismatch and run deleteAll.
-	t.Run("recovery_via_upgrade", func(t *testing.T) {
-		upgradeChart(t, "distributed-minimal-values.yaml")
-
-		for _, name := range clusterNames {
-			if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
-				t.Fatalf("cluster %s not healthy after recovery: %v", name, err)
-			}
-		}
-		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
-			logs, _ := testKube.Logs("job/pgedge-init-spock")
-			t.Fatalf("init-spock job failed during recovery: %v\nlogs:\n%s", err, logs)
-		}
-	})
-
-	// Verify n2's spock identity is correct after recovery.
-	t.Run("node_identity_restored", func(t *testing.T) {
-		out, err := testKube.ExecSQL("pgedge-n2-1",
-			"SELECT n.node_name FROM spock.node n JOIN spock.local_node ln ON n.node_id = ln.node_id;")
-		if err != nil {
-			t.Fatalf("failed to query local node: %v", err)
-		}
-		if strings.TrimSpace(out) != "n2" {
-			t.Errorf("expected local node=n2 after recovery, got: %s", out)
-		}
-	})
-
-	// Verify both nodes see both spock nodes.
-	t.Run("spock_nodes_correct", func(t *testing.T) {
-		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
-			t.Run(pod, func(t *testing.T) {
-				out, err := testKube.ExecSQL(pod,
-					"SELECT node_name FROM spock.node ORDER BY node_name;")
-				if err != nil {
-					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
-				}
-				for _, expected := range []string{"n1", "n2"} {
-					if !strings.Contains(out, expected) {
-						t.Errorf("pod %s: spock.node missing %s, got: %s", pod, expected, out)
-					}
-				}
-			})
-		}
-	})
-
-	// Verify subscriptions are re-established.
-	t.Run("subscriptions_reestablished", func(t *testing.T) {
-		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
-			t.Run(pod, func(t *testing.T) {
-				out, err := testKube.ExecSQL(pod,
-					"SELECT count(*) FROM spock.subscription;")
-				if err != nil {
-					t.Fatalf("failed to query subscriptions on %s: %v", pod, err)
-				}
-				if strings.TrimSpace(out) != "1" {
-					t.Errorf("pod %s: expected 1 subscription, got: %s", pod, out)
-				}
-			})
-		}
-	})
-
-	// Verify replication slots are back.
-	t.Run("slots_restored", func(t *testing.T) {
-		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
-			t.Run(pod, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-				defer cancel()
-
-				err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
-					out, err := testKube.ExecSQL(pod,
-						"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical';")
-					if err != nil {
-						return false, nil
-					}
-					return strings.TrimSpace(out) == "1", nil
-				})
-				if err != nil {
-					t.Errorf("pod %s: replication slot not restored", pod)
-				}
-			})
-		}
-	})
-
-	// Verify replication works end-to-end after recovery.
-	t.Run("replication_works_after_recovery", func(t *testing.T) {
-		_, err := testKube.ExecSQL("pgedge-n1-1",
-			"INSERT INTO test_bootstrap VALUES (2, 'after-restore');")
-		if err != nil {
-			t.Fatalf("failed to insert after recovery: %v", err)
-		}
-
-		ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel1()
-
-		err = wait.Until(ctx1, 2*time.Second, func() (bool, error) {
-			out, err := testKube.ExecSQL("pgedge-n2-1",
-				"SELECT val FROM test_bootstrap WHERE id = 2;")
-			if err != nil {
-				return false, nil
-			}
-			return strings.Contains(out, "after-restore"), nil
-		})
-		if err != nil {
-			t.Error("n1→n2 replication broken after bootstrap recovery")
-		}
-
-		_, err = testKube.ExecSQL("pgedge-n2-1",
-			"INSERT INTO test_bootstrap VALUES (3, 'n2-after-restore');")
-		if err != nil {
-			t.Fatalf("failed to insert on n2: %v", err)
-		}
-
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel2()
-
-		err = wait.Until(ctx2, 2*time.Second, func() (bool, error) {
-			out, err := testKube.ExecSQL("pgedge-n1-1",
-				"SELECT val FROM test_bootstrap WHERE id = 3;")
-			if err != nil {
-				return false, nil
-			}
-			return strings.Contains(out, "n2-after-restore"), nil
-		})
-		if err != nil {
-			t.Error("n2→n1 active-active replication broken after bootstrap recovery")
-		}
-	})
-}
-
 // TestResetSpock verifies that the resetSpock flag drops and recreates all
 // Spock state. Simulates stale spock catalog state (foreign node entries,
 // wrong node_interface DSN) and verifies resetSpock cleans it up.
@@ -578,26 +352,47 @@ func TestResetSpock(t *testing.T) {
 		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
 	}
 
-	// Inject stale spock state: add a foreign node entry with wrong DSN.
-	t.Run("inject_stale_state", func(t *testing.T) {
+	// Simulate a realistic post-restore state: corrupt DSN, drop slots, drop subscription.
+	t.Run("simulate_stale_restore", func(t *testing.T) {
+		// Corrupt the node_interface DSN.
 		_, err := testKube.ExecSQL("pgedge-n1-1", `
 			SELECT spock.repair_mode('True');
-			SELECT spock.node_create('stale_node',
-				'host=fake-host dbname=app user=pgedge sslmode=disable port=5432')
-			WHERE 'stale_node' NOT IN (SELECT node_name FROM spock.node);
+			UPDATE spock.node_interface SET if_dsn = 'host=CORRUPTED dbname=app user=pgedge port=5432';
 		`)
 		if err != nil {
-			t.Fatalf("failed to inject stale node: %v", err)
+			t.Fatalf("failed to corrupt node_interface: %v", err)
 		}
 
-		// Verify stale node exists.
-		out, err := testKube.ExecSQL("pgedge-n1-1",
-			"SELECT node_name FROM spock.node WHERE node_name = 'stale_node';")
+		// Drop all subscriptions on n1 (simulates stale/missing subs after restore).
+		_, err = testKube.ExecSQL("pgedge-n1-1",
+			"SELECT spock.sub_drop(sub_name, true) FROM spock.subscription;")
 		if err != nil {
-			t.Fatalf("failed to query stale node: %v", err)
+			t.Fatalf("failed to drop subscriptions on n1: %v", err)
 		}
-		if !strings.Contains(out, "stale_node") {
-			t.Fatal("stale_node was not injected")
+
+		// Drop replication slots on n1 (slots aren't copied during restore).
+		_, err = testKube.ExecSQL("pgedge-n1-1", dropSlotsSQL)
+		if err != nil {
+			t.Fatalf("failed to drop slots on n1: %v", err)
+		}
+
+		// Verify the damage.
+		out, err := testKube.ExecSQL("pgedge-n1-1",
+			"SELECT count(*) FROM spock.subscription;")
+		if err != nil {
+			t.Fatalf("failed to query subscriptions: %v", err)
+		}
+		if strings.TrimSpace(out) != "0" {
+			t.Fatalf("expected 0 subscriptions after drop, got: %s", out)
+		}
+
+		out, err = testKube.ExecSQL("pgedge-n1-1",
+			"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical';")
+		if err != nil {
+			t.Fatalf("failed to query slots: %v", err)
+		}
+		if strings.TrimSpace(out) != "0" {
+			t.Fatalf("expected 0 slots after drop, got: %s", out)
 		}
 	})
 
@@ -616,29 +411,70 @@ func TestResetSpock(t *testing.T) {
 		}
 	})
 
-	// Verify stale node is gone.
-	t.Run("stale_node_removed", func(t *testing.T) {
+	// Verify the corrupted DSN was fixed by the reset.
+	t.Run("node_interface_dsn_restored", func(t *testing.T) {
 		out, err := testKube.ExecSQL("pgedge-n1-1",
-			"SELECT node_name FROM spock.node;")
+			"SELECT if_dsn FROM spock.node_interface WHERE if_name = 'n1';")
 		if err != nil {
-			t.Fatalf("failed to query spock.node: %v", err)
+			t.Fatalf("failed to query node_interface: %v", err)
 		}
-		if strings.Contains(out, "stale_node") {
-			t.Errorf("stale_node still exists after resetSpock: %s", out)
+		if strings.Contains(out, "CORRUPTED") {
+			t.Errorf("node_interface DSN still corrupted after reset: %s", out)
+		}
+		if !strings.Contains(out, "pgedge-n1-rw") {
+			t.Errorf("node_interface DSN doesn't contain expected hostname: %s", out)
 		}
 	})
 
-	// Verify only configured nodes exist.
+	// Verify correct node count and names.
 	t.Run("correct_nodes_exist", func(t *testing.T) {
 		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
 			t.Run(pod, func(t *testing.T) {
 				out, err := testKube.ExecSQL(pod,
-					"SELECT count(*) FROM spock.node;")
+					"SELECT node_name FROM spock.node ORDER BY node_name;")
 				if err != nil {
 					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
 				}
-				if strings.TrimSpace(out) != "2" {
-					t.Errorf("pod %s: expected 2 spock nodes, got: %s", pod, out)
+				if !strings.Contains(out, "n1") || !strings.Contains(out, "n2") {
+					t.Errorf("pod %s: expected nodes n1 and n2, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
+	// Verify correct subscription count.
+	t.Run("subscriptions_reestablished", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod,
+					"SELECT count(*) FROM spock.subscription;")
+				if err != nil {
+					t.Fatalf("failed to query subscriptions on %s: %v", pod, err)
+				}
+				if strings.TrimSpace(out) != "1" {
+					t.Errorf("pod %s: expected 1 subscription, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
+	// Verify replication slots restored.
+	t.Run("slots_restored", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+				defer cancel()
+
+				err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
+					out, err := testKube.ExecSQL(pod,
+						"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical';")
+					if err != nil {
+						return false, nil
+					}
+					return strings.TrimSpace(out) == "1", nil
+				})
+				if err != nil {
+					t.Errorf("pod %s: replication slot not restored after reset", pod)
 				}
 			})
 		}

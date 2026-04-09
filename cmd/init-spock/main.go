@@ -61,10 +61,14 @@ func run(ctx context.Context) error {
 		conns[node.Name] = pool
 	}
 
-	// Step 3: Reset Spock if requested (Barman restore scenarios)
+	// Step 3: Reset Spock state where needed
 	if cfg.ResetSpock {
 		slog.Info("resetSpock enabled — dropping and recreating spock on all nodes")
 		if err := spock.ResetSpock(ctx, cfg, conns); err != nil {
+			return err
+		}
+	} else {
+		if err := spock.ResetBootstrappedNodes(ctx, cfg, conns); err != nil {
 			return err
 		}
 	}

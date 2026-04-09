@@ -35,7 +35,6 @@ func RefreshActual(
 
 	discoverOrphans(ctx, cfg, conns, actual)
 	checkSlotHealth(actual)
-	propagateNodeRecreate(actual)
 
 	return actual, nil
 }
@@ -61,45 +60,6 @@ func checkSlotHealth(actual map[resource.Identifier]resource.Resource) {
 			}
 			slog.Warn("subscription missing provider slot",
 				"sub", sub.subName(), "slot", sub.replicationSlotID())
-		}
-	}
-}
-
-// propagateNodeRecreate marks subscriptions and slots as NeedsRecreate when their
-// node is being recreated. deleteAll wipes all spock state on the connection, so
-// every resource on that connection must be recreated too.
-func propagateNodeRecreate(actual map[resource.Identifier]resource.Resource) {
-	// Find nodes that need recreation.
-	recreateNodes := make(map[string]bool)
-	for id, r := range actual {
-		if id.Type != ResourceTypeNode {
-			continue
-		}
-		if r.Status().NeedsRecreate {
-			recreateNodes[id.ID] = true
-		}
-	}
-	if len(recreateNodes) == 0 {
-		return
-	}
-
-	// Mark subscriptions on the affected connection (where dst is the recreated node).
-	for id, r := range actual {
-		if id.Type != ResourceTypeSubscription {
-			continue
-		}
-		sub, ok := r.(*Subscription)
-		if !ok {
-			continue
-		}
-		if recreateNodes[sub.dst.Name] {
-			sub.status = resource.Status{
-				Exists:        true,
-				NeedsRecreate: true,
-				Reason:        fmt.Sprintf("node %s is being recreated", sub.dst.Name),
-			}
-			slog.Warn("subscription cascading from node recreate",
-				"sub", sub.subName(), "node", sub.dst.Name)
 		}
 	}
 }

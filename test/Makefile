@@ -85,7 +85,7 @@ test-nodes: kind-load-image
 .PHONY: test-recovery
 test-recovery: kind-load-image
 	cd $(root_dir) && go test -tags integration -v -timeout 30m \
-		-run "TestSlotLoss|TestOrphanSlot|TestCNPGBootstrap|TestIdempotent" ./test/integration/...
+		-run "TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent" ./test/integration/...
 
 .PHONY: test-reset
 test-reset: kind-load-image

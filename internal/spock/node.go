@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -46,28 +45,15 @@ func (n *SpockNode) Dependencies() []resource.Identifier {
 }
 
 func (n *SpockNode) Refresh(ctx context.Context) error {
-	var localName string
+	var exists bool
 	err := n.conn.QueryRow(ctx,
-		"SELECT n.node_name FROM spock.node n JOIN spock.local_node ln ON n.node_id = ln.node_id",
-	).Scan(&localName)
+		"SELECT EXISTS(SELECT 1 FROM spock.node n JOIN spock.local_node ln ON n.node_id = ln.node_id WHERE n.node_name = $1)",
+		n.node.Name,
+	).Scan(&exists)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			n.status = resource.Status{Exists: false}
-			return nil
-		}
 		return fmt.Errorf("inspect spock node on %s: %w", n.node.Name, err)
 	}
-
-	if localName != n.node.Name {
-		n.status = resource.Status{
-			Exists:        true,
-			NeedsRecreate: true,
-			Reason:        fmt.Sprintf("local node name %q != configured %q (CNPG bootstrap)", localName, n.node.Name),
-		}
-		return nil
-	}
-
-	n.status = resource.Status{Exists: true}
+	n.status = resource.Status{Exists: exists}
 	return nil
 }
 
@@ -108,51 +94,11 @@ func (n *SpockNode) Create(ctx context.Context) error {
 		return fmt.Errorf("commit spock node %s: %w", n.node.Name, err)
 	}
 	slog.Info("created spock node", "node", n.node.Name)
-
-	// Restore repsets after node recreation (CNPG-bootstrapped nodes)
-	// Must happen after Create, not Delete — Spock functions require a node to exist.
-	// Matches Python flow: backup → drop → create → restore
-	if n.status.NeedsRecreate {
-		if err := RestoreRepsets(ctx, n.conn, n.node.Name); err != nil {
-			return fmt.Errorf("restore repsets on %s: %w", n.node.Name, err)
-		}
-	}
 	return nil
 }
 
 func (n *SpockNode) Delete(ctx context.Context) error {
-	if n.status.NeedsRecreate {
-		return n.deleteAll(ctx)
-	}
 	return n.deleteOne(ctx)
-}
-
-// deleteAll wipes all Spock state on this connection (CNPG bootstrap recovery).
-func (n *SpockNode) deleteAll(ctx context.Context) error {
-	if err := BackupRepsets(ctx, n.conn, n.node.Name); err != nil {
-		return err
-	}
-
-	tx, err := n.conn.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin delete tx on %s: %w", n.node.Name, err)
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = tx.Exec(ctx, `
-		SELECT spock.repair_mode('True');
-		SELECT spock.sub_drop(sub_name, true) FROM spock.subscription;
-		SELECT spock.node_drop(node_name, true) FROM spock.node;
-	`)
-	if err != nil {
-		return fmt.Errorf("drop all spock state on %s: %w", n.node.Name, err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit drop all spock state on %s: %w", n.node.Name, err)
-	}
-	slog.Info("dropped all spock state", "node", n.node.Name)
-	return nil
 }
 
 // deleteOne drops a single node reference (orphan cleanup).
