@@ -99,9 +99,9 @@ func (n *SpockNode) Create(ctx context.Context) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
 			slog.Info("spock node already exists", "node", n.node.Name)
-		} else {
-			return fmt.Errorf("create spock node %s: %w", n.node.Name, err)
+			return nil
 		}
+		return fmt.Errorf("create spock node %s: %w", n.node.Name, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
