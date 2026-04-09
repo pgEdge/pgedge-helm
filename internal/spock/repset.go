@@ -48,6 +48,7 @@ func backupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) (*r
 	if err != nil {
 		return nil, fmt.Errorf("query replication sets on %s: %w", nodeName, err)
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var s replicationSet
 		if err := rows.Scan(&s.name, &s.replicateInsert, &s.replicateUpdate, &s.replicateDelete, &s.replicateTruncate); err != nil {
@@ -55,7 +56,6 @@ func backupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) (*r
 		}
 		snap.sets = append(snap.sets, s)
 	}
-	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read replication sets on %s: %w", nodeName, err)
 	}
@@ -74,6 +74,7 @@ func backupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) (*r
 	if err != nil {
 		return nil, fmt.Errorf("query replication set tables on %s: %w", nodeName, err)
 	}
+	defer trows.Close()
 	for trows.Next() {
 		var t replicationSetTable
 		if err := trows.Scan(&t.setName, &t.tableName, &t.attList, &t.rowFilter); err != nil {
@@ -81,7 +82,6 @@ func backupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) (*r
 		}
 		snap.tables = append(snap.tables, t)
 	}
-	trows.Close()
 	if err := trows.Err(); err != nil {
 		return nil, fmt.Errorf("read replication set tables on %s: %w", nodeName, err)
 	}
@@ -114,8 +114,7 @@ func restoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string, sn
 			"SELECT spock.repset_create($1, $2, $3, $4, $5)",
 			s.name, s.replicateInsert, s.replicateUpdate, s.replicateDelete, s.replicateTruncate)
 		if err != nil {
-			slog.Warn("recreate repset", "node", nodeName, "set", s.name, "error", err)
-			continue
+			return fmt.Errorf("recreate repset %q on %s: %w", s.name, nodeName, err)
 		}
 	}
 
@@ -125,8 +124,7 @@ func restoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string, sn
 			"SELECT spock.repset_add_table($1, $2, false, $3, $4)",
 			t.setName, t.tableName, t.attList, t.rowFilter)
 		if err != nil {
-			slog.Warn("add table to repset", "node", nodeName, "table", t.tableName, "set", t.setName, "error", err)
-			continue
+			return fmt.Errorf("add table %q to repset %q on %s: %w", t.tableName, t.setName, nodeName, err)
 		}
 		slog.Info("restored table to repset", "node", nodeName, "table", t.tableName, "set", t.setName)
 	}

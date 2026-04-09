@@ -256,7 +256,7 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 
 				err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
 					out, err := testKube.ExecSQL(pod,
-						"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical';")
+						"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
 					if err != nil {
 						return false, nil
 					}
@@ -265,7 +265,7 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 				if err != nil {
 					// Log the actual slot names for debugging.
 					out, _ := testKube.ExecSQL(pod,
-						"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical';")
+						"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
 					t.Errorf("pod %s: expected 1 slot after removing n3, remaining slots: %s", pod, out)
 				}
 			})
@@ -277,7 +277,7 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
 			t.Run(pod, func(t *testing.T) {
 				out, err := testKube.ExecSQL(pod,
-					"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical';")
+					"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
 				if err != nil {
 					t.Fatalf("failed to query slot names on %s: %v", pod, err)
 				}
@@ -461,8 +461,9 @@ func TestResetSpock(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
 				}
-				if !strings.Contains(out, "n1") || !strings.Contains(out, "n2") {
-					t.Errorf("pod %s: expected nodes n1 and n2, got: %s", pod, out)
+				got := strings.Fields(strings.TrimSpace(out))
+				if len(got) != 2 || got[0] != "n1" || got[1] != "n2" {
+					t.Errorf("pod %s: expected exactly [n1 n2], got: %v", pod, got)
 				}
 			})
 		}
