@@ -48,7 +48,9 @@ func waitForAll(ctx context.Context, client dynamic.Interface, namespace, appNam
 		})
 		if err != nil {
 			slog.Warn("failed to list clusters", "error", err)
-		} else if len(list.Items) > 0 {
+		} else if len(list.Items) == 0 {
+			slog.Info("no CNPG clusters found yet", "namespace", namespace, "appName", appName)
+		} else {
 			allHealthy := true
 			for _, item := range list.Items {
 				phase, _, _ := unstructured.NestedString(item.Object, "status", "phase")
