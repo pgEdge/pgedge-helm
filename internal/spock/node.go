@@ -114,7 +114,7 @@ func (n *SpockNode) Create(ctx context.Context) error {
 	// Matches Python flow: backup → drop → create → restore
 	if n.status.NeedsRecreate {
 		if err := RestoreRepsets(ctx, n.conn, n.node.Name); err != nil {
-			slog.Warn("failed to restore repsets", "node", n.node.Name, "error", err)
+			return fmt.Errorf("restore repsets on %s: %w", n.node.Name, err)
 		}
 	}
 	return nil
