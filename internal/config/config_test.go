@@ -90,6 +90,41 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigResetSpock(t *testing.T) {
+	yaml := `
+- name: n1
+  hostname: pgedge-n1-rw
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	t.Setenv("RESET_SPOCK", "true")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.ResetSpock {
+		t.Error("expected ResetSpock=true when RESET_SPOCK=true")
+	}
+}
+
+func TestLoadConfigResetSpockDefault(t *testing.T) {
+	yaml := `
+- name: n1
+  hostname: pgedge-n1-rw
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ResetSpock {
+		t.Error("expected ResetSpock=false when RESET_SPOCK is unset")
+	}
+}
+
 func writeTemp(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()

@@ -161,14 +161,17 @@ func discoverOrphanNodes(
 
 		orphanCfg := config.Node{Name: orphanName}
 
-		// One SpockNode per orphan (first surviving connection found).
-		nodeID := resource.Identifier{Type: ResourceTypeNode, ID: orphanName}
-		if _, exists := actual[nodeID]; !exists {
-			n := NewSpockNode(orphanCfg, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conn)
-			n.status = resource.Status{Exists: true}
-			actual[nodeID] = n
-			slog.Info("discovered orphan node", "orphan", orphanName, "survivor", survivor.Name)
+		// Create one SpockNode per (orphan, survivor) pair so node_drop
+		// runs on every survivor's connection. Use a survivor-scoped ID
+		// to avoid collisions in the actual map.
+		nodeID := resource.Identifier{
+			Type: ResourceTypeNode,
+			ID:   fmt.Sprintf("%s@%s", orphanName, survivor.Name),
 		}
+		n := NewSpockNode(orphanCfg, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conn)
+		n.status = resource.Status{Exists: true}
+		actual[nodeID] = n
+		slog.Info("discovered orphan node", "orphan", orphanName, "survivor", survivor.Name)
 
 		// Infer one orphan subscription per surviving connection.
 		// The topology is fully meshed, so each surviving node had a subscription

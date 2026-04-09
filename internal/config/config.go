@@ -28,6 +28,7 @@ type Config struct {
 	Namespace  string
 	AdminUser  string
 	PgEdgeUser string
+	ResetSpock bool
 	Nodes      []Node
 }
 
@@ -58,6 +59,7 @@ func Load(nodesPath string) (*Config, error) {
 	if namespace == "" {
 		namespace = "default"
 	}
+	resetSpock := os.Getenv("RESET_SPOCK") == "true"
 	nodes, err := LoadNodes(nodesPath)
 	if err != nil {
 		return nil, err
@@ -68,6 +70,7 @@ func Load(nodesPath string) (*Config, error) {
 		Namespace:  namespace,
 		AdminUser:  "admin",
 		PgEdgeUser: "pgedge",
+		ResetSpock: resetSpock,
 		Nodes:      nodes,
 	}, nil
 }

@@ -33,6 +33,10 @@ pgEdge:
       capabilities:
         drop:
           - ALL
+    # -- When true, the init-spock job will drop and recreate all Spock state on every node
+    # before reconciling. Use this when bootstrapping from a Barman backup that contains
+    # stale Spock configuration. Remove after successful initialization.
+    resetSpock: false
 
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.

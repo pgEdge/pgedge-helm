@@ -187,3 +187,31 @@ func TestExecuteStopsOnError(t *testing.T) {
 		t.Error("r2.Create should not have been called after phase 0 failed")
 	}
 }
+
+func TestPlanOrphanNodesPerSurvivor(t *testing.T) {
+	actual := map[Identifier]Resource{
+		{Type: "spock.node", ID: "n3@n1"}: &mockResource{
+			id:     Identifier{Type: "spock.node", ID: "n3@n1"},
+			status: Status{Exists: true},
+		},
+		{Type: "spock.node", ID: "n3@n2"}: &mockResource{
+			id:     Identifier{Type: "spock.node", ID: "n3@n2"},
+			status: Status{Exists: true},
+		},
+	}
+	desired := map[Identifier]Resource{}
+
+	phases := Plan(actual, desired)
+
+	var deleteCount int
+	for _, phase := range phases {
+		for _, e := range phase {
+			if e.Action == ActionDelete {
+				deleteCount++
+			}
+		}
+	}
+	if deleteCount != 2 {
+		t.Errorf("expected 2 delete events for orphan n3 on both survivors, got %d", deleteCount)
+	}
+}

@@ -288,6 +288,22 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 		}
 	})
 
+	// Verify spock.node on both survivors has no entry for n3.
+	t.Run("no_n3_spock_node_entries", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod,
+					"SELECT node_name FROM spock.node WHERE node_name = 'n3';")
+				if err != nil {
+					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
+				}
+				if strings.Contains(out, "n3") {
+					t.Errorf("pod %s: stale spock.node entry for n3 still exists: %s", pod, out)
+				}
+			})
+		}
+	})
+
 	// Verify replication still works between surviving nodes.
 	t.Run("replication_works_after_cleanup", func(t *testing.T) {
 		_, err := testKube.ExecSQL("pgedge-n1-1",
@@ -540,6 +556,120 @@ END $body$;`)
 		})
 		if err != nil {
 			t.Error("n2→n1 active-active replication broken after bootstrap recovery")
+		}
+	})
+}
+
+// TestResetSpock verifies that the resetSpock flag drops and recreates all
+// Spock state. Simulates stale spock catalog state (foreign node entries,
+// wrong node_interface DSN) and verifies resetSpock cleans it up.
+func TestResetSpock(t *testing.T) {
+	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "distributed-minimal-values.yaml")
+
+	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
+	for _, name := range clusterNames {
+		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
+			t.Fatalf("cluster %s not healthy: %v", name, err)
+		}
+	}
+	if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+		logs, _ := testKube.Logs("job/pgedge-init-spock")
+		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
+	}
+
+	// Inject stale spock state: add a foreign node entry with wrong DSN.
+	t.Run("inject_stale_state", func(t *testing.T) {
+		_, err := testKube.ExecSQL("pgedge-n1-1", `
+			SELECT spock.repair_mode('True');
+			SELECT spock.node_create('stale_node',
+				'host=fake-host dbname=app user=pgedge sslmode=disable port=5432')
+			WHERE 'stale_node' NOT IN (SELECT node_name FROM spock.node);
+		`)
+		if err != nil {
+			t.Fatalf("failed to inject stale node: %v", err)
+		}
+
+		// Verify stale node exists.
+		out, err := testKube.ExecSQL("pgedge-n1-1",
+			"SELECT node_name FROM spock.node WHERE node_name = 'stale_node';")
+		if err != nil {
+			t.Fatalf("failed to query stale node: %v", err)
+		}
+		if !strings.Contains(out, "stale_node") {
+			t.Fatal("stale_node was not injected")
+		}
+	})
+
+	// Upgrade with resetSpock: true.
+	t.Run("reset_via_upgrade", func(t *testing.T) {
+		upgradeChart(t, "distributed-reset-spock-values.yaml")
+
+		for _, name := range clusterNames {
+			if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
+				t.Fatalf("cluster %s not healthy after reset: %v", name, err)
+			}
+		}
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock job failed after reset: %v\nlogs:\n%s", err, logs)
+		}
+	})
+
+	// Verify stale node is gone.
+	t.Run("stale_node_removed", func(t *testing.T) {
+		out, err := testKube.ExecSQL("pgedge-n1-1",
+			"SELECT node_name FROM spock.node;")
+		if err != nil {
+			t.Fatalf("failed to query spock.node: %v", err)
+		}
+		if strings.Contains(out, "stale_node") {
+			t.Errorf("stale_node still exists after resetSpock: %s", out)
+		}
+	})
+
+	// Verify only configured nodes exist.
+	t.Run("correct_nodes_exist", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				out, err := testKube.ExecSQL(pod,
+					"SELECT count(*) FROM spock.node;")
+				if err != nil {
+					t.Fatalf("failed to query spock.node on %s: %v", pod, err)
+				}
+				if strings.TrimSpace(out) != "2" {
+					t.Errorf("pod %s: expected 2 spock nodes, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
+	// Verify replication works after reset.
+	t.Run("replication_works_after_reset", func(t *testing.T) {
+		_, err := testKube.ExecSQL("pgedge-n1-1",
+			"CREATE TABLE IF NOT EXISTS test_reset (id int PRIMARY KEY, val text);")
+		if err != nil {
+			t.Fatalf("failed to create test table: %v", err)
+		}
+		_, err = testKube.ExecSQL("pgedge-n1-1",
+			"INSERT INTO test_reset VALUES (1, 'after-reset');")
+		if err != nil {
+			t.Fatalf("failed to insert: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
+			out, err := testKube.ExecSQL("pgedge-n2-1",
+				"SELECT val FROM test_reset WHERE id = 1;")
+			if err != nil {
+				return false, nil
+			}
+			return strings.Contains(out, "after-reset"), nil
+		})
+		if err != nil {
+			t.Error("replication broken after resetSpock")
 		}
 	})
 }

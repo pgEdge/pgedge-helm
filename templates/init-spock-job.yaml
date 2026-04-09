@@ -26,6 +26,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          {{- if .Values.pgEdge.initSpockJobConfig.resetSpock }}
+          - name: RESET_SPOCK
+            value: "true"
+          {{- end }}
         volumeMounts:
           - name: {{ .Values.pgEdge.appName }}-config
             mountPath: /config
