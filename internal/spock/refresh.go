@@ -194,7 +194,7 @@ func discoverOrphanSlots(
 	actual map[resource.Identifier]resource.Resource,
 ) {
 	rows, err := conn.Query(ctx,
-		"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical'")
+		"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%'")
 	if err != nil {
 		slog.Warn("query replication slots", "survivor", survivor.Name, "error", err)
 		return
