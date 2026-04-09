@@ -51,9 +51,6 @@ func BackupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) err
 // RestoreRepsets restores Spock replication sets after recreating a node.
 // Corresponds to Python restore_spock_repsets(). Always cleans up backup tables.
 func RestoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) error {
-	// Always cleanup backup tables, even on failure
-	defer cleanupRepsetBackup(ctx, conn, nodeName)
-
 	// Check if backup exists
 	var exists bool
 	err := conn.QueryRow(ctx, `
@@ -62,10 +59,16 @@ func RestoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) er
 			WHERE table_schema = 'spock' AND table_name = 'replication_set_backup'
 		)
 	`).Scan(&exists)
-	if err != nil || !exists {
+	if err != nil {
+		return fmt.Errorf("check repset backup on %s: %w", nodeName, err)
+	}
+	if !exists {
 		slog.Info("no repset backup to restore", "node", nodeName)
 		return nil
 	}
+
+	// Cleanup backup tables after a successful restore
+	defer cleanupRepsetBackup(ctx, conn, nodeName)
 
 	tx, err := conn.Begin(ctx)
 	if err != nil {
