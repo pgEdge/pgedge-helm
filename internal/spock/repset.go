@@ -9,66 +9,94 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// BackupRepsets backs up Spock replication sets before dropping a node.
-// Corresponds to Python backup_spock_repsets().
-func BackupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) error {
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin repset backup on %s: %w", nodeName, err)
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = tx.Exec(ctx, "SET log_statement = 'none'")
-	if err != nil {
-		return fmt.Errorf("set log_statement on %s: %w", nodeName, err)
-	}
-
-	_, err = tx.Exec(ctx, `
-		SET spock.enable_ddl_replication = off;
-		DROP TABLE IF EXISTS spock.replication_set_table_backup;
-		DROP TABLE IF EXISTS spock.replication_set_backup;
-	`)
-	if err != nil {
-		return fmt.Errorf("cleanup old backup on %s: %w", nodeName, err)
-	}
-
-	_, err = tx.Exec(ctx, `
-		SET spock.enable_ddl_replication = off;
-		CREATE TABLE spock.replication_set_backup AS SELECT * FROM spock.replication_set;
-		CREATE TABLE spock.replication_set_table_backup AS SELECT * FROM spock.replication_set_table;
-	`)
-	if err != nil {
-		return fmt.Errorf("backup repsets on %s: %w", nodeName, err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit repset backup on %s: %w", nodeName, err)
-	}
-	slog.Info("backed up repsets", "node", nodeName)
-	return nil
+// replicationSet holds an in-memory snapshot of a spock replication set.
+type replicationSet struct {
+	name             string
+	replicateInsert  bool
+	replicateUpdate  bool
+	replicateDelete  bool
+	replicateTruncate bool
 }
 
-// RestoreRepsets restores Spock replication sets after recreating a node.
-// Corresponds to Python restore_spock_repsets(). Always cleans up backup tables.
-func RestoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) error {
-	// Check if backup exists
-	var exists bool
-	err := conn.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM information_schema.tables
-			WHERE table_schema = 'spock' AND table_name = 'replication_set_backup'
-		)
-	`).Scan(&exists)
+// replicationSetTable holds an in-memory snapshot of a table assignment.
+type replicationSetTable struct {
+	setName   string
+	tableName string
+	attList   *string
+	rowFilter *string
+}
+
+// repsetSnapshot holds the in-memory backup of replication set configuration.
+type repsetSnapshot struct {
+	sets   []replicationSet
+	tables []replicationSetTable
+}
+
+// backupRepsets reads replication set configuration into memory.
+// This must be called before DROP EXTENSION since the spock schema
+// is destroyed by the cascade.
+func backupRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) (*repsetSnapshot, error) {
+	snap := &repsetSnapshot{}
+
+	// Read all replication sets (including built-in).
+	// Built-in sets are recreated by CREATE EXTENSION, but we need their
+	// IDs to map table assignments. Only custom sets get repset_create'd.
+	rows, err := conn.Query(ctx, `
+		SELECT set_name, replicate_insert, replicate_update, replicate_delete, replicate_truncate
+		FROM spock.replication_set
+		ORDER BY set_id`)
 	if err != nil {
-		return fmt.Errorf("check repset backup on %s: %w", nodeName, err)
+		return nil, fmt.Errorf("query replication sets on %s: %w", nodeName, err)
 	}
-	if !exists {
-		slog.Info("no repset backup to restore", "node", nodeName)
-		return nil
+	for rows.Next() {
+		var s replicationSet
+		if err := rows.Scan(&s.name, &s.replicateInsert, &s.replicateUpdate, &s.replicateDelete, &s.replicateTruncate); err != nil {
+			return nil, fmt.Errorf("scan replication set on %s: %w", nodeName, err)
+		}
+		snap.sets = append(snap.sets, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read replication sets on %s: %w", nodeName, err)
 	}
 
-	// Cleanup backup tables after a successful restore
-	defer cleanupRepsetBackup(ctx, conn, nodeName)
+	// Read replication set table assignments.
+	trows, err := conn.Query(ctx, `
+		SELECT rs.set_name, rst.set_reloid::regclass::text, rst.set_att_list, rst.set_row_filter
+		FROM spock.replication_set_table rst
+		JOIN spock.replication_set rs ON rst.set_id = rs.set_id
+		WHERE EXISTS (
+			SELECT 1 FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.oid = rst.set_reloid AND c.relkind IN ('r', 'v')
+		)
+		ORDER BY rst.set_id, rst.set_reloid`)
+	if err != nil {
+		return nil, fmt.Errorf("query replication set tables on %s: %w", nodeName, err)
+	}
+	for trows.Next() {
+		var t replicationSetTable
+		if err := trows.Scan(&t.setName, &t.tableName, &t.attList, &t.rowFilter); err != nil {
+			return nil, fmt.Errorf("scan replication set table on %s: %w", nodeName, err)
+		}
+		snap.tables = append(snap.tables, t)
+	}
+	trows.Close()
+	if err := trows.Err(); err != nil {
+		return nil, fmt.Errorf("read replication set tables on %s: %w", nodeName, err)
+	}
+
+	slog.Info("backed up repsets to memory", "node", nodeName, "sets", len(snap.sets), "tables", len(snap.tables))
+	return snap, nil
+}
+
+// restoreRepsets writes the in-memory replication set snapshot back to the database.
+// Must be called after the spock extension and local node have been recreated.
+func restoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string, snap *repsetSnapshot) error {
+	if snap == nil || (len(snap.sets) == 0 && len(snap.tables) == 0) {
+		slog.Info("no repsets to restore", "node", nodeName)
+		return nil
+	}
 
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -76,59 +104,25 @@ func RestoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) er
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, "SET log_statement = 'none'")
-	if err != nil {
-		return fmt.Errorf("set log_statement on %s: %w", nodeName, err)
-	}
-
-	// Recreate custom replication sets (skip built-in ones)
-	_, err = tx.Exec(ctx, `
-		SELECT spock.repset_create(
-			rs.set_name, rs.replicate_insert, rs.replicate_update,
-			rs.replicate_delete, rs.replicate_truncate
-		)
-		FROM spock.replication_set_backup rs
-		WHERE rs.set_name NOT IN ('default', 'default_insert_only', 'ddl_sql')
-	`)
-	if err != nil {
-		return fmt.Errorf("recreate repsets on %s: %w", nodeName, err)
+	// Recreate custom replication sets (built-in ones already exist after CREATE EXTENSION).
+	builtinSets := map[string]bool{"default": true, "default_insert_only": true, "ddl_sql": true}
+	for _, s := range snap.sets {
+		if builtinSets[s.name] {
+			continue
+		}
+		_, err := tx.Exec(ctx,
+			"SELECT spock.repset_create($1, $2, $3, $4, $5)",
+			s.name, s.replicateInsert, s.replicateUpdate, s.replicateDelete, s.replicateTruncate)
+		if err != nil {
+			slog.Warn("recreate repset", "node", nodeName, "set", s.name, "error", err)
+			continue
+		}
 	}
 
 	// Re-add tables to replication sets.
-	// Collect all rows first — pgx can't execute on a tx while rows are open.
-	type repsetTable struct {
-		setName, tableName string
-		attList, rowFilter *string
-	}
-	rows, err := tx.Query(ctx, `
-		SELECT rs.set_name, rst.set_reloid::regclass::text, rst.set_att_list, rst.set_row_filter
-		FROM spock.replication_set_table_backup rst
-		LEFT JOIN spock.replication_set_backup rs ON rst.set_id = rs.set_id
-		WHERE EXISTS (
-			SELECT 1 FROM pg_class c
-			JOIN pg_namespace n ON n.oid = c.relnamespace
-			WHERE c.oid = rst.set_reloid AND c.relkind IN ('r', 'v')
-		)
-	`)
-	if err != nil {
-		return fmt.Errorf("query repset tables on %s: %w", nodeName, err)
-	}
-	var tables []repsetTable
-	for rows.Next() {
-		var t repsetTable
-		if err := rows.Scan(&t.setName, &t.tableName, &t.attList, &t.rowFilter); err != nil {
-			slog.Warn("scan repset table row", "node", nodeName, "error", err)
-			continue
-		}
-		tables = append(tables, t)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("read repset table backup on %s: %w", nodeName, err)
-	}
-
-	for _, t := range tables {
-		_, err := tx.Exec(ctx, "SELECT spock.repset_add_table($1, $2, false, $3, $4)",
+	for _, t := range snap.tables {
+		_, err := tx.Exec(ctx,
+			"SELECT spock.repset_add_table($1, $2, false, $3, $4)",
 			t.setName, t.tableName, t.attList, t.rowFilter)
 		if err != nil {
 			slog.Warn("add table to repset", "node", nodeName, "table", t.tableName, "set", t.setName, "error", err)
@@ -142,28 +136,4 @@ func RestoreRepsets(ctx context.Context, conn *pgxpool.Pool, nodeName string) er
 	}
 	slog.Info("restored repsets", "node", nodeName)
 	return nil
-}
-
-// cleanupRepsetBackup drops the backup tables regardless of restore success/failure.
-func cleanupRepsetBackup(ctx context.Context, conn *pgxpool.Pool, nodeName string) {
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		slog.Warn("begin repset cleanup", "node", nodeName, "error", err)
-		return
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = tx.Exec(ctx, `
-		SET log_statement = 'none';
-		SET spock.enable_ddl_replication = off;
-		DROP TABLE IF EXISTS spock.replication_set_table_backup;
-		DROP TABLE IF EXISTS spock.replication_set_backup;
-	`)
-	if err != nil {
-		slog.Warn("cleanup repset backup tables", "node", nodeName, "error", err)
-		return
-	}
-	if err := tx.Commit(ctx); err != nil {
-		slog.Warn("commit repset cleanup", "node", nodeName, "error", err)
-	}
 }

@@ -352,6 +352,32 @@ func TestResetSpock(t *testing.T) {
 		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
 	}
 
+	// Set up repset state to verify it survives the reset:
+	// - A user table added to the default repset
+	// - A custom repset with its own table
+	t.Run("setup_repsets", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			// Create a table that DDL replication auto-adds to the default repset.
+			_, err := testKube.ExecSQL(pod,
+				"CREATE TABLE IF NOT EXISTS test_default_repset (id int PRIMARY KEY, val text);")
+			if err != nil {
+				t.Fatalf("failed to create default repset table on %s: %v", pod, err)
+			}
+
+			// Create a custom repset with a table only in that repset.
+			// Disable AutoDDL so the table isn't auto-added to default.
+			_, err = testKube.ExecSQL(pod, `
+				SET spock.enable_ddl_replication = off;
+				CREATE TABLE IF NOT EXISTS test_custom_repset (id int PRIMARY KEY, val text);
+				SELECT spock.repset_create('custom_repset');
+				SELECT spock.repset_add_table('custom_repset', 'test_custom_repset');
+			`)
+			if err != nil {
+				t.Fatalf("failed to create custom repset on %s: %v", pod, err)
+			}
+		}
+	})
+
 	// Simulate a realistic post-restore state: corrupt DSN, drop slots, drop subscription.
 	t.Run("simulate_stale_restore", func(t *testing.T) {
 		// Corrupt the node_interface DSN.
@@ -453,6 +479,43 @@ func TestResetSpock(t *testing.T) {
 				}
 				if strings.TrimSpace(out) != "1" {
 					t.Errorf("pod %s: expected 1 subscription, got: %s", pod, out)
+				}
+			})
+		}
+	})
+
+	// Verify repset configuration survived the reset.
+	t.Run("repsets_preserved", func(t *testing.T) {
+		for _, pod := range []string{"pgedge-n1-1", "pgedge-n2-1"} {
+			t.Run(pod, func(t *testing.T) {
+				// Custom repset still exists.
+				out, err := testKube.ExecSQL(pod,
+					"SELECT set_name FROM spock.replication_set WHERE set_name = 'custom_repset';")
+				if err != nil {
+					t.Fatalf("failed to query repsets on %s: %v", pod, err)
+				}
+				if !strings.Contains(out, "custom_repset") {
+					t.Errorf("pod %s: custom_repset not restored after reset", pod)
+				}
+
+				// Custom repset table assignment preserved.
+				out, err = testKube.ExecSQL(pod,
+					"SELECT set_reloid::regclass::text FROM spock.replication_set_table rst JOIN spock.replication_set rs ON rst.set_id = rs.set_id WHERE rs.set_name = 'custom_repset';")
+				if err != nil {
+					t.Fatalf("failed to query custom repset tables on %s: %v", pod, err)
+				}
+				if !strings.Contains(out, "test_custom_repset") {
+					t.Errorf("pod %s: test_custom_repset not in custom_repset after reset, got: %s", pod, out)
+				}
+
+				// Default repset table assignment preserved.
+				out, err = testKube.ExecSQL(pod,
+					"SELECT set_reloid::regclass::text FROM spock.replication_set_table rst JOIN spock.replication_set rs ON rst.set_id = rs.set_id WHERE rs.set_name = 'default';")
+				if err != nil {
+					t.Fatalf("failed to query default repset tables on %s: %v", pod, err)
+				}
+				if !strings.Contains(out, "test_default_repset") {
+					t.Errorf("pod %s: test_default_repset not in default repset after reset, got: %s", pod, out)
 				}
 			})
 		}

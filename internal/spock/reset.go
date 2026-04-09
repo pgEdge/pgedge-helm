@@ -49,8 +49,12 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, dbName
 		return fmt.Errorf("check spock extension on %s: %w", node.Name, err)
 	}
 
+	// Backup repsets into memory before nuking — the spock schema is
+	// destroyed by DROP EXTENSION CASCADE, so SQL-table backups won't survive.
+	var snap *repsetSnapshot
 	if spockExists {
-		if err := BackupRepsets(ctx, conn, node.Name); err != nil {
+		snap, err = backupRepsets(ctx, conn, node.Name)
+		if err != nil {
 			return fmt.Errorf("backup repsets on %s: %w", node.Name, err)
 		}
 	}
@@ -86,8 +90,8 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, dbName
 	}
 	slog.Info("recreated spock node", "node", node.Name)
 
-	if err := RestoreRepsets(ctx, conn, node.Name); err != nil {
-		slog.Warn("restore repsets failed (continuing)", "node", node.Name, "error", err)
+	if err := restoreRepsets(ctx, conn, node.Name, snap); err != nil {
+		return fmt.Errorf("restore repsets on %s: %w", node.Name, err)
 	}
 
 	return nil
