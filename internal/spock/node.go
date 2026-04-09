@@ -20,17 +20,15 @@ const sslSettings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/proj
 type SpockNode struct {
 	node       config.Node
 	dbName     string
-	adminUser  string
 	pgedgeUser string
 	conn       *pgxpool.Pool
 	status     resource.Status
 }
 
-func NewSpockNode(node config.Node, dbName, adminUser, pgedgeUser string, conn *pgxpool.Pool) *SpockNode {
+func NewSpockNode(node config.Node, dbName, pgedgeUser string, conn *pgxpool.Pool) *SpockNode {
 	return &SpockNode{
 		node:       node,
 		dbName:     dbName,
-		adminUser:  adminUser,
 		pgedgeUser: pgedgeUser,
 		conn:       conn,
 	}

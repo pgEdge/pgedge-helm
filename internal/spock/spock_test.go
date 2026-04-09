@@ -37,7 +37,7 @@ func TestPgEdgeUserInitialStatus(t *testing.T) {
 var _ resource.Resource = (*PgEdgeUser)(nil)
 
 func TestSpockNodeIdentifier(t *testing.T) {
-	n := NewSpockNode(config.Node{Name: "n1", Hostname: "pgedge-n1-rw"}, "app", "admin", "pgedge", nil)
+	n := NewSpockNode(config.Node{Name: "n1", Hostname: "pgedge-n1-rw"}, "app", "pgedge", nil)
 	id := n.Identifier()
 	if id.Type != ResourceTypeNode || id.ID != "n1" {
 		t.Errorf("expected spock.node/n1, got %s/%s", id.Type, id.ID)
@@ -45,7 +45,7 @@ func TestSpockNodeIdentifier(t *testing.T) {
 }
 
 func TestSpockNodeDependsOnUser(t *testing.T) {
-	n := NewSpockNode(config.Node{Name: "n1"}, "app", "admin", "pgedge", nil)
+	n := NewSpockNode(config.Node{Name: "n1"}, "app", "pgedge", nil)
 	deps := n.Dependencies()
 	if len(deps) != 1 || deps[0].Type != ResourceTypeUser || deps[0].ID != "n1" {
 		t.Errorf("expected dep on spock.user/n1, got %v", deps)
@@ -53,7 +53,7 @@ func TestSpockNodeDependsOnUser(t *testing.T) {
 }
 
 func TestSpockNodeInitialStatus(t *testing.T) {
-	n := NewSpockNode(config.Node{Name: "n1"}, "app", "admin", "pgedge", nil)
+	n := NewSpockNode(config.Node{Name: "n1"}, "app", "pgedge", nil)
 	s := n.Status()
 	if s.Exists {
 		t.Error("initial status should be Exists=false")

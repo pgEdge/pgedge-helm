@@ -24,7 +24,7 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 		u := NewPgEdgeUser(node, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conns[node.Name])
 		resources[u.Identifier()] = u
 
-		n := NewSpockNode(node, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conns[node.Name])
+		n := NewSpockNode(node, cfg.DBName, cfg.PgEdgeUser, conns[node.Name])
 		resources[n.Identifier()] = n
 	}
 

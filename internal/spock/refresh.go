@@ -128,7 +128,7 @@ func discoverOrphanNodes(
 			Type: ResourceTypeNode,
 			ID:   fmt.Sprintf("%s@%s", orphanName, survivor.Name),
 		}
-		n := NewSpockNode(orphanCfg, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conn)
+		n := NewSpockNode(orphanCfg, cfg.DBName, cfg.PgEdgeUser, conn)
 		n.status = resource.Status{Exists: true}
 		actual[nodeID] = n
 		slog.Info("discovered orphan node", "orphan", orphanName, "survivor", survivor.Name)
