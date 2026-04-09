@@ -106,6 +106,8 @@ func (r *ReplicationSlot) Delete(ctx context.Context) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit drop slot %s: %w", r.slotName(), err)
 	}
-	slog.Info("dropped replication slot", "slot", r.slotName())
+	if slotExists {
+		slog.Info("dropped replication slot", "slot", r.slotName())
+	}
 	return nil
 }
