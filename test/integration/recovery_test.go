@@ -164,10 +164,10 @@ func TestSlotLossRecovery(t *testing.T) {
 			t.Fatalf("failed to insert after recovery: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
+		ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel1()
 
-		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
+		err = wait.Until(ctx1, 2*time.Second, func() (bool, error) {
 			out, err := testKube.ExecSQL("pgedge-n2-1",
 				"SELECT val FROM test_slot_recovery WHERE id = 2;")
 			if err != nil {
@@ -186,7 +186,10 @@ func TestSlotLossRecovery(t *testing.T) {
 			t.Fatalf("failed to insert on n2 after recovery: %v", err)
 		}
 
-		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel2()
+
+		err = wait.Until(ctx2, 2*time.Second, func() (bool, error) {
 			out, err := testKube.ExecSQL("pgedge-n1-1",
 				"SELECT val FROM test_slot_recovery WHERE id = 3;")
 			if err != nil {
@@ -503,10 +506,10 @@ END $body$;`)
 			t.Fatalf("failed to insert after recovery: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
+		ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel1()
 
-		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
+		err = wait.Until(ctx1, 2*time.Second, func() (bool, error) {
 			out, err := testKube.ExecSQL("pgedge-n2-1",
 				"SELECT val FROM test_bootstrap WHERE id = 2;")
 			if err != nil {
@@ -524,7 +527,10 @@ END $body$;`)
 			t.Fatalf("failed to insert on n2: %v", err)
 		}
 
-		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel2()
+
+		err = wait.Until(ctx2, 2*time.Second, func() (bool, error) {
 			out, err := testKube.ExecSQL("pgedge-n1-1",
 				"SELECT val FROM test_bootstrap WHERE id = 3;")
 			if err != nil {
