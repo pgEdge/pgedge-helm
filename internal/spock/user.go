@@ -72,9 +72,9 @@ func (u *PgEdgeUser) Create(ctx context.Context) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
 			slog.Info("pgedge user already exists", "node", u.node.Name)
-		} else {
-			return fmt.Errorf("create pgedge user on %s: %w", u.node.Name, err)
+			return nil
 		}
+		return fmt.Errorf("create pgedge user on %s: %w", u.node.Name, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

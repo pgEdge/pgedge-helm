@@ -119,9 +119,9 @@ func (s *Subscription) Create(ctx context.Context) error {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
 			slog.Info("subscription already exists", "sub", s.subName())
-		} else {
-			return fmt.Errorf("create subscription %s: %w", s.subName(), err)
+			return nil
 		}
+		return fmt.Errorf("create subscription %s: %w", s.subName(), err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
