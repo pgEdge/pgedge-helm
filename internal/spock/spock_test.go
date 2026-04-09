@@ -238,19 +238,29 @@ func TestComputeDesiredSyncFlag(t *testing.T) {
 	resources := ComputeDesired(cfg, conns)
 
 	// sub from n1→n2 should have sync=true (n2 bootstraps from n1)
-	subN1N2 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n1_n2"}]
-	if sub, ok := subN1N2.(*Subscription); ok {
-		if !sub.sync {
-			t.Error("sub_n1_n2 should have sync=true")
-		}
+	rawN1N2, ok := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n1_n2"}]
+	if !ok {
+		t.Fatal("missing sub_n1_n2")
+	}
+	subN1N2, ok := rawN1N2.(*Subscription)
+	if !ok {
+		t.Fatalf("sub_n1_n2 has unexpected type %T", rawN1N2)
+	}
+	if !subN1N2.sync {
+		t.Error("sub_n1_n2 should have sync=true")
 	}
 
 	// sub from n2→n1 should have sync=false (n1 doesn't bootstrap from n2)
-	subN2N1 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n2_n1"}]
-	if sub, ok := subN2N1.(*Subscription); ok {
-		if sub.sync {
-			t.Error("sub_n2_n1 should have sync=false")
-		}
+	rawN2N1, ok := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n2_n1"}]
+	if !ok {
+		t.Fatal("missing sub_n2_n1")
+	}
+	subN2N1, ok := rawN2N1.(*Subscription)
+	if !ok {
+		t.Fatalf("sub_n2_n1 has unexpected type %T", rawN2N1)
+	}
+	if subN2N1.sync {
+		t.Error("sub_n2_n1 should have sync=false")
 	}
 }
 
