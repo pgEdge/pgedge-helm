@@ -26,8 +26,7 @@ func RefreshActual(
 
 	for id, r := range desired {
 		if err := r.Refresh(ctx); err != nil {
-			slog.Warn("refresh failed", "type", id.Type, "id", id.ID, "error", err)
-			continue
+			return nil, fmt.Errorf("refresh %s/%s: %w", id.Type, id.ID, err)
 		}
 		if r.Status().Exists {
 			actual[id] = r
