@@ -36,13 +36,13 @@ func Plan(actual, desired map[Identifier]Resource) [][]Event {
 
 	// Delete phases (reverse dependency order — dependents first)
 	if len(deletes) > 0 {
-		deletePhases := topoSort(deletes, desired, true)
+		deletePhases := topoSort(deletes, true)
 		phases = append(phases, deletePhases...)
 	}
 
 	// Create phases (dependency order — dependencies first)
 	if len(creates) > 0 {
-		createPhases := topoSort(creates, desired, false)
+		createPhases := topoSort(creates, false)
 		phases = append(phases, createPhases...)
 	}
 
@@ -51,7 +51,7 @@ func Plan(actual, desired map[Identifier]Resource) [][]Event {
 
 // topoSort orders events into phases respecting dependencies.
 // If reverse=true, dependents come before dependencies (for deletes).
-func topoSort(events []Event, allResources map[Identifier]Resource, reverse bool) [][]Event {
+func topoSort(events []Event, reverse bool) [][]Event {
 	eventSet := make(map[Identifier]Event)
 	for _, e := range events {
 		eventSet[e.Resource.Identifier()] = e
