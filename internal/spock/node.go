@@ -14,6 +14,9 @@ import (
 	"github.com/pgEdge/pgedge-helm/internal/resource"
 )
 
+// pgCodeDuplicateObject is the PostgreSQL error code for "duplicate object".
+const pgCodeDuplicateObject = "42710"
+
 const sslSettings = "sslcert=/projected/pgedge/certificates/tls.crt sslkey=/projected/pgedge/certificates/tls.key sslmode=require"
 
 // SpockNode manages a Spock node on a PostgreSQL instance.
@@ -81,7 +84,7 @@ func (n *SpockNode) Create(ctx context.Context) error {
 		n.node.Name, dsn)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
+		if errors.As(err, &pgErr) && pgErr.Code == pgCodeDuplicateObject {
 			slog.Info("spock node already exists", "node", n.node.Name)
 			return nil
 		}

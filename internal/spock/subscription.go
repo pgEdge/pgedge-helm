@@ -117,7 +117,7 @@ func (s *Subscription) Create(ctx context.Context) error {
 	`, s.subName(), dsn, s.sync, s.sync)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
+		if errors.As(err, &pgErr) && pgErr.Code == pgCodeDuplicateObject {
 			slog.Info("subscription already exists", "sub", s.subName())
 			return nil
 		}

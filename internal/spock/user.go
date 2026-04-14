@@ -70,7 +70,7 @@ func (u *PgEdgeUser) Create(ctx context.Context) error {
 	_, err = tx.Exec(ctx, stmt)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
+		if errors.As(err, &pgErr) && pgErr.Code == pgCodeDuplicateObject {
 			slog.Info("pgedge user already exists", "node", u.node.Name)
 			return nil
 		}
