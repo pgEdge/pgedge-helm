@@ -65,14 +65,27 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, dbName
 	}
 	slog.Info("dropped spock extension", "node", node.Name)
 
-	_, err = conn.Exec(ctx,
-		"SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_type = 'logical'")
+	// Terminate active walsenders on spock slots before dropping.
+	_, err = conn.Exec(ctx, `
+		SELECT pg_terminate_backend(active_pid)
+		  FROM pg_replication_slots
+		 WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%' AND active`)
+	if err != nil {
+		slog.Warn("terminate walsenders failed (continuing)", "node", node.Name, "error", err)
+	}
+
+	_, err = conn.Exec(ctx, `
+		SELECT pg_drop_replication_slot(slot_name)
+		  FROM pg_replication_slots
+		 WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%'`)
 	if err != nil {
 		slog.Warn("drop replication slots failed (continuing)", "node", node.Name, "error", err)
 	}
 
-	_, err = conn.Exec(ctx,
-		"SELECT pg_replication_origin_drop(roname) FROM pg_replication_origin")
+	_, err = conn.Exec(ctx, `
+		SELECT pg_replication_origin_drop(roname)
+		  FROM pg_replication_origin
+		 WHERE roname LIKE 'spk_%'`)
 	if err != nil {
 		slog.Warn("drop replication origins failed (continuing)", "node", node.Name, "error", err)
 	}
