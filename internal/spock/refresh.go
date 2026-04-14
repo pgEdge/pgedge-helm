@@ -51,7 +51,7 @@ func checkSlotHealth(actual map[resource.Identifier]resource.Resource) {
 		if !ok {
 			continue
 		}
-		slotID := resource.Identifier{Type: ResourceTypeReplicationSlot, ID: sub.replicationSlotID()}
+		slotID := resource.Identifier{Type: ResourceTypeReplicationSlot, ID: sub.replicationSlotName()}
 		if _, slotExists := actual[slotID]; !slotExists {
 			sub.status = resource.Status{
 				Exists:        true,
@@ -59,7 +59,7 @@ func checkSlotHealth(actual map[resource.Identifier]resource.Resource) {
 				Reason:        "provider-side replication slot missing",
 			}
 			slog.Warn("subscription missing provider slot",
-				"sub", sub.subName(), "slot", sub.replicationSlotID())
+				"sub", sub.subName(), "slot", sub.replicationSlotName())
 		}
 	}
 }

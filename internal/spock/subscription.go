@@ -51,7 +51,7 @@ func (s *Subscription) Identifier() resource.Identifier {
 	return resource.Identifier{Type: ResourceTypeSubscription, ID: s.subName()}
 }
 
-func (s *Subscription) replicationSlotID() string {
+func (s *Subscription) replicationSlotName() string {
 	return strings.ReplaceAll(
 		fmt.Sprintf("spk_%s_%s_sub_%s_%s", s.dbName, s.src.Name, s.src.Name, s.dst.Name),
 		"-", "_",
@@ -62,7 +62,7 @@ func (s *Subscription) Dependencies() []resource.Identifier {
 	return []resource.Identifier{
 		{Type: ResourceTypeNode, ID: s.src.Name},
 		{Type: ResourceTypeNode, ID: s.dst.Name},
-		{Type: ResourceTypeReplicationSlot, ID: s.replicationSlotID()},
+		{Type: ResourceTypeReplicationSlot, ID: s.replicationSlotName()},
 	}
 }
 
