@@ -21,7 +21,7 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 	resources := make(map[resource.Identifier]resource.Resource)
 
 	for _, node := range cfg.Nodes {
-		u := NewPgEdgeUser(node, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, conns[node.Name])
+		u := NewPgEdgeUser(node, cfg.DBName, cfg.PgEdgeUser, conns[node.Name])
 		resources[u.Identifier()] = u
 
 		n := NewSpockNode(node, cfg.DBName, cfg.PgEdgeUser, conns[node.Name])
@@ -38,7 +38,7 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 			resources[slot.Identifier()] = slot
 
 			sync := dst.Bootstrap.Mode == "spock" && dst.Bootstrap.SourceNode == src.Name
-			s := NewSubscription(src, dst, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, sync, conns[dst.Name])
+			s := NewSubscription(src, dst, cfg.DBName, cfg.PgEdgeUser, sync, conns[dst.Name])
 			resources[s.Identifier()] = s
 		}
 	}

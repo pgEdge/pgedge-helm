@@ -18,17 +18,15 @@ import (
 type PgEdgeUser struct {
 	node       config.Node
 	dbName     string
-	adminUser  string
 	pgedgeUser string
 	conn       *pgxpool.Pool
 	status     resource.Status
 }
 
-func NewPgEdgeUser(node config.Node, dbName, adminUser, pgedgeUser string, conn *pgxpool.Pool) *PgEdgeUser {
+func NewPgEdgeUser(node config.Node, dbName, pgedgeUser string, conn *pgxpool.Pool) *PgEdgeUser {
 	return &PgEdgeUser{
 		node:       node,
 		dbName:     dbName,
-		adminUser:  adminUser,
 		pgedgeUser: pgedgeUser,
 		conn:       conn,
 	}

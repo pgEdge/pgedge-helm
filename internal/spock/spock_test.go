@@ -11,7 +11,7 @@ import (
 )
 
 func TestPgEdgeUserIdentifier(t *testing.T) {
-	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "admin", "pgedge", nil)
+	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "pgedge", nil)
 	id := u.Identifier()
 	if id.Type != ResourceTypeUser || id.ID != "n1" {
 		t.Errorf("expected spock.user/n1, got %s/%s", id.Type, id.ID)
@@ -19,14 +19,14 @@ func TestPgEdgeUserIdentifier(t *testing.T) {
 }
 
 func TestPgEdgeUserNoDependencies(t *testing.T) {
-	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "admin", "pgedge", nil)
+	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "pgedge", nil)
 	if len(u.Dependencies()) != 0 {
 		t.Errorf("PgEdgeUser should have no dependencies, got %v", u.Dependencies())
 	}
 }
 
 func TestPgEdgeUserInitialStatus(t *testing.T) {
-	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "admin", "pgedge", nil)
+	u := NewPgEdgeUser(config.Node{Name: "n1"}, "app", "pgedge", nil)
 	s := u.Status()
 	if s.Exists {
 		t.Error("initial status should be Exists=false")
@@ -66,7 +66,7 @@ var _ resource.Resource = (*SpockNode)(nil)
 func TestSubscriptionIdentifier(t *testing.T) {
 	src := config.Node{Name: "n1", Hostname: "pgedge-n1-rw"}
 	dst := config.Node{Name: "n2", Hostname: "pgedge-n2-rw"}
-	s := NewSubscription(src, dst, "app", "admin", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
 	id := s.Identifier()
 	if id.Type != ResourceTypeSubscription {
 		t.Errorf("type: got %q", id.Type)
@@ -79,7 +79,7 @@ func TestSubscriptionIdentifier(t *testing.T) {
 func TestSubscriptionIdentifierDashesReplaced(t *testing.T) {
 	src := config.Node{Name: "us-east-1", Hostname: "pgedge-us-east-1-rw"}
 	dst := config.Node{Name: "us-west-2", Hostname: "pgedge-us-west-2-rw"}
-	s := NewSubscription(src, dst, "app", "admin", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
 	id := s.Identifier()
 	if id.ID != "sub_us_east_1_us_west_2" {
 		t.Errorf("id: got %q, want sub_us_east_1_us_west_2", id.ID)
@@ -89,7 +89,7 @@ func TestSubscriptionIdentifierDashesReplaced(t *testing.T) {
 func TestSubscriptionDependsOnNodesAndSlot(t *testing.T) {
 	src := config.Node{Name: "n1"}
 	dst := config.Node{Name: "n2"}
-	s := NewSubscription(src, dst, "app", "admin", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
 	deps := s.Dependencies()
 	if len(deps) != 3 {
 		t.Fatalf("expected 3 deps, got %d", len(deps))
@@ -115,12 +115,12 @@ func TestSubscriptionSyncFlag(t *testing.T) {
 		Name: "n2",
 		Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"},
 	}
-	s := NewSubscription(src, dst, "app", "admin", "pgedge", true, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", true, nil)
 	if !s.sync {
 		t.Error("expected sync=true when dst bootstraps from src via spock")
 	}
 
-	s2 := NewSubscription(src, dst, "app", "admin", "pgedge", false, nil)
+	s2 := NewSubscription(src, dst, "app", "pgedge", false, nil)
 	if s2.sync {
 		t.Error("expected sync=false when not bootstrapping from this src")
 	}

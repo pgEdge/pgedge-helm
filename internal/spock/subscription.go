@@ -21,19 +21,17 @@ type Subscription struct {
 	src        config.Node
 	dst        config.Node
 	dbName     string
-	adminUser  string
 	pgedgeUser string
 	sync       bool
 	conn       *pgxpool.Pool // dst node's connection
 	status     resource.Status
 }
 
-func NewSubscription(src, dst config.Node, dbName, adminUser, pgedgeUser string, sync bool, conn *pgxpool.Pool) *Subscription {
+func NewSubscription(src, dst config.Node, dbName, pgedgeUser string, sync bool, conn *pgxpool.Pool) *Subscription {
 	return &Subscription{
 		src:        src,
 		dst:        dst,
 		dbName:     dbName,
-		adminUser:  adminUser,
 		pgedgeUser: pgedgeUser,
 		sync:       sync,
 		conn:       conn,

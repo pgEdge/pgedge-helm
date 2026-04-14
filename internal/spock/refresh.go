@@ -136,7 +136,7 @@ func discoverOrphanNodes(
 		// Infer one orphan subscription per surviving connection.
 		// The topology is fully meshed, so each surviving node had a subscription
 		// from the orphan. sub_drop($1, true) is safe if it no longer exists.
-		sub := NewSubscription(orphanCfg, survivor, cfg.DBName, cfg.AdminUser, cfg.PgEdgeUser, false, conn)
+		sub := NewSubscription(orphanCfg, survivor, cfg.DBName, cfg.PgEdgeUser, false, conn)
 		sub.status = resource.Status{Exists: true}
 		actual[sub.Identifier()] = sub
 		slog.Info("discovered orphan subscription", "sub", sub.subName(), "survivor", survivor.Name)
