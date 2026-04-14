@@ -16,23 +16,22 @@ func Execute(ctx context.Context, phases [][]Event) error {
 
 		g, ctx := errgroup.WithContext(ctx)
 		for _, event := range phase {
-			e := event
 			g.Go(func() error {
-				id := e.Resource.Identifier()
-				switch e.Action {
+				id := event.Resource.Identifier()
+				switch event.Action {
 				case ActionCreate:
 					slog.Info("creating resource", "type", id.Type, "id", id.ID)
-					if err := e.Resource.Create(ctx); err != nil {
+					if err := event.Resource.Create(ctx); err != nil {
 						return fmt.Errorf("create %s/%s: %w", id.Type, id.ID, err)
 					}
 				case ActionDelete:
 					slog.Info("deleting resource", "type", id.Type, "id", id.ID)
-					if err := e.Resource.Delete(ctx); err != nil {
+					if err := event.Resource.Delete(ctx); err != nil {
 						return fmt.Errorf("delete %s/%s: %w", id.Type, id.ID, err)
 					}
 				default:
-					slog.Error("unsupported action", "action", e.Action, "type", id.Type, "id", id.ID)
-					return fmt.Errorf("unsupported action %d for %s/%s", e.Action, id.Type, id.ID)
+					slog.Error("unsupported action", "action", event.Action, "type", id.Type, "id", id.ID)
+					return fmt.Errorf("unsupported action %d for %s/%s", event.Action, id.Type, id.ID)
 				}
 				return nil
 			})
