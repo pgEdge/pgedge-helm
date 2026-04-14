@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -59,7 +60,7 @@ func Load(nodesPath string) (*Config, error) {
 	if namespace == "" {
 		namespace = "default"
 	}
-	resetSpock := os.Getenv("RESET_SPOCK") == "true"
+	resetSpock, _ := strconv.ParseBool(os.Getenv("RESET_SPOCK"))
 	nodes, err := LoadNodes(nodesPath)
 	if err != nil {
 		return nil, err
