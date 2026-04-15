@@ -35,9 +35,9 @@ kind-up:
 	kind delete cluster --name $(KIND_CLUSTER_NAME) 2>/dev/null || true
 	kind create cluster --config $(KIND_CONFIG) --name $(KIND_CLUSTER_NAME)
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) --server-side -f \
-		https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/refs/heads/main/manifests/cloudnative-pg/v1.28.1/cnpg-1.28.1.yaml
+		https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/refs/heads/main/manifests/cloudnative-pg/v1.29.0/cnpg-1.29.0.yaml
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f \
-		https://github.com/cert-manager/cert-manager/releases/download/v1.19.3/cert-manager.yaml
+		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
 		-n cnpg-system cnpg-controller-manager --timeout=120s
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
