@@ -435,19 +435,15 @@ func TestComputeDesiredSyncFlag(t *testing.T) {
 	resources := ComputeDesired(cfg, conns)
 
 	// sub from n1→n2 should have sync=true (populate sync subscription)
-	subN1N2 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n1_n2"}]
-	if sub, ok := subN1N2.(*Subscription); ok {
-		if !sub.sync {
-			t.Error("sub_n1_n2 should have sync=true")
-		}
+	subN1N2 := mustSubscription(t, resources, "sub_n1_n2")
+	if !subN1N2.sync {
+		t.Error("sub_n1_n2 should have sync=true")
 	}
 
 	// sub from n2→n1 should have sync=false
-	subN2N1 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n2_n1"}]
-	if sub, ok := subN2N1.(*Subscription); ok {
-		if sub.sync {
-			t.Error("sub_n2_n1 should have sync=false")
-		}
+	subN2N1 := mustSubscription(t, resources, "sub_n2_n1")
+	if subN2N1.sync {
+		t.Error("sub_n2_n1 should have sync=false")
 	}
 
 	// Populate resources should be emitted (2-node add, no peers)
@@ -471,33 +467,21 @@ func TestComputeDesiredPopulateTwoNodeAdd(t *testing.T) {
 	assertResource(t, resources, ResourceTypeWaitForSyncEvent, "n1_n2")
 
 	// Source→new subscription should have sync=true
-	subID := resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n1_n2"}
-	sub, ok := resources[subID]
-	if !ok {
-		t.Fatal("missing sub_n1_n2")
-	}
-	if s, ok := sub.(*Subscription); ok {
-		if !s.sync {
-			t.Error("source→new subscription should have sync=true")
-		}
+	sub := mustSubscription(t, resources, "sub_n1_n2")
+	if !sub.sync {
+		t.Error("source→new subscription should have sync=true")
 	}
 
 	// Reverse sub n2→n1 should have extraDep on WaitForSyncEvent
-	revSubID := resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n2_n1"}
-	revSub, ok := resources[revSubID]
-	if !ok {
-		t.Fatal("missing sub_n2_n1")
+	revSub := mustSubscription(t, resources, "sub_n2_n1")
+	found := false
+	for _, d := range revSub.Dependencies() {
+		if d.Type == ResourceTypeWaitForSyncEvent && d.ID == "n1_n2" {
+			found = true
+		}
 	}
-	if s, ok := revSub.(*Subscription); ok {
-		found := false
-		for _, d := range s.Dependencies() {
-			if d.Type == ResourceTypeWaitForSyncEvent && d.ID == "n1_n2" {
-				found = true
-			}
-		}
-		if !found {
-			t.Error("sub_n2_n1 should depend on wait_for_sync_event/n1_n2")
-		}
+	if !found {
+		t.Error("sub_n2_n1 should depend on wait_for_sync_event/n1_n2")
 	}
 
 	// No ReplicationSlotCreate (no peers)
@@ -532,40 +516,34 @@ func TestComputeDesiredPopulateThreeNodeAdd(t *testing.T) {
 	assertResource(t, resources, ResourceTypeWaitForSyncEvent, "n1_n3")
 
 	// Source→new subscription should have sync=true
-	subN1N3 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n1_n3"}]
-	if s, ok := subN1N3.(*Subscription); ok {
-		if !s.sync {
-			t.Error("sub_n1_n3 should have sync=true")
-		}
+	subN1N3 := mustSubscription(t, resources, "sub_n1_n3")
+	if !subN1N3.sync {
+		t.Error("sub_n1_n3 should have sync=true")
 	}
 
 	// Peer→new end-state subscription (sub_n2_n3) should depend on slot advance
-	subN2N3 := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: "sub_n2_n3"}]
-	if s, ok := subN2N3.(*Subscription); ok {
-		found := false
-		for _, d := range s.Dependencies() {
-			if d.Type == ResourceTypeReplicationSlotAdvanceFromCTS {
-				found = true
-			}
+	subN2N3 := mustSubscription(t, resources, "sub_n2_n3")
+	foundAdvance := false
+	for _, d := range subN2N3.Dependencies() {
+		if d.Type == ResourceTypeReplicationSlotAdvanceFromCTS {
+			foundAdvance = true
 		}
-		if !found {
-			t.Error("sub_n2_n3 should depend on replication_slot_advance_from_cts")
-		}
+	}
+	if !foundAdvance {
+		t.Error("sub_n2_n3 should depend on replication_slot_advance_from_cts")
 	}
 
 	// New→existing subs should depend on WaitForSyncEvent(source→new)
 	for _, subID := range []string{"sub_n3_n1", "sub_n3_n2"} {
-		sub := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: subID}]
-		if s, ok := sub.(*Subscription); ok {
-			found := false
-			for _, d := range s.Dependencies() {
-				if d.Type == ResourceTypeWaitForSyncEvent && d.ID == "n1_n3" {
-					found = true
-				}
+		s := mustSubscription(t, resources, subID)
+		foundWait := false
+		for _, d := range s.Dependencies() {
+			if d.Type == ResourceTypeWaitForSyncEvent && d.ID == "n1_n3" {
+				foundWait = true
 			}
-			if !found {
-				t.Errorf("%s should depend on wait_for_sync_event/n1_n3", subID)
-			}
+		}
+		if !foundWait {
+			t.Errorf("%s should depend on wait_for_sync_event/n1_n3", subID)
 		}
 	}
 }
@@ -603,10 +581,12 @@ func TestComputeDesiredNoNewNodesUnchanged(t *testing.T) {
 		if id.Type != ResourceTypeSubscription {
 			continue
 		}
-		if s, ok := r.(*Subscription); ok {
-			if len(s.extraDeps) > 0 {
-				t.Errorf("%s has unexpected extraDeps: %v", id.ID, s.extraDeps)
-			}
+		s, ok := r.(*Subscription)
+		if !ok {
+			t.Fatalf("subscription %s has type %T, want *Subscription", id.ID, r)
+		}
+		if len(s.extraDeps) > 0 {
+			t.Errorf("%s has unexpected extraDeps: %v", id.ID, s.extraDeps)
 		}
 	}
 }
@@ -617,4 +597,17 @@ func assertResource(t *testing.T, resources map[resource.Identifier]resource.Res
 	if _, ok := resources[key]; !ok {
 		t.Errorf("missing %s/%s", resType, id)
 	}
+}
+
+func mustSubscription(t *testing.T, resources map[resource.Identifier]resource.Resource, id string) *Subscription {
+	t.Helper()
+	r, ok := resources[resource.Identifier{Type: ResourceTypeSubscription, ID: id}]
+	if !ok {
+		t.Fatalf("missing subscription %s", id)
+	}
+	s, ok := r.(*Subscription)
+	if !ok {
+		t.Fatalf("subscription %s has type %T, want *Subscription", id, r)
+	}
+	return s
 }

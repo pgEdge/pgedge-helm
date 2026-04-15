@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -69,7 +70,10 @@ func (r *WaitForSyncEvent) Create(ctx context.Context) error {
 		}
 
 		// Check subscription health — fail early if broken
-		subName := fmt.Sprintf("sub_%s_%s", r.providerName, r.subscriberName)
+		subName := strings.ReplaceAll(
+			fmt.Sprintf("sub_%s_%s", r.providerName, r.subscriberName),
+			"-", "_",
+		)
 		var status string
 		err := r.conn.QueryRow(ctx,
 			"SELECT status FROM spock.sub_show_status() WHERE subscription_name = $1",
