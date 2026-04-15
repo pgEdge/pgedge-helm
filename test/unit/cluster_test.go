@@ -310,7 +310,7 @@ func TestClusterDefaultImageName(t *testing.T) {
 	}
 
 	imageName := getNestedString(&clusters[0], "spec", "imageName")
-	expected := "ghcr.io/pgedge/pgedge-postgres:17-spock5-standard"
+	expected := "ghcr.io/pgedge/pgedge-postgres:18-spock5-standard"
 	if imageName != expected {
 		t.Errorf("expected imageName=%q, got %q", expected, imageName)
 	}

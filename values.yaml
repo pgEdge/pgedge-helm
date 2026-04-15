@@ -43,7 +43,7 @@ pgEdge:
   clusterSpec:
     instances: 1
     imagePullPolicy: Always
-    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
     certificates:
       clientCASecret: client-ca-key-pair
       replicationTLSSecret: streaming-replica-client-cert

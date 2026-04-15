@@ -38,7 +38,7 @@ First, list the instances with `kubectl cnpg status <NODE NAME>`:
 Cluster Summary
 Name                 default/pgedge-n1
 System ID:           7561064585676382226
-PostgreSQL Image:    ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+PostgreSQL Image:    ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
 Primary instance:    pgedge-n1-1
 Primary start time:  2025-10-14 13:12:30 +0000 UTC (uptime 8h3m57s)
 Status:              Cluster in healthy state

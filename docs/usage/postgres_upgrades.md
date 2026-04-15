@@ -11,7 +11,7 @@ The use of this mutable tag in the chart makes it easier to keep examples update
 ```yaml
 clusterSpec:
   imagePullPolicy: Always
-  imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+  imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
 ```
 
 !!! note
@@ -25,7 +25,7 @@ For example, this pins to a specific Postgres minor version and Spock minor vers
 ```yaml
 clusterSpec:
   imagePullPolicy: Always
-  imageName: ghcr.io/pgedge/pgedge-postgres:17.6-spock5.0.1-standard
+  imageName: ghcr.io/pgedge/pgedge-postgres:18.3-spock5.0.6-standard
 ```
 
 In order to perform minor version upgrades for Postgres or Spock, simply update the `imageName` and perform a `helm upgrade`. CloudNativePG will handle rolling out the new image across your nodes.
@@ -53,7 +53,7 @@ In addition to stopping writes from your applications, you should also ensure th
 
 If your database schema is compatible across major versions, you can use Spock to bootstrap upgraded nodes into your installation in order to gradually perform a major version upgrade.
 
-For example, let's assume you have 2 nodes running Postgres 16:
+For example, let's assume you have 2 nodes running Postgres 17:
 
 ```yaml
 pgEdge:
@@ -65,12 +65,12 @@ pgEdge:
       hostname: pgedge-n2-rw
 
   clusterSpec:
-    imageName: ghcr.io/pgedge/pgedge-postgres:16-spock5-standard
+    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
     storage:
       size: 1Gi
 ```
 
-You can add a new node (n3) running Postgres 17, with bootstrap configuration to load data from an existing node running Postgres 16:
+You can add a new node (n3) running Postgres 18, with bootstrap configuration to load data from an existing node running Postgres 17:
 
 ```yaml
 pgEdge:
@@ -86,10 +86,10 @@ pgEdge:
         mode: spock
         sourceNode: n1
       clusterSpec:
-        imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+        imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
 
   clusterSpec:
-    imageName: ghcr.io/pgedge/pgedge-postgres:16-spock5-standard
+    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
     storage:
       size: 1Gi
 ```
@@ -102,7 +102,7 @@ CloudNativePG supports in-place major version upgrades using its [Offline In-Pla
 
 In order to perform a major version upgrade using this chart, simply update the `imageName` in the `clusterSpec` and perform a `helm upgrade`.
 
-For example, given the following two node configuration running Postgres 16:
+For example, given the following two node configuration running Postgres 17:
 
 ```yaml
 pgEdge:
@@ -113,12 +113,12 @@ pgEdge:
     - name: n2
       hostname: pgedge-n2-rw
   clusterSpec:
-    imageName: ghcr.io/pgedge/pgedge-postgres:16-spock5-standard
+    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
     storage:
       size: 1Gi
 ```
 
-You can perform a major version upgrade from 16 to 17 by specifying a new image for Postgres 17:
+You can perform a major version upgrade from 17 to 18 by specifying a new image for Postgres 17:
 
 ```yaml
 pgEdge:
@@ -130,7 +130,7 @@ pgEdge:
       hostname: pgedge-n2-rw
 
   clusterSpec:
-    imageName: ghcr.io/pgedge/pgedge-postgres:17-spock5-standard
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
     storage:
       size: 1Gi
 ```

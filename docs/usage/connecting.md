@@ -84,7 +84,7 @@ By default, the managed `app` user is issued a *unique password for each pgEdge 
 
 ```shell
 kubectl run psql-client --rm -it \
-  --image=ghcr.io/pgedge/pgedge-postgres:17-spock5-standard \
+  --image=ghcr.io/pgedge/pgedge-postgres:18-spock5-standard \
   --env "PGPASSWORD=$(kubectl get secret pgedge-n3-app -o jsonpath='{.data.password}' | base64 -d)" \
   -- psql -h pgedge-n3-rw -d app -U app
 ```
