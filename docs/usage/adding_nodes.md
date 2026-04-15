@@ -3,7 +3,7 @@
 This chart supports two methods for adding new nodes to an existing installation:
 
 1. Using Spock to add a node via logical replication
-2. Using CloudNativePG to add a node via [bootstrap](https://cloudnative-pg.io/documentation/1.18/bootstrap/)
+2. Using CloudNativePG to add a node via [bootstrap](https://cloudnative-pg.io/docs/1.29/bootstrap)
 
 ## Adding a node via spock
 
@@ -66,7 +66,7 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
 ## Adding a node via CloudNativePG bootstrap
 
-As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/documentation/1.28/bootstrap/#bootstrap-from-another-cluster) capability.
+As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/docs/1.29/bootstrap/#bootstrap-from-another-cluster) capability.
 
 Here is an example of adding a node `n3` using the Barman Cloud CNPG-I plugin to bootstrap the node from the existing node `n1` which has backups and wal archiving configured in S3. 
 

@@ -1,6 +1,6 @@
 # Configuring Backups
 
-CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/documentation/1.28/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
+CloudNativePG provides multiple ways to configure backups depending on your business requirements. A comparison of the currently available options can be found in their [documentation](https://cloudnative-pg.io/docs/1.29/backup/#comparing-available-backup-options-object-stores-vs-volume-snapshots).
 
 This chart supports deploying backup-related resources like `ObjectStore` and `ScheduledBackup` using the `extraResources` field. This allows you to manage all your pgEdge infrastructure in a single Helm deployment.
 
