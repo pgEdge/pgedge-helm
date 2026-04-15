@@ -37,6 +37,9 @@ pgEdge:
     # before reconciling. Use this when bootstrapping from a Barman backup that contains
     # stale Spock configuration. Remove after successful initialization.
     resetSpock: false
+    # -- Maximum time (in seconds) for the init-spock job to complete.
+    # Increase for large databases where initial sync may take longer.
+    timeout: 7200
 
   # -- Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis
   # using the `clusterSpec` field in each node definition.

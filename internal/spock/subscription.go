@@ -25,9 +25,10 @@ type Subscription struct {
 	sync       bool
 	conn       *pgxpool.Pool // dst node's connection
 	status     resource.Status
+	extraDeps  []resource.Identifier
 }
 
-func NewSubscription(src, dst config.Node, dbName, pgedgeUser string, sync bool, conn *pgxpool.Pool) *Subscription {
+func NewSubscription(src, dst config.Node, dbName, pgedgeUser string, sync bool, conn *pgxpool.Pool, extraDeps ...resource.Identifier) *Subscription {
 	return &Subscription{
 		src:        src,
 		dst:        dst,
@@ -35,6 +36,7 @@ func NewSubscription(src, dst config.Node, dbName, pgedgeUser string, sync bool,
 		pgedgeUser: pgedgeUser,
 		sync:       sync,
 		conn:       conn,
+		extraDeps:  extraDeps,
 	}
 }
 
@@ -57,11 +59,12 @@ func (s *Subscription) replicationSlotName() string {
 }
 
 func (s *Subscription) Dependencies() []resource.Identifier {
-	return []resource.Identifier{
+	deps := []resource.Identifier{
 		{Type: ResourceTypeNode, ID: s.src.Name},
 		{Type: ResourceTypeNode, ID: s.dst.Name},
 		{Type: ResourceTypeReplicationSlot, ID: s.replicationSlotName()},
 	}
+	return append(deps, s.extraDeps...)
 }
 
 func (s *Subscription) Refresh(ctx context.Context) error {
@@ -76,6 +79,20 @@ func (s *Subscription) Refresh(ctx context.Context) error {
 
 	if !subExists {
 		s.status = resource.Status{Exists: false}
+		return nil
+	}
+
+	// A disabled subscription that should be enabled triggers an update.
+	var isEnabled bool
+	err = s.conn.QueryRow(ctx,
+		"SELECT sub_enabled FROM spock.subscription WHERE sub_name = $1",
+		s.subName(),
+	).Scan(&isEnabled)
+	if err != nil {
+		return fmt.Errorf("check subscription enabled %s: %w", s.subName(), err)
+	}
+	if !isEnabled {
+		s.status = resource.Status{Exists: true, NeedsUpdate: true, Reason: "subscription is disabled"}
 		return nil
 	}
 
@@ -98,6 +115,29 @@ func (s *Subscription) Create(ctx context.Context) error {
 	_, err = tx.Exec(ctx, `SELECT spock.repair_mode('True')`)
 	if err != nil {
 		return fmt.Errorf("repair mode for subscription %s: %w", s.subName(), err)
+	}
+
+	// Check if the subscription already exists (e.g. created disabled by populate).
+	// If it exists and we want it enabled, enable it instead of recreating.
+	var existsDisabled bool
+	err = tx.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM spock.subscription WHERE sub_name = $1 AND NOT sub_enabled)",
+		s.subName(),
+	).Scan(&existsDisabled)
+	if err != nil {
+		return fmt.Errorf("check disabled subscription %s: %w", s.subName(), err)
+	}
+
+	if existsDisabled {
+		_, err = tx.Exec(ctx, `SELECT spock.sub_enable($1)`, s.subName())
+		if err != nil {
+			return fmt.Errorf("enable subscription %s: %w", s.subName(), err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit enable subscription %s: %w", s.subName(), err)
+		}
+		slog.Info("enabled existing disabled subscription", "sub", s.subName())
+		return nil
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -125,11 +165,35 @@ func (s *Subscription) Create(ctx context.Context) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit subscription %s: %w", s.subName(), err)
 	}
-	syncMsg := ""
+	msg := "created subscription"
 	if s.sync {
-		syncMsg = " (with initial sync)"
+		msg += " (with initial sync)"
 	}
-	slog.Info("created subscription"+syncMsg, "sub", s.subName())
+	slog.Info(msg, "sub", s.subName())
+	return nil
+}
+
+func (s *Subscription) Update(ctx context.Context) error {
+	tx, err := s.conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx for subscription update %s: %w", s.subName(), err)
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `SELECT spock.repair_mode('True')`)
+	if err != nil {
+		return fmt.Errorf("repair mode for subscription update %s: %w", s.subName(), err)
+	}
+
+	_, err = tx.Exec(ctx, `SELECT spock.sub_enable($1)`, s.subName())
+	if err != nil {
+		return fmt.Errorf("enable subscription %s: %w", s.subName(), err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit subscription update %s: %w", s.subName(), err)
+	}
+	slog.Info("enabled subscription", "sub", s.subName())
 	return nil
 }
 

@@ -9,6 +9,7 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.pgEdge.initSpockJobConfig.timeout | default 7200 }}
   ttlSecondsAfterFinished: 3600
   template:
     spec:
@@ -30,6 +31,8 @@ spec:
           - name: RESET_SPOCK
             value: "true"
           {{- end }}
+          - name: INIT_SPOCK_TIMEOUT
+            value: {{ .Values.pgEdge.initSpockJobConfig.timeout | default 7200 | quote }}
         volumeMounts:
           - name: {{ .Values.pgEdge.appName }}-config
             mountPath: /config

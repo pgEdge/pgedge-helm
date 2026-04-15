@@ -24,6 +24,11 @@ func Execute(ctx context.Context, phases [][]Event) error {
 					if err := event.Resource.Create(ctx); err != nil {
 						return fmt.Errorf("create %s/%s: %w", id.Type, id.ID, err)
 					}
+				case ActionUpdate:
+					slog.Info("updating resource", "type", id.Type, "id", id.ID)
+					if err := event.Resource.Update(ctx); err != nil {
+						return fmt.Errorf("update %s/%s: %w", id.Type, id.ID, err)
+					}
 				case ActionDelete:
 					slog.Info("deleting resource", "type", id.Type, "id", id.ID)
 					if err := event.Resource.Delete(ctx); err != nil {

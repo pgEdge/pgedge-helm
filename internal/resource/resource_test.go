@@ -14,21 +14,29 @@ type mockResource struct {
 	deps         []Identifier
 	status       Status
 	createCalled bool
+	updateCalled bool
 	deleteCalled bool
 	createErr    error
+	updateErr    error
 	deleteErr    error
 	mu           sync.Mutex
 }
 
-func (m *mockResource) Identifier() Identifier      { return m.id }
-func (m *mockResource) Dependencies() []Identifier  { return m.deps }
+func (m *mockResource) Identifier() Identifier        { return m.id }
+func (m *mockResource) Dependencies() []Identifier    { return m.deps }
 func (m *mockResource) Refresh(context.Context) error { return nil }
-func (m *mockResource) Status() Status               { return m.status }
+func (m *mockResource) Status() Status                { return m.status }
 func (m *mockResource) Create(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.createCalled = true
 	return m.createErr
+}
+func (m *mockResource) Update(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updateCalled = true
+	return m.updateErr
 }
 func (m *mockResource) Delete(ctx context.Context) error {
 	m.mu.Lock()

@@ -10,7 +10,7 @@ You may manage server certificates yourself using cert-manager and CloudNativePG
 
 ## Node Management
 
-Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade, but writes must be stopped on existing nodes during the upgrade.
+Adding nodes is supported by updating the `pgEdge.nodes` value and running a helm upgrade. Writes can continue uninterrupted on existing nodes during the upgrade.
 
 See [Adding Nodes](usage/adding_nodes.md) for more information.
 

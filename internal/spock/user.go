@@ -82,6 +82,8 @@ func (u *PgEdgeUser) Create(ctx context.Context) error {
 	return nil
 }
 
+func (u *PgEdgeUser) Update(_ context.Context) error { return nil }
+
 func (u *PgEdgeUser) Delete(ctx context.Context) error {
 	return nil // Never delete the pgedge user
 }

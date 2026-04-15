@@ -98,6 +98,8 @@ func (n *SpockNode) Create(ctx context.Context) error {
 	return nil
 }
 
+func (n *SpockNode) Update(_ context.Context) error { return nil }
+
 func (n *SpockNode) Delete(ctx context.Context) error {
 	return n.deleteOne(ctx)
 }

@@ -19,7 +19,7 @@ At a high level, this chart features support for:
 - Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
 - Deploying additional Kubernetes resources (NetworkPolicies, PodMonitors, backups, etc.) alongside pgEdge using `extraResources`.
 - Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
-- Adding pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups.
+- Zero downtime node addition via Spock, or adding nodes from backups using CloudNativePG's bootstrap capabilities.
 - Performing Postgres major and minor version upgrades.
 - Client certificate authentication for managed users, including the `pgedge` replication user.
 - Configuration options to support deployments across multiple Kubernetes clusters.
@@ -186,6 +186,7 @@ You can run `make gen-docs` after updating the templates to generate the associa
 | pgEdge.initSpockJobConfig.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Container Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
 | pgEdge.initSpockJobConfig.podSecurityContext | object | `{"fsGroup":65532,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
 | pgEdge.initSpockJobConfig.resetSpock | bool | `false` | When true, the init-spock job will drop and recreate all Spock state on every node before reconciling. Use this when bootstrapping from a Barman backup that contains stale Spock configuration. Remove after successful initialization. |
+| pgEdge.initSpockJobConfig.timeout | int | `7200` | Maximum time (in seconds) for the init-spock job to complete. Increase for large databases where initial sync may take longer. |
 | pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
 | pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
 

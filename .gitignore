@@ -1,6 +1,7 @@
 .monokle
 broker-info.subm*
 kubeconfig
+init-spock
 
 
 #Ignore vscode AI rules

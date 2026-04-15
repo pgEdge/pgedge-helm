@@ -15,7 +15,7 @@ At a high level, this chart features support for:
 - Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
 - Deploying additional Kubernetes resources (NetworkPolicies, PodMonitors, backups, etc.) alongside pgEdge using `extraResources`.
 - Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
-- Adding pgEdge nodes using Spock or CloudNativePG's bootstrap capabilities to synchronize data from existing nodes or backups.
+- Zero downtime node addition via Spock, or adding nodes from backups using CloudNativePG's bootstrap capabilities.
 - Performing Postgres major and minor version upgrades.
 - Client certificate authentication for managed users, including the `pgedge` replication user.
 - Configuration options to support deployments across multiple Kubernetes clusters.

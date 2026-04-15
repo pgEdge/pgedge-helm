@@ -13,6 +13,7 @@ type Identifier struct {
 type Status struct {
 	Exists        bool
 	NeedsRecreate bool
+	NeedsUpdate   bool
 	Reason        string
 }
 
@@ -23,6 +24,7 @@ type Resource interface {
 	Refresh(ctx context.Context) error
 	Status() Status
 	Create(ctx context.Context) error
+	Update(ctx context.Context) error
 	Delete(ctx context.Context) error
 }
 
@@ -31,6 +33,7 @@ type Action int
 
 const (
 	ActionCreate Action = iota
+	ActionUpdate
 	ActionDelete
 )
 

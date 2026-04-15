@@ -70,6 +70,8 @@ func (r *ReplicationSlot) Create(ctx context.Context) error {
 	return nil
 }
 
+func (r *ReplicationSlot) Update(_ context.Context) error { return nil }
+
 // Delete terminates any active walsender and drops the replication slot.
 func (r *ReplicationSlot) Delete(ctx context.Context) error {
 	tx, err := r.conn.Begin(ctx)
