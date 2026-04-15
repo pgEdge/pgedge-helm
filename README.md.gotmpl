@@ -54,7 +54,7 @@ make setup
 
 ### pgedge-helm-utils Image
 
-The `pgedge-helm-utils` image is a lightweight Python container that runs the init-spock job during Helm installation and upgrades.
+The `pgedge-helm-utils` image is a statically compiled Go binary that runs the init-spock job during Helm installation and upgrades. The job outputs structured JSON logs.
 
 For local development and testing, you must build the image and load it into your local Kubernetes cluster (e.g., kind, minikube) prior to installing or upgrading the chart:
 

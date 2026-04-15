@@ -111,3 +111,9 @@ This builds upon the example configuration started in [Performing Backups](backu
 The subsequent init-spock job reconfigures the restored node, ensuring replication remains healthy after performing the update.
 
 Regardless of the CloudNativePG bootstrap approach you take, you should ensure that the data being restored on the new node aligns with the state of the other nodes.
+
+## Recovering from a failed add
+
+If the init-spock job fails while adding a node (e.g. due to a crash, timeout, or connectivity issue), the new node may be left in a partially configured state. To retry, first remove the node from the `nodes` list in `values.yaml` and run `helm upgrade` to clean up, then re-add the node and upgrade again.
+
+Do not retry the add without first removing the node, as the reconciler may encounter stale replication state from the failed attempt.

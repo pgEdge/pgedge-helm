@@ -14,6 +14,16 @@ Adding nodes is supported by updating the `pgEdge.nodes` value and running a hel
 
 See [Adding Nodes](usage/adding_nodes.md) for more information.
 
+## Reset flags must be removed after use
+
+The `resetSpock: true` and `bootstrap.mode: cnpg` flags in `values.yaml` are run-once settings. If left in place after the initial setup, every subsequent `helm upgrade` will drop and recreate the Spock extension, wiping all subscriptions, replication slots, and catalog state before rebuilding them. This causes replication downtime on each upgrade.
+
+Remove these flags from `values.yaml` immediately after the first successful initialization.
+
+## Repset snapshot is in-memory during reset
+
+When the init-spock job resets a node, it snapshots the replication set configuration into memory, drops the Spock extension with `CASCADE`, recreates it, and then restores the snapshot. If the job crashes or is OOM-killed between the drop and restore steps, the repset configuration is lost and must be manually recreated. The failure window is narrow (a few SQL statements), but operators should be aware of it when troubleshooting failed reset runs.
+
 ## App database name
 
 The app database is named "app" by default, and cannot be renamed without modifying various Helm templates and the default values.yaml file.

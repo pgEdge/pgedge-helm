@@ -54,7 +54,7 @@ make setup
 
 ### pgedge-helm-utils Image
 
-The `pgedge-helm-utils` image is a lightweight Python container that runs the init-spock job during Helm installation and upgrades.
+The `pgedge-helm-utils` image is a statically compiled Go binary that runs the init-spock job during Helm installation and upgrades. The job outputs structured JSON logs.
 
 For local development and testing, you must build the image and load it into your local Kubernetes cluster (e.g., kind, minikube) prior to installing or upgrading the chart:
 
@@ -185,6 +185,7 @@ You can run `make gen-docs` after updating the templates to generate the associa
 | pgEdge.initSpockImageName | string | `""` | Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>. Override this for local development or to use a custom image. |
 | pgEdge.initSpockJobConfig.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Container Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
 | pgEdge.initSpockJobConfig.podSecurityContext | object | `{"fsGroup":65532,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
+| pgEdge.initSpockJobConfig.resetSpock | bool | `false` | When true, the init-spock job will drop and recreate all Spock state on every node before reconciling. Use this when bootstrapping from a Barman backup that contains stale Spock configuration. Remove after successful initialization. |
 | pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
 | pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
 

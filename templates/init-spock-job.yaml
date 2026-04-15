@@ -17,10 +17,6 @@ spec:
       containers:
       - name: {{ .Values.pgEdge.appName }}-init-spock
         image: {{ .Values.pgEdge.initSpockImageName | default (printf "ghcr.io/pgedge/pgedge-helm-utils:v%s" .Chart.Version) }}
-        command:
-          - python
-          - -u
-          - /scripts/init-spock.py
         env:
           - name: APP_NAME
             value: {{ .Values.pgEdge.appName | quote }}
@@ -30,6 +26,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          {{- if .Values.pgEdge.initSpockJobConfig.resetSpock }}
+          - name: RESET_SPOCK
+            value: "true"
+          {{- end }}
         volumeMounts:
           - name: {{ .Values.pgEdge.appName }}-config
             mountPath: /config
