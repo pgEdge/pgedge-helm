@@ -4,7 +4,7 @@ You can use simple chart modifications to perform either a minor or major versio
 
 ## Minor Version Upgrades
 
-This chart utilizes a mutable tag by default to pull the latest pgEdge Enterprise Postgres image for Postgres 17 and Spock 5.
+This chart utilizes a mutable tag by default to pull the latest pgEdge Enterprise Postgres image for Postgres 18 and Spock 5.
 
 The use of this mutable tag in the chart makes it easier to keep examples updated as new versions of Postgres and Spock are released.
 
@@ -94,7 +94,7 @@ pgEdge:
       size: 1Gi
 ```
 
-Using this approach, you can gradually upgrade to Postgres 17 by removing existing Postgres 16 nodes.
+Using this approach, you can gradually upgrade to Postgres 18 by removing existing Postgres 17 nodes.
 
 ### Performing in-place upgrades via CloudNativePG
 
@@ -118,7 +118,7 @@ pgEdge:
       size: 1Gi
 ```
 
-You can perform a major version upgrade from 17 to 18 by specifying a new image for Postgres 17:
+You can perform a major version upgrade from 17 to 18 by specifying a new image for Postgres 18:
 
 ```yaml
 pgEdge:
