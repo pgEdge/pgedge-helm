@@ -214,12 +214,16 @@ func TestNodesAddNodeZeroDowntime(t *testing.T) {
 		}
 	}
 
-	// Seed initial data
-	_, err := testKube.ExecSQL("pgedge-n1-1",
-		"INSERT INTO test_zdt_n1 (data) VALUES ('before-upgrade');")
-	if err != nil {
-		t.Fatalf("failed to insert initial data: %v", err)
+	// Seed initial data on each node so sync has meaningful work
+	for _, pod := range writerPods {
+		node := podToNode(pod)
+		_, err := testKube.ExecSQL(pod,
+			fmt.Sprintf("INSERT INTO test_zdt_%s (data) SELECT md5(random()::text) FROM generate_series(1, 10000);", node))
+		if err != nil {
+			t.Fatalf("failed to seed data on %s: %v", pod, err)
+		}
 	}
+	waitForReplication(t, writerPods)
 
 	// Start background writers — each writes to its own table
 	ctx, cancelWriter := context.WithCancel(context.Background())
@@ -228,7 +232,7 @@ func TestNodesAddNodeZeroDowntime(t *testing.T) {
 		go func(pod string) {
 			node := podToNode(pod)
 			table := "test_zdt_" + node
-			ticker := time.NewTicker(2 * time.Second)
+			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
 			for {
 				select {
@@ -237,7 +241,7 @@ func TestNodesAddNodeZeroDowntime(t *testing.T) {
 					return
 				case <-ticker.C:
 					_, err := testKube.ExecSQL(pod,
-						fmt.Sprintf("INSERT INTO %s (data) SELECT md5(random()::text) FROM generate_series(1, 5);", table))
+						fmt.Sprintf("INSERT INTO %s (data) SELECT md5(random()::text) FROM generate_series(1, 100);", table))
 					if err != nil {
 						writerDone <- fmt.Errorf("background write to %s failed: %w", pod, err)
 						return
