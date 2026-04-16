@@ -276,6 +276,14 @@ func TestCustomDatabaseInstall(t *testing.T) {
 		}
 	})
 
+	t.Run("certificates_ready", func(t *testing.T) {
+		for _, cert := range []string{"admin-client-cert", "app-client-cert"} {
+			if err := wait.ForCertReady(testKube, cert, timeout); err != nil {
+				t.Fatalf("certificate %s not ready: %v", cert, err)
+			}
+		}
+	})
+
 	t.Run("custom_admin_can_connect", func(t *testing.T) {
 		out, err := testKube.ConnectWithCert("pgedge-n1-rw", "admin-client-cert", "dbadmin", "mydb", "SELECT current_user;")
 		if err != nil {

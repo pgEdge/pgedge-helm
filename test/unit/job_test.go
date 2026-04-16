@@ -165,6 +165,9 @@ func TestClusterCustomDatabase(t *testing.T) {
 	if !found {
 		t.Fatal("expected pg_hba to be set")
 	}
+	if len(hba) < 3 {
+		t.Fatalf("expected at least 3 pg_hba rules, got %d", len(hba))
+	}
 	for _, rule := range hba[:3] {
 		if !strings.Contains(rule, "mydb") {
 			t.Errorf("expected pg_hba rule to reference mydb database, got: %s", rule)

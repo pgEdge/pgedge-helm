@@ -22,9 +22,9 @@ spec:
           - name: APP_NAME
             value: {{ .Values.pgEdge.appName | quote }}
           - name: DB_NAME
-            value: {{ .Values.pgEdge.clusterSpec.bootstrap.initdb.database }}
+            value: {{ .Values.pgEdge.clusterSpec.bootstrap.initdb.database | quote }}
           - name: ADMIN_USER
-            value: {{ .Values.pgEdge.adminUser }}
+            value: {{ .Values.pgEdge.adminUser | quote }}
           - name: NAMESPACE
             valueFrom:
               fieldRef:

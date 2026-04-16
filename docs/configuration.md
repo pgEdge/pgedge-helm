@@ -74,8 +74,8 @@ The chart creates several PostgreSQL roles, each with a specific purpose. Role m
 
 | Role | Purpose | Authentication | Configurable |
 |------|---------|---------------|--------------|
-| **app** (owner) | Application database owner. Created by `initdb.owner`. | Client certificate (`app-client-cert` secret) and per-node password (`pgedge-n#-app` secret) | Yes — via `initdb.owner` |
-| **admin** | Superuser for database administration. Used by the init-spock job. | Client certificate (`admin-client-cert` secret) and per-node password (`pgedge-n#-admin` secret) | Yes — via `pgEdge.adminUser` |
+| **app** (owner) | Application database owner. Created by `initdb.owner`. | Client certificate (`app-client-cert` secret) and per-node password (`pgedge-n#-<owner>` secret, default `pgedge-n#-app`) | Yes — via `initdb.owner` |
+| **admin** | Superuser for database administration. Used by the init-spock job. | Client certificate (`admin-client-cert` secret) and per-node password (`pgedge-n#-<adminUser>` secret, default `pgedge-n#-admin`) | Yes — via `pgEdge.adminUser` |
 | **pgedge** | Internal replication user for Spock. Created by the init-spock job. | Client certificate (`pgedge-client-cert` secret) | No |
 | **streaming_replica** | Used by CloudNativePG for physical streaming replication within each node's HA cluster. | Client certificate (`streaming-replica-client-cert` secret) | No |
 
