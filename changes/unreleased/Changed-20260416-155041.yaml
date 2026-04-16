@@ -1,0 +1,3 @@
+kind: Changed
+body: Updated default Postgres image to 18, CloudNativePG to 1.29, and cert-manager to use the latest release (#51)
+time: 2026-04-16T15:50:41.16161-05:00
