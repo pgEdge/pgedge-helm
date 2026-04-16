@@ -90,6 +90,41 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDefaultAdminUser(t *testing.T) {
+	yaml := `
+- name: n1
+  hostname: pgedge-n1-rw
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AdminUser != "admin" {
+		t.Errorf("expected AdminUser=admin, got %q", cfg.AdminUser)
+	}
+}
+
+func TestLoadConfigCustomAdminUser(t *testing.T) {
+	yaml := `
+- name: n1
+  hostname: pgedge-n1-rw
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	t.Setenv("ADMIN_USER", "dbadmin")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AdminUser != "dbadmin" {
+		t.Errorf("expected AdminUser=dbadmin, got %q", cfg.AdminUser)
+	}
+}
+
 func TestLoadConfigResetSpock(t *testing.T) {
 	yaml := `
 - name: n1

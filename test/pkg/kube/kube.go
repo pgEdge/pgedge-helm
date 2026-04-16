@@ -49,10 +49,19 @@ func (k *Kubectl) Exec(pod, container string, cmd ...string) (string, error) {
 	return k.run(args...)
 }
 
-// ExecSQL runs a SQL query via psql in a pod.
-// Uses: kubectl exec <pod> -- psql -U admin -d app -tAc "<sql>"
+// ExecSQL runs a SQL query via psql in a pod against the default "app" database as the "admin" user.
 func (k *Kubectl) ExecSQL(pod, sql string) (string, error) {
-	return k.Exec(pod, "postgres", "psql", "-U", "admin", "-d", "app", "-tAc", sql)
+	return k.ExecSQLAs(pod, "admin", "app", sql)
+}
+
+// ExecSQLDB runs a SQL query via psql in a pod against the specified database as the "admin" user.
+func (k *Kubectl) ExecSQLDB(pod, db, sql string) (string, error) {
+	return k.ExecSQLAs(pod, "admin", db, sql)
+}
+
+// ExecSQLAs runs a SQL query via psql in a pod as the specified user and database.
+func (k *Kubectl) ExecSQLAs(pod, user, db, sql string) (string, error) {
+	return k.Exec(pod, "postgres", "psql", "-U", user, "-d", db, "-tAc", sql)
 }
 
 // Logs returns the logs for a pod.

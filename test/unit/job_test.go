@@ -3,6 +3,7 @@
 package unit
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -76,6 +77,117 @@ func TestInitSpockJobCustomImage(t *testing.T) {
 	expected := "my-registry.io/custom-image:v1.0.0"
 	if image != expected {
 		t.Errorf("expected custom image %q, got %q", expected, image)
+	}
+}
+
+func TestInitSpockJobDefaultDBName(t *testing.T) {
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
+	jobs := filterByKind(objects, "Job")
+
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 Job, got %d", len(jobs))
+	}
+
+	containers, found, _ := unstructured.NestedSlice(jobs[0].Object,
+		"spec", "template", "spec", "containers")
+	if !found || len(containers) == 0 {
+		t.Fatal("no containers found in job")
+	}
+	container := containers[0].(map[string]interface{})
+	envVars, _, _ := unstructured.NestedSlice(container, "env")
+	for _, e := range envVars {
+		env := e.(map[string]interface{})
+		if env["name"] == "DB_NAME" {
+			if env["value"] != "app" {
+				t.Errorf("expected DB_NAME=app, got %q", env["value"])
+			}
+			return
+		}
+	}
+	t.Error("DB_NAME env var not found in job container")
+}
+
+func TestInitSpockJobCustomDBName(t *testing.T) {
+	objects := renderTemplate(t, "custom-database-values.yaml")
+	jobs := filterByKind(objects, "Job")
+
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 Job, got %d", len(jobs))
+	}
+
+	containers, found, _ := unstructured.NestedSlice(jobs[0].Object,
+		"spec", "template", "spec", "containers")
+	if !found || len(containers) == 0 {
+		t.Fatal("no containers found in job")
+	}
+	container := containers[0].(map[string]interface{})
+	envVars, _, _ := unstructured.NestedSlice(container, "env")
+
+	envMap := map[string]string{}
+	for _, e := range envVars {
+		env := e.(map[string]interface{})
+		if name, ok := env["name"].(string); ok {
+			if val, ok := env["value"].(string); ok {
+				envMap[name] = val
+			}
+		}
+	}
+
+	if envMap["DB_NAME"] != "mydb" {
+		t.Errorf("expected DB_NAME=mydb, got %q", envMap["DB_NAME"])
+	}
+	if envMap["ADMIN_USER"] != "dbadmin" {
+		t.Errorf("expected ADMIN_USER=dbadmin, got %q", envMap["ADMIN_USER"])
+	}
+}
+
+func TestClusterCustomDatabase(t *testing.T) {
+	objects := renderTemplate(t, "custom-database-values.yaml")
+	clusters := filterByKind(objects, "Cluster")
+
+	if len(clusters) != 1 {
+		t.Fatalf("expected 1 Cluster, got %d", len(clusters))
+	}
+
+	cluster := &clusters[0]
+
+	db := getNestedString(cluster, "spec", "bootstrap", "initdb", "database")
+	if db != "mydb" {
+		t.Errorf("expected bootstrap.initdb.database=mydb, got %q", db)
+	}
+
+	owner := getNestedString(cluster, "spec", "bootstrap", "initdb", "owner")
+	if owner != "myuser" {
+		t.Errorf("expected bootstrap.initdb.owner=myuser, got %q", owner)
+	}
+
+	hba, found, _ := unstructured.NestedStringSlice(cluster.Object, "spec", "postgresql", "pg_hba")
+	if !found {
+		t.Fatal("expected pg_hba to be set")
+	}
+	for _, rule := range hba[:3] {
+		if !strings.Contains(rule, "mydb") {
+			t.Errorf("expected pg_hba rule to reference mydb database, got: %s", rule)
+		}
+	}
+}
+
+func TestCustomCertCommonNames(t *testing.T) {
+	objects := renderTemplate(t, "custom-database-values.yaml")
+	certs := filterByKind(objects, "Certificate")
+
+	certCN := map[string]string{}
+	for _, cert := range certs {
+		name := cert.GetName()
+		cn := getNestedString(&cert, "spec", "commonName")
+		certCN[name] = cn
+	}
+
+	if certCN["admin-client-cert"] != "dbadmin" {
+		t.Errorf("expected admin-client-cert commonName=dbadmin, got %q", certCN["admin-client-cert"])
+	}
+	if certCN["app-client-cert"] != "myuser" {
+		t.Errorf("expected app-client-cert commonName=myuser, got %q", certCN["app-client-cert"])
 	}
 }
 

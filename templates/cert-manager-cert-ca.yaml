@@ -107,7 +107,7 @@ spec:
   secretName: admin-client-cert
   usages:
     - client auth
-  commonName: admin
+  commonName: {{ .Values.pgEdge.adminUser }}
   issuerRef:
     name: client-ca-issuer
     kind: Issuer
@@ -123,7 +123,7 @@ spec:
   secretName: app-client-cert
   usages:
     - client auth
-  commonName: app
+  commonName: {{ .Values.pgEdge.clusterSpec.bootstrap.initdb.owner }}
   issuerRef:
     name: client-ca-issuer
     kind: Issuer

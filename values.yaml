@@ -14,6 +14,8 @@ pgEdge:
   # -- Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions
   # In multi-cluster deployments, this should only be set to true on the last cluster to be deployed.
   initSpock: true
+  # -- The name of the admin role used for database management and init-spock connections.
+  adminUser: admin
   # -- Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>.
   # Override this for local development or to use a custom image.
   initSpockImageName: ""
