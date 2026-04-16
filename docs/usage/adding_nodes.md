@@ -53,16 +53,15 @@ helm upgrade \
     pgedge ./
 ```
 
-The `init-spock` job will run during the upgrade, ensuring that replication configuration is established across the new and existing nodes, and use Spock subscription's `sync_data` and `sync_structure` to align the new node via logical replication.
+The `init-spock` job will run during the upgrade, ensuring that replication configuration is established across the new and existing nodes, and use Spock subscription's `sync_data` and `sync_structure` to align the new node via logical replication. Writes can continue uninterrupted on existing nodes throughout this process.
 
 !!! note
 
-    In order to ensure the health of replication across your nodes, you should:
+    For large databases, the initial sync may take significant time. You can configure the timeout via `pgEdge.initSpockJobConfig.timeout` (default: 7200 seconds / 2 hours). If the job fails or times out, see [Recovering from a failed add](#recovering-from-a-failed-add).
 
-    - Stop writes to all nodes before performing the upgrade.
-    - Ensure all previous writes have replicated to other nodes by monitoring replication lag via [spock](https://github.com/pgEdge/spock/blob/main/docs/monitoring/lag_tracking.md).
+!!! warning
 
-    This will ensure that all nodes remain aligned during the update, and replication can continue successfully once you resume writes.
+    Remove the `bootstrap` block from the new node's configuration after a successful add. If left in place, subsequent `helm upgrade` runs will re-execute the populate pipeline, which may interfere with active replication.
 
 ## Adding a node via CloudNativePG bootstrap
 

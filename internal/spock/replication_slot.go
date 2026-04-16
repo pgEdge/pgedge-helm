@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -36,10 +35,7 @@ func (r *ReplicationSlot) slotName() string {
 	if r.nameOverride != "" {
 		return r.nameOverride
 	}
-	return strings.ReplaceAll(
-		fmt.Sprintf("spk_%s_%s_sub_%s_%s", r.dbName, r.providerName, r.providerName, r.subscriberName),
-		"-", "_",
-	)
+	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
 }
 
 func (r *ReplicationSlot) Identifier() resource.Identifier {
@@ -69,6 +65,8 @@ func (r *ReplicationSlot) Status() resource.Status { return r.status }
 func (r *ReplicationSlot) Create(ctx context.Context) error {
 	return nil
 }
+
+func (r *ReplicationSlot) Update(_ context.Context) error { return nil }
 
 // Delete terminates any active walsender and drops the replication slot.
 func (r *ReplicationSlot) Delete(ctx context.Context) error {

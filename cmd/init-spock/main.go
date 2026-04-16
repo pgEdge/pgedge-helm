@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -34,6 +36,22 @@ func run(ctx context.Context) error {
 	cfg, err := config.Load("/config/pgedge.yaml")
 	if err != nil {
 		return err
+	}
+
+	// Apply timeout if configured. Use 30s less than the Kubernetes
+	// activeDeadlineSeconds so the process can log errors gracefully
+	// before the kubelet sends SIGTERM.
+	if timeoutStr := os.Getenv("INIT_SPOCK_TIMEOUT"); timeoutStr != "" {
+		timeoutSec, err := strconv.Atoi(timeoutStr)
+		if err == nil && timeoutSec > 0 {
+			gracePeriod := 30
+			if timeoutSec <= gracePeriod {
+				gracePeriod = 0
+			}
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSec-gracePeriod)*time.Second)
+			defer cancel()
+		}
 	}
 
 	slog.Info("configuring spock", "nodes", len(cfg.Nodes))

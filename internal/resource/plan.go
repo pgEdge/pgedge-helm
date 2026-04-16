@@ -9,6 +9,7 @@ package resource
 func Plan(actual, desired map[Identifier]Resource) [][]Event {
 	var deletes []Event
 	var creates []Event
+	var updates []Event
 
 	// Resources in actual but not desired → delete
 	for id, r := range actual {
@@ -17,13 +18,15 @@ func Plan(actual, desired map[Identifier]Resource) [][]Event {
 		}
 	}
 
-	// Resources that need recreation → delete + create
+	// Resources that need recreation, update, or creation
 	for id, r := range desired {
 		if _, have := actual[id]; have {
 			s := r.Status()
 			if s.Exists && s.NeedsRecreate {
 				deletes = append(deletes, Event{Action: ActionDelete, Resource: r})
 				creates = append(creates, Event{Action: ActionCreate, Resource: r})
+			} else if s.Exists && s.NeedsUpdate {
+				updates = append(updates, Event{Action: ActionUpdate, Resource: r})
 			}
 			// Exists and healthy → no-op
 			continue
@@ -38,6 +41,12 @@ func Plan(actual, desired map[Identifier]Resource) [][]Event {
 	if len(deletes) > 0 {
 		deletePhases := topoSort(deletes, true)
 		phases = append(phases, deletePhases...)
+	}
+
+	// Update phases (dependency order — dependencies first)
+	if len(updates) > 0 {
+		updatePhases := topoSort(updates, false)
+		phases = append(phases, updatePhases...)
 	}
 
 	// Create phases (dependency order — dependencies first)
