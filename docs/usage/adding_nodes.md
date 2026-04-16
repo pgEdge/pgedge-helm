@@ -59,6 +59,10 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
     For large databases, the initial sync may take significant time. You can configure the timeout via `pgEdge.initSpockJobConfig.timeout` (default: 7200 seconds / 2 hours). If the job fails or times out, see [Recovering from a failed add](#recovering-from-a-failed-add).
 
+!!! warning
+
+    Remove the `bootstrap` block from the new node's configuration after a successful add. If left in place, subsequent `helm upgrade` runs will re-execute the populate pipeline, which may interfere with active replication.
+
 ## Adding a node via CloudNativePG bootstrap
 
 As an alternative approach to adding a node, you can also bootstrap the new node using CloudNativePG's [Bootstrap from another cluster](https://cloudnative-pg.io/docs/1.29/bootstrap/#bootstrap-from-another-cluster) capability.
