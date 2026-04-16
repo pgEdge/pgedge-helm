@@ -92,7 +92,7 @@ func (s *DisabledSubscription) Create(ctx context.Context) error {
 	`, s.subName(), dsn)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42710" {
+		if errors.As(err, &pgErr) && pgErr.Code == pgCodeDuplicateObject {
 			slog.Info("disabled subscription already exists", "sub", s.subName())
 		} else {
 			return fmt.Errorf("create disabled subscription %s: %w", s.subName(), err)
