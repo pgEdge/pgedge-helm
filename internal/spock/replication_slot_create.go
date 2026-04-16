@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -33,10 +32,7 @@ func NewReplicationSlotCreate(providerName, subscriberName, dbName string, conn 
 }
 
 func (r *ReplicationSlotCreate) slotName() string {
-	return strings.ReplaceAll(
-		fmt.Sprintf("spk_%s_%s_sub_%s_%s", r.dbName, r.providerName, r.providerName, r.subscriberName),
-		"-", "_",
-	)
+	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
 }
 
 func (r *ReplicationSlotCreate) Identifier() resource.Identifier {

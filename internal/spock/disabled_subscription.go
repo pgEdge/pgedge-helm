@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,10 +39,7 @@ func NewDisabledSubscription(src, dst config.Node, dbName, pgedgeUser string, co
 }
 
 func (s *DisabledSubscription) subName() string {
-	return strings.ReplaceAll(
-		fmt.Sprintf("sub_%s_%s", s.src.Name, s.dst.Name),
-		"-", "_",
-	)
+	return spockSubName(s.src.Name, s.dst.Name)
 }
 
 func (s *DisabledSubscription) Identifier() resource.Identifier {
@@ -54,10 +50,7 @@ func (s *DisabledSubscription) Dependencies() []resource.Identifier {
 	return []resource.Identifier{
 		{Type: ResourceTypeNode, ID: s.src.Name},
 		{Type: ResourceTypeNode, ID: s.dst.Name},
-		{Type: ResourceTypeReplicationSlotCreate, ID: strings.ReplaceAll(
-			fmt.Sprintf("spk_%s_%s_sub_%s_%s", s.dbName, s.src.Name, s.src.Name, s.dst.Name),
-			"-", "_",
-		)},
+		{Type: ResourceTypeReplicationSlotCreate, ID: spockSlotName(s.dbName, s.src.Name, s.dst.Name)},
 	}
 }
 

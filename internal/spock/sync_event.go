@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -43,10 +42,7 @@ func (r *SyncEvent) Identifier() resource.Identifier {
 func (r *SyncEvent) Dependencies() []resource.Identifier {
 	deps := []resource.Identifier{
 		{Type: ResourceTypeNode, ID: r.providerName},
-		{Type: ResourceTypeSubscription, ID: strings.ReplaceAll(
-			fmt.Sprintf("sub_%s_%s", r.providerName, r.subscriberName),
-			"-", "_",
-		)},
+		{Type: ResourceTypeSubscription, ID: spockSubName(r.providerName, r.subscriberName)},
 	}
 	return append(deps, r.extraDeps...)
 }
