@@ -1,0 +1,29 @@
+pgEdge:
+  appName: pgedge
+  adminUser: dbadmin
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    storage:
+      size: 1Gi
+    bootstrap:
+      initdb:
+        database: mydb
+        owner: myuser
+    managed:
+      roles:
+        - name: dbadmin
+          ensure: present
+          comment: Admin role
+          login: true
+          superuser: true
+    postgresql:
+      pg_hba:
+        - hostssl mydb pgedge 0.0.0.0/0 cert
+        - hostssl mydb dbadmin 0.0.0.0/0 cert
+        - hostssl mydb myuser 0.0.0.0/0 cert
+        - hostssl all streaming_replica all cert map=cnpg_streaming_replica
+      pg_ident:
+        - local postgres dbadmin
+        - local postgres myuser

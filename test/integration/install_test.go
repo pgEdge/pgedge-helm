@@ -259,6 +259,75 @@ func TestDistributedInstall(t *testing.T) {
 	})
 }
 
+func TestCustomDatabaseInstall(t *testing.T) {
+	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "custom-database-values.yaml")
+
+	t.Run("cluster_healthy", func(t *testing.T) {
+		if err := wait.ForClusterHealthy(testKube, "pgedge-n1", timeout); err != nil {
+			t.Fatalf("cluster pgedge-n1 not healthy: %v", err)
+		}
+	})
+
+	t.Run("init_spock_job_succeeds", func(t *testing.T) {
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
+		}
+	})
+
+	t.Run("certificates_ready", func(t *testing.T) {
+		for _, cert := range []string{"admin-client-cert", "app-client-cert"} {
+			if err := wait.ForCertReady(testKube, cert, timeout); err != nil {
+				t.Fatalf("certificate %s not ready: %v", cert, err)
+			}
+		}
+	})
+
+	t.Run("custom_admin_can_connect", func(t *testing.T) {
+		out, err := testKube.ConnectWithCert("pgedge-n1-rw", "admin-client-cert", "dbadmin", "mydb", "SELECT current_user;")
+		if err != nil {
+			t.Fatalf("dbadmin cert auth connection failed: %v", err)
+		}
+		if !strings.Contains(out, "dbadmin") {
+			t.Errorf("expected current_user=dbadmin, got: %s", out)
+		}
+	})
+
+	t.Run("custom_owner_can_connect", func(t *testing.T) {
+		out, err := testKube.ConnectWithCert("pgedge-n1-rw", "app-client-cert", "myuser", "mydb", "SELECT current_user;")
+		if err != nil {
+			t.Fatalf("myuser cert auth connection failed: %v", err)
+		}
+		if !strings.Contains(out, "myuser") {
+			t.Errorf("expected current_user=myuser, got: %s", out)
+		}
+	})
+
+	t.Run("spock_initialized_on_custom_db", func(t *testing.T) {
+		pod := getPodName("pgedge-n1")
+		out, err := testKube.ExecSQLWith(pod, "SELECT node_name FROM spock.node;", "dbadmin", "mydb")
+		if err != nil {
+			t.Fatalf("failed to query spock.node on mydb: %v", err)
+		}
+		if !strings.Contains(out, "n1") {
+			t.Errorf("expected spock node n1 registered on mydb, got: %s", out)
+		}
+	})
+
+	t.Run("default_app_database_does_not_exist", func(t *testing.T) {
+		pod := getPodName("pgedge-n1")
+		out, err := testKube.ExecSQLWith(pod,
+			"SELECT 1 FROM pg_database WHERE datname = 'app';", "dbadmin", "mydb")
+		if err != nil {
+			t.Fatalf("failed to query pg_database: %v", err)
+		}
+		if strings.Contains(out, "1") {
+			t.Error("expected 'app' database to not exist, but it does")
+		}
+	})
+}
+
 func TestDistributedHAInstall(t *testing.T) {
 	t.Cleanup(func() { uninstallChart(t) })
 	installChart(t, "distributed-ha-values.yaml")

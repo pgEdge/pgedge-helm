@@ -60,6 +60,10 @@ func Load(nodesPath string) (*Config, error) {
 	if namespace == "" {
 		namespace = "default"
 	}
+	adminUser := os.Getenv("ADMIN_USER")
+	if adminUser == "" {
+		adminUser = "admin"
+	}
 	resetSpock, _ := strconv.ParseBool(os.Getenv("RESET_SPOCK"))
 	nodes, err := LoadNodes(nodesPath)
 	if err != nil {
@@ -69,7 +73,7 @@ func Load(nodesPath string) (*Config, error) {
 		AppName:    appName,
 		DBName:     dbName,
 		Namespace:  namespace,
-		AdminUser:  "admin",
+		AdminUser:  adminUser,
 		PgEdgeUser: "pgedge",
 		ResetSpock: resetSpock,
 		Nodes:      nodes,

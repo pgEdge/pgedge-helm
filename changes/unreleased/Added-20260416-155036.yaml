@@ -1,0 +1,3 @@
+kind: Added
+body: Added the ability to configure the database name, owner, and admin role via Helm values (`initdb.database`, `initdb.owner`, `pgEdge.adminUser`). Also added documentation covering all managed users, their authentication methods, and how to create additional users or disable passwords (#54)
+time: 2026-04-16T15:50:36.735527-05:00

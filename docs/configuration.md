@@ -68,9 +68,109 @@ If you override a list in the `clusterSpec` for a node, you must include all req
 
 For more information about configuring CloudNativePG, see the [CloudNativePG documentation](https://cloudnative-pg.io/docs/).
 
+## Users and authentication
+
+The chart creates several PostgreSQL roles, each with a specific purpose. Role management is built on top of CloudNativePG's [PostgreSQL Role Management roles](https://cloudnative-pg.io/docs/1.29/declarative_role_management) and [Bootstrap](https://cloudnative-pg.io/docs/1.29/bootstrap/) configuration.
+
+| Role | Purpose | Authentication | Configurable |
+|------|---------|---------------|--------------|
+| **app** (owner) | Application database owner. Created by `initdb.owner`. | Client certificate (`app-client-cert` secret) and per-node password (`pgedge-n#-<owner>` secret, default `pgedge-n#-app`) | Yes — via `initdb.owner` |
+| **admin** | Superuser for database administration. Used by the init-spock job. | Client certificate (`admin-client-cert` secret) and per-node password (`pgedge-n#-<adminUser>` secret, default `pgedge-n#-admin`) | Yes — via `pgEdge.adminUser` |
+| **pgedge** | Internal replication user for Spock. Created by the init-spock job. | Client certificate (`pgedge-client-cert` secret) | No |
+| **streaming_replica** | Used by CloudNativePG for physical streaming replication within each node's HA cluster. | Client certificate (`streaming-replica-client-cert` secret) | No |
+
+### Customizing the database name and owner
+
+The default application database is named `app` with an `app` owner. To use a different name, set `pgEdge.clusterSpec.bootstrap.initdb.database` and `pgEdge.clusterSpec.bootstrap.initdb.owner`:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    bootstrap:
+      initdb:
+        database: mydb
+        owner: myuser
+```
+
+When changing the database or owner name, you must also override `pg_hba` and `pg_ident` to match, since these are plain values that cannot reference other values:
+
+```yaml
+    postgresql:
+      pg_hba:
+        - hostssl mydb pgedge 0.0.0.0/0 cert
+        - hostssl mydb admin 0.0.0.0/0 cert
+        - hostssl mydb myuser 0.0.0.0/0 cert
+        - hostssl all streaming_replica all cert map=cnpg_streaming_replica
+      pg_ident:
+        - local postgres admin
+        - local postgres myuser
+```
+
+The client certificate for the owner (`app-client-cert` secret) will automatically use the correct `commonName` for the new owner.
+
+### Customizing the admin role
+
+To change the admin role name, set `pgEdge.adminUser` and update the managed role definition to match:
+
+```yaml
+pgEdge:
+  adminUser: dbadmin
+  clusterSpec:
+    managed:
+      roles:
+        - name: dbadmin
+          ensure: present
+          comment: Admin role
+          login: true
+          superuser: true
+```
+
+The `adminUser` value must match a role defined in `managed.roles` with `superuser: true`. As with the database name, you must also update `pg_hba` and `pg_ident` to reference the new admin name.
+
+### Creating additional users
+
+Additional users can be created using CloudNativePG's [managed roles](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-RoleConfiguration):
+
+```yaml
+pgEdge:
+  clusterSpec:
+    managed:
+      roles:
+        - name: admin
+          ensure: present
+          login: true
+          superuser: true
+        - name: readonly
+          ensure: present
+          login: true
+          superuser: false
+```
+
+New roles need corresponding `pg_hba` entries to connect. Add them to the `pg_hba` list in your values file.
+
+### Password authentication
+
+By default, CloudNativePG generates a unique password for each managed user on each node, stored in a secret named `pgedge-n#-<username>`. This means the `app` user will have a different password on `pgedge-n1` than on `pgedge-n2`.
+
+If your application needs a consistent password across all nodes, you can pre-create a Kubernetes secret with the desired password and reference it in the role definition using `passwordSecret`. See the [CloudNativePG managed roles documentation](https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/#postgresql-cnpg-io-v1-RoleConfiguration) for details.
+
+The `pg_hba` rules in this chart only allow `cert` authentication for remote connections, so passwords are only usable via local connections (e.g., `kubectl cnpg psql`). To fully disable password-based login for a managed role, set `disablePassword: true` in the role definition:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    managed:
+      roles:
+        - name: admin
+          ensure: present
+          login: true
+          superuser: true
+          disablePassword: true
+```
+
 ## Spock configuration
 
-This chart contains a python job to initialize Spock multi-master replication across all nodes once they are all available.
+This chart contains a job to initialize Spock multi-master replication across all nodes once they are all available.
 
 This job runs by default, waiting for any clusters associated with the current deployment to be ready before performing initialization.
 
@@ -127,6 +227,7 @@ The following table lists all available options and their descriptions.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| pgEdge.adminUser | string | `"admin"` | The name of the admin role used for database management and init-spock connections. |
 | pgEdge.appName | string | `"pgedge"` | Determines the name of resources in the pgEdge cluster. Many other values are derived from this name, so it must be less than or equal to 26 characters in length. |
 | pgEdge.clusterSpec | object | `{"bootstrap":{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;"],"postInitSQL":[],"postInitTemplateSQL":[]}},"certificates":{"clientCASecret":"client-ca-key-pair","replicationTLSSecret":"streaming-replica-client-cert"},"imageName":"ghcr.io/pgedge/pgedge-postgres:18-spock5-standard","imagePullPolicy":"Always","instances":1,"managed":{"roles":[{"comment":"Admin role","ensure":"present","login":true,"name":"admin","superuser":true}]},"postgresql":{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"pg_hba":["hostssl app pgedge 0.0.0.0/0 cert","hostssl app admin 0.0.0.0/0 cert","hostssl app app 0.0.0.0/0 cert","hostssl all streaming_replica all cert map=cnpg_streaming_replica"],"pg_ident":["local postgres admin","local postgres app"],"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]},"projectedVolumeTemplate":{"sources":[{"secret":{"items":[{"key":"tls.crt","mode":384,"path":"pgedge/certificates/tls.crt"},{"key":"tls.key","mode":384,"path":"pgedge/certificates/tls.key"},{"key":"ca.crt","mode":384,"path":"pgedge/certificates/ca.crt"}],"name":"pgedge-client-cert"}}]}}` | Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis using the `clusterSpec` field in each node definition. |
 | pgEdge.externalNodes | list | `[]` | Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart. This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster. |
