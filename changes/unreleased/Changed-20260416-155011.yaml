@@ -1,0 +1,3 @@
+kind: Changed
+body: Rewrote the quickstart documentation for experienced Kubernetes users with a streamlined, copy-paste-and-go guide that assumes a working cluster (#46)
+time: 2026-04-16T15:50:11.328-05:00
