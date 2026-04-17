@@ -148,6 +148,13 @@ func uninstallChart(t *testing.T) {
 			t.Fatalf("cleanup failed: %s with label %s not fully deleted: %v", resource, label, err)
 		}
 	}
+	// CNPG-managed secrets (CA, server TLS) are owned by the Cluster resource and
+	// garbage collected asynchronously. If stale secrets persist into the next test,
+	// the new cluster's CA won't match the old server cert, causing permanent TLS
+	// handshake failures ("x509: ECDSA verification failure").
+	if err := testKube.WaitForDelete("secrets", "cnpg.io/cluster", timeout); err != nil {
+		t.Fatalf("cleanup failed: CNPG-managed secrets not fully deleted: %v", err)
+	}
 }
 
 func getPodName(clusterName string) string {
