@@ -125,7 +125,7 @@ pgEdge:
           superuser: true
 ```
 
-As with the database name, you must also update `pg_hba` and `pg_ident` to reference the new admin name.
+The `adminUser` value must match a role defined in `managed.roles` with `superuser: true`. As with the database name, you must also update `pg_hba` and `pg_ident` to reference the new admin name.
 
 ### Creating additional users
 
