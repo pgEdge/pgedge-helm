@@ -51,16 +51,11 @@ func (k *Kubectl) Exec(pod, container string, cmd ...string) (string, error) {
 
 // ExecSQL runs a SQL query via psql in a pod against the default "app" database as the "admin" user.
 func (k *Kubectl) ExecSQL(pod, sql string) (string, error) {
-	return k.ExecSQLAs(pod, "admin", "app", sql)
+	return k.ExecSQLWith(pod, sql, "admin", "app")
 }
 
-// ExecSQLDB runs a SQL query via psql in a pod against the specified database as the "admin" user.
-func (k *Kubectl) ExecSQLDB(pod, db, sql string) (string, error) {
-	return k.ExecSQLAs(pod, "admin", db, sql)
-}
-
-// ExecSQLAs runs a SQL query via psql in a pod as the specified user and database.
-func (k *Kubectl) ExecSQLAs(pod, user, db, sql string) (string, error) {
+// ExecSQLWith runs a SQL query via psql in a pod as the specified user and database.
+func (k *Kubectl) ExecSQLWith(pod, sql, user, db string) (string, error) {
 	return k.Exec(pod, "postgres", "psql", "-U", user, "-d", db, "-tAc", sql)
 }
 

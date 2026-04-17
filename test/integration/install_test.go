@@ -306,7 +306,7 @@ func TestCustomDatabaseInstall(t *testing.T) {
 
 	t.Run("spock_initialized_on_custom_db", func(t *testing.T) {
 		pod := getPodName("pgedge-n1")
-		out, err := testKube.ExecSQLAs(pod, "dbadmin", "mydb", "SELECT node_name FROM spock.node;")
+		out, err := testKube.ExecSQLWith(pod, "SELECT node_name FROM spock.node;", "dbadmin", "mydb")
 		if err != nil {
 			t.Fatalf("failed to query spock.node on mydb: %v", err)
 		}
@@ -317,8 +317,8 @@ func TestCustomDatabaseInstall(t *testing.T) {
 
 	t.Run("default_app_database_does_not_exist", func(t *testing.T) {
 		pod := getPodName("pgedge-n1")
-		out, err := testKube.ExecSQLAs(pod, "dbadmin", "mydb",
-			"SELECT 1 FROM pg_database WHERE datname = 'app';")
+		out, err := testKube.ExecSQLWith(pod,
+			"SELECT 1 FROM pg_database WHERE datname = 'app';", "dbadmin", "mydb")
 		if err != nil {
 			t.Fatalf("failed to query pg_database: %v", err)
 		}
