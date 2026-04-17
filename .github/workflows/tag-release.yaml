@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -22,6 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Tag release
+        id: tag
         env:
           branch_name: ${{ github.event.pull_request.head.ref }}
         run: |
@@ -38,3 +41,12 @@ jobs:
 
           git tag -a -F changes/${version}.md ${version}
           git push origin ${version}
+
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+  release:
+    needs: tag-release
+    uses: ./.github/workflows/release.yaml
+    with:
+      version: ${{ needs.tag-release.outputs.version }}
+    secrets: inherit
