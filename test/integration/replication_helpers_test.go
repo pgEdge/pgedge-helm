@@ -73,15 +73,14 @@ func verifyMeshReplication(t *testing.T, table string, pods []string, baseID int
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
 	for srcPod, id := range writes {
 		for _, dstPod := range pods {
 			if dstPod == srcPod {
 				continue
 			}
 			t.Run(fmt.Sprintf("%s_to_%s", srcPod, dstPod), func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+				defer cancel()
 				expected := fmt.Sprintf("from-%s", srcPod)
 				err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
 					out, err := testKube.ExecSQL(dstPod,
