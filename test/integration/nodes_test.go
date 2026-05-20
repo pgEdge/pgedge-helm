@@ -91,44 +91,8 @@ func TestNodesAddNode(t *testing.T) {
 	})
 
 	t.Run("full_mesh_replication", func(t *testing.T) {
-		// Insert a row on each node and verify it reaches all others
-		writes := map[string]int{
-			"pgedge-n1-1": 10,
-			"pgedge-n2-1": 11,
-			"pgedge-n3-1": 12,
-		}
-		for pod, id := range writes {
-			_, err := testKube.ExecSQL(pod,
-				fmt.Sprintf("INSERT INTO test_add_node VALUES (%d, 'from-%s');", id, pod))
-			if err != nil {
-				t.Fatalf("failed to insert on %s: %v", pod, err)
-			}
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		for srcPod, id := range writes {
-			for _, dstPod := range []string{"pgedge-n1-1", "pgedge-n2-1", "pgedge-n3-1"} {
-				if dstPod == srcPod {
-					continue
-				}
-				t.Run(fmt.Sprintf("%s_to_%s", srcPod, dstPod), func(t *testing.T) {
-					expected := fmt.Sprintf("from-%s", srcPod)
-					err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
-						out, err := testKube.ExecSQL(dstPod,
-							fmt.Sprintf("SELECT val FROM test_add_node WHERE id = %d;", id))
-						if err != nil {
-							return false, nil
-						}
-						return strings.Contains(out, expected), nil
-					})
-					if err != nil {
-						t.Errorf("data from %s (id=%d) did not replicate to %s", srcPod, id, dstPod)
-					}
-				})
-			}
-		}
+		verifyMeshReplication(t, "test_add_node",
+			[]string{"pgedge-n1-1", "pgedge-n2-1", "pgedge-n3-1"}, 10)
 	})
 
 	t.Run("idempotent_rerun_on_3_nodes", func(t *testing.T) {
@@ -281,6 +245,30 @@ func TestNodesAddNodeZeroDowntime(t *testing.T) {
 	// Confirm replication caught up after final writes
 	waitForReplication(t, allPods)
 
+	t.Run("origin_advanced_on_n3", func(t *testing.T) {
+		// Each peer slot has a corresponding spk_* origin on n3. Assert
+		// pg_replication_origin_progress is non-zero. A zeroed origin
+		// causes the apply worker on a CNPG-promoted standby to replay
+		// historical WAL from 0/0, producing duplicate-key errors.
+		// Enumerate by spk_* prefix to avoid hard-coding the database name.
+		out, err := testKube.ExecSQL("pgedge-n3-1", `
+			SELECT roname || '=' || pg_replication_origin_progress(roname, false)::text
+			FROM pg_replication_origin
+			WHERE roname LIKE 'spk_%';`)
+		if err != nil {
+			t.Fatalf("query origin progress: %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if len(lines) < 2 {
+			t.Fatalf("expected at least 2 spk_* origins on n3 (one per peer), got: %q", out)
+		}
+		for _, line := range lines {
+			if strings.HasSuffix(line, "=0/0") {
+				t.Errorf("origin at 0/0 on n3: %s — OriginAdvance did not advance", line)
+			}
+		}
+	})
+
 	t.Run("n3_has_all_data", func(t *testing.T) {
 		// All replication paths confirmed caught up — counts must match
 		for _, table := range []string{"test_zdt_n1", "test_zdt_n2"} {
@@ -344,51 +332,6 @@ func TestNodesAddNodeZeroDowntime(t *testing.T) {
 			})
 		}
 	})
-}
-
-// waitForReplication fires a sync event on each pod and waits for every other
-// pod to receive it, confirming all replication paths have caught up.
-// Matches the Control Plane's WaitForReplication pattern.
-func waitForReplication(t *testing.T, pods []string) {
-	t.Helper()
-
-	type syncEvt struct {
-		provider string
-		lsn      string
-	}
-
-	var events []syncEvt
-	for _, pod := range pods {
-		lsn, err := testKube.ExecSQL(pod, "SELECT spock.sync_event();")
-		if err != nil {
-			t.Fatalf("sync_event on %s: %v", pod, err)
-		}
-		events = append(events, syncEvt{podToNode(pod), strings.TrimSpace(lsn)})
-	}
-
-	for _, evt := range events {
-		for _, dst := range pods {
-			if podToNode(dst) == evt.provider {
-				continue
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-			err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
-				_, err := testKube.ExecSQL(dst,
-					fmt.Sprintf("CALL spock.wait_for_sync_event(true, '%s', '%s'::pg_lsn, 10);",
-						evt.provider, evt.lsn))
-				return err == nil, nil
-			})
-			cancel()
-			if err != nil {
-				t.Fatalf("%s did not receive sync event from %s (lsn=%s)", dst, evt.provider, evt.lsn)
-			}
-		}
-	}
-}
-
-// podToNode extracts the node name from a pod name (e.g. "pgedge-n1-1" -> "n1").
-func podToNode(pod string) string {
-	return strings.TrimSuffix(strings.TrimPrefix(pod, "pgedge-"), "-1")
 }
 
 func TestNodesRemoveNode(t *testing.T) {

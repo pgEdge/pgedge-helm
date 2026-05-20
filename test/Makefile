@@ -92,6 +92,11 @@ test-reset: kind-load-image
 	cd $(root_dir) && go test -tags integration -v -timeout 30m \
 		-run "TestResetSpock" ./test/integration/...
 
+.PHONY: test-failover
+test-failover: kind-load-image
+	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+		-run "TestUnplannedFailover" ./test/integration/...
+
 # ---- All ----
 
 .PHONY: test-all
