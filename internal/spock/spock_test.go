@@ -526,12 +526,12 @@ func TestComputeDesiredPopulateThreeNodeAdd(t *testing.T) {
 	subN2N3 := mustSubscription(t, resources, "sub_n2_n3")
 	foundAdvance := false
 	for _, d := range subN2N3.Dependencies() {
-		if d.Type == ResourceTypeReplicationOriginAdvance {
+		if d.Type == ResourceTypeReplicationOriginAdvance && d.ID == "n2_n3" {
 			foundAdvance = true
 		}
 	}
 	if !foundAdvance {
-		t.Error("sub_n2_n3 should depend on replication_origin_advance")
+		t.Error("sub_n2_n3 should depend on replication_origin_advance/n2_n3")
 	}
 
 	// New→existing subs should depend on WaitForSyncEvent(source→new)
