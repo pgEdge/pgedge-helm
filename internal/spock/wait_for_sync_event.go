@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -17,6 +18,12 @@ const (
 
 // WaitForSyncEvent polls on the subscriber until it receives the sync event
 // from the provider. Reads the LSN from the paired SyncEvent via struct pointer.
+//
+// Transient subscription states (disabled, down) trigger backoff polling
+// rather than immediate failure — the apply worker may not have started yet
+// during add-node. Unknown subscription states are treated as errors
+// (fail-closed default).
+//
 // Ephemeral resource — re-executes every run.
 type WaitForSyncEvent struct {
 	providerName   string
@@ -80,7 +87,19 @@ func (r *WaitForSyncEvent) Create(ctx context.Context) error {
 			// Don't fail — status query might not work during initialization
 		} else {
 			switch status {
+			case "initializing", "replicating", "unknown":
+				// Worker is running — fall through to wait_for_sync_event call.
 			case "disabled", "down":
+				// Worker not yet started — transient during add-node. Sleep
+				// before next iteration to avoid busy-looping while the
+				// worker comes up.
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(syncEventTimeout * time.Second):
+				}
+				continue
+			default:
 				return fmt.Errorf("subscription has unhealthy status %q: provider=%s subscriber=%s",
 					status, r.providerName, r.subscriberName)
 			}

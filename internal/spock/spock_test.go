@@ -521,16 +521,17 @@ func TestComputeDesiredPopulateThreeNodeAdd(t *testing.T) {
 		t.Error("sub_n1_n3 should have sync=true")
 	}
 
-	// Peer→new end-state subscription (sub_n2_n3) should depend on slot advance
+	// Peer→new end-state subscription (sub_n2_n3) gates on origin advance
+	// (which transitively depends on slot advance).
 	subN2N3 := mustSubscription(t, resources, "sub_n2_n3")
 	foundAdvance := false
 	for _, d := range subN2N3.Dependencies() {
-		if d.Type == ResourceTypeReplicationSlotAdvanceFromCTS {
+		if d.Type == ResourceTypeReplicationOriginAdvance {
 			foundAdvance = true
 		}
 	}
 	if !foundAdvance {
-		t.Error("sub_n2_n3 should depend on replication_slot_advance_from_cts")
+		t.Error("sub_n2_n3 should depend on replication_origin_advance")
 	}
 
 	// New→existing subs should depend on WaitForSyncEvent(source→new)
@@ -610,4 +611,175 @@ func mustSubscription(t *testing.T, resources map[resource.Identifier]resource.R
 		t.Fatalf("subscription %s has type %T, want *Subscription", id, r)
 	}
 	return s
+}
+
+// --- ReplicationOriginAdvance tests ---
+
+func TestReplicationOriginAdvanceIdentifier(t *testing.T) {
+	r := NewReplicationOriginAdvance("n2", "n3", "app", nil, nil)
+	id := r.Identifier()
+	if id.Type != ResourceTypeReplicationOriginAdvance {
+		t.Errorf("type: got %q, want %q", id.Type, ResourceTypeReplicationOriginAdvance)
+	}
+	if id.ID != "n2_n3" {
+		t.Errorf("id: got %q, want n2_n3", id.ID)
+	}
+}
+
+func TestReplicationOriginAdvanceDependsOnSlotAdvance(t *testing.T) {
+	slotAdv := &ReplicationSlotAdvanceFromCTS{providerName: "n2", subscriberName: "n3"}
+	r := NewReplicationOriginAdvance("n2", "n3", "app", slotAdv, nil)
+	deps := r.Dependencies()
+	if len(deps) != 1 {
+		t.Fatalf("expected 1 dep, got %d: %v", len(deps), deps)
+	}
+	if deps[0].Type != ResourceTypeReplicationSlotAdvanceFromCTS || deps[0].ID != "n2_n3" {
+		t.Errorf("expected dep on replication_slot_advance_from_cts/n2_n3, got %v", deps[0])
+	}
+}
+
+func TestReplicationOriginAdvanceEphemeral(t *testing.T) {
+	r := NewReplicationOriginAdvance("n2", "n3", "app", nil, nil)
+	if r.Status().Exists {
+		t.Error("ephemeral resource should not exist")
+	}
+}
+
+// --- PeerCatchup tests ---
+
+func TestPeerCatchupIdentifier(t *testing.T) {
+	syncEvt := &SyncEvent{providerName: "n2", subscriberName: "n1"}
+	r := NewPeerCatchup("n2", "n1", syncEvt, nil)
+	id := r.Identifier()
+	if id.Type != ResourceTypePeerCatchup {
+		t.Errorf("type: got %q, want %q", id.Type, ResourceTypePeerCatchup)
+	}
+	if id.ID != "n2_n1" {
+		t.Errorf("id: got %q, want n2_n1", id.ID)
+	}
+}
+
+func TestPeerCatchupDependsOnSyncEvent(t *testing.T) {
+	syncEvt := &SyncEvent{providerName: "n2", subscriberName: "n1"}
+	r := NewPeerCatchup("n2", "n1", syncEvt, nil)
+	deps := r.Dependencies()
+	if len(deps) != 1 {
+		t.Fatalf("expected 1 dep, got %d: %v", len(deps), deps)
+	}
+	if deps[0].Type != ResourceTypeSyncEvent || deps[0].ID != "n2_n1" {
+		t.Errorf("expected dep on sync_event/n2_n1, got %v", deps[0])
+	}
+}
+
+func TestPeerCatchupEphemeral(t *testing.T) {
+	r := NewPeerCatchup("n2", "n1", nil, nil)
+	if r.Status().Exists {
+		t.Error("ephemeral resource should not exist")
+	}
+}
+
+var _ resource.Resource = (*PeerCatchup)(nil)
+
+var _ resource.Resource = (*ReplicationOriginAdvance)(nil)
+
+// --- ComputeDesired populate hardening tests (CP PR #385) ---
+
+func TestComputeDesiredPopulateIncludesPeerCatchup(t *testing.T) {
+	cfg := &config.Config{
+		DBName: "app", AdminUser: "admin", PgEdgeUser: "pgedge",
+		Nodes: []config.Node{
+			{Name: "n1", Hostname: "h1"},
+			{Name: "n2", Hostname: "h2"},
+			{Name: "n3", Hostname: "h3", Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"}},
+		},
+	}
+	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
+	resources := ComputeDesired(cfg, conns)
+
+	// PeerCatchup(peer=n2, source=n1) — id is "n2_n1".
+	assertResource(t, resources, ResourceTypePeerCatchup, "n2_n1")
+}
+
+func TestComputeDesiredPopulateIncludesOriginAdvance(t *testing.T) {
+	cfg := &config.Config{
+		DBName: "app", AdminUser: "admin", PgEdgeUser: "pgedge",
+		Nodes: []config.Node{
+			{Name: "n1", Hostname: "h1"},
+			{Name: "n2", Hostname: "h2"},
+			{Name: "n3", Hostname: "h3", Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"}},
+		},
+	}
+	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
+	resources := ComputeDesired(cfg, conns)
+
+	// One OriginAdvance per (peer, new) pair. Only peer is n2 here.
+	assertResource(t, resources, ResourceTypeReplicationOriginAdvance, "n2_n3")
+}
+
+func TestComputeDesiredSourceSubscriptionWaitsOnPeerCatchup(t *testing.T) {
+	cfg := &config.Config{
+		DBName: "app", AdminUser: "admin", PgEdgeUser: "pgedge",
+		Nodes: []config.Node{
+			{Name: "n1", Hostname: "h1"},
+			{Name: "n2", Hostname: "h2"},
+			{Name: "n3", Hostname: "h3", Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"}},
+		},
+	}
+	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
+	resources := ComputeDesired(cfg, conns)
+
+	// Source→new subscription (sub_n1_n3) must depend on PeerCatchup(n2_n1)
+	// AND on WaitForSyncEvent(n2_n1). The first proves apply-progress
+	// caught up; the second proves the bookmark landed.
+	sub := mustSubscription(t, resources, "sub_n1_n3")
+	var foundCatchup, foundWait bool
+	for _, d := range sub.Dependencies() {
+		if d.Type == ResourceTypePeerCatchup && d.ID == "n2_n1" {
+			foundCatchup = true
+		}
+		if d.Type == ResourceTypeWaitForSyncEvent && d.ID == "n2_n1" {
+			foundWait = true
+		}
+	}
+	if !foundCatchup {
+		t.Error("sub_n1_n3 should depend on peer_catchup/n2_n1")
+	}
+	if !foundWait {
+		t.Error("sub_n1_n3 should depend on wait_for_sync_event/n2_n1")
+	}
+}
+
+func TestComputeDesiredPeerSubscriptionWaitsOnOriginAdvance(t *testing.T) {
+	cfg := &config.Config{
+		DBName: "app", AdminUser: "admin", PgEdgeUser: "pgedge",
+		Nodes: []config.Node{
+			{Name: "n1", Hostname: "h1"},
+			{Name: "n2", Hostname: "h2"},
+			{Name: "n3", Hostname: "h3", Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"}},
+		},
+	}
+	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
+	resources := ComputeDesired(cfg, conns)
+
+	// Peer→new end-state subscription (sub_n2_n3) should now depend on
+	// ReplicationOriginAdvance (which itself depends on slot advance,
+	// so slot advance still runs first). It must NOT directly depend on
+	// ReplicationSlotAdvanceFromCTS anymore — that dep moved to OriginAdvance.
+	sub := mustSubscription(t, resources, "sub_n2_n3")
+	var foundOrigin bool
+	var foundSlotAdvanceDirect bool
+	for _, d := range sub.Dependencies() {
+		if d.Type == ResourceTypeReplicationOriginAdvance && d.ID == "n2_n3" {
+			foundOrigin = true
+		}
+		if d.Type == ResourceTypeReplicationSlotAdvanceFromCTS {
+			foundSlotAdvanceDirect = true
+		}
+	}
+	if !foundOrigin {
+		t.Error("sub_n2_n3 should depend on replication_origin_advance/n2_n3")
+	}
+	if foundSlotAdvanceDirect {
+		t.Error("sub_n2_n3 should NOT directly depend on replication_slot_advance_from_cts (gated via OriginAdvance instead)")
+	}
 }
