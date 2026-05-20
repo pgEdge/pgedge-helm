@@ -71,7 +71,7 @@ func run(ctx context.Context) error {
 		if err := pg.WaitReady(ctx, node.Hostname, node.InternalHostname, cfg.DBName, cfg.AdminUser); err != nil {
 			return err
 		}
-		pool, err := pg.ConnectPool(ctx, node.Hostname, cfg.DBName, cfg.AdminUser)
+		pool, err := pg.ConnectPool(ctx, node.Hostname, node.InternalHostname, cfg.DBName, cfg.AdminUser)
 		if err != nil {
 			return err
 		}

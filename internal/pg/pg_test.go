@@ -58,6 +58,32 @@ func TestConnectHost(t *testing.T) {
 	}
 }
 
+func TestBuildPoolConfigPrefersInternalHostname(t *testing.T) {
+	certPath, keyPath := generateTempCerts(t)
+
+	cfg, err := buildPoolConfig("external.example.com", "pgedge-n1-rw",
+		"app", "admin", certPath, keyPath)
+	if err != nil {
+		t.Fatalf("buildPoolConfig: %v", err)
+	}
+	if cfg.ConnConfig.Host != "pgedge-n1-rw" {
+		t.Errorf("Host: got %q, want internalHostname pgedge-n1-rw", cfg.ConnConfig.Host)
+	}
+}
+
+func TestBuildPoolConfigFallsBackToHostname(t *testing.T) {
+	certPath, keyPath := generateTempCerts(t)
+
+	cfg, err := buildPoolConfig("external.example.com", "",
+		"app", "admin", certPath, keyPath)
+	if err != nil {
+		t.Fatalf("buildPoolConfig: %v", err)
+	}
+	if cfg.ConnConfig.Host != "external.example.com" {
+		t.Errorf("Host: got %q, want hostname external.example.com", cfg.ConnConfig.Host)
+	}
+}
+
 // generateTempCerts creates a temporary self-signed certificate and key for testing.
 func generateTempCerts(t *testing.T) (certPath, keyPath string) {
 	t.Helper()
