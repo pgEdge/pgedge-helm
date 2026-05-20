@@ -112,6 +112,8 @@ func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
 
 	// Read current slot position. Skip if target is at or before current
 	// (slots never go backwards, so this is safe without a transaction).
+	// Compare via pg_lsn casts because LSN strings (e.g. "F/FFFFFFF" vs
+	// "10/0") do not order correctly under Go string comparison.
 	var currentLSN string
 	err = r.conn.QueryRow(ctx,
 		"SELECT restart_lsn::text FROM pg_replication_slots WHERE slot_name = $1",
@@ -120,7 +122,15 @@ func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read current slot lsn %s: %w", slotName, err)
 	}
-	if targetLSN <= currentLSN {
+	var atOrBefore bool
+	err = r.conn.QueryRow(ctx,
+		"SELECT $1::pg_lsn <= $2::pg_lsn",
+		targetLSN, currentLSN,
+	).Scan(&atOrBefore)
+	if err != nil {
+		return fmt.Errorf("compare slot lsn %s: %w", slotName, err)
+	}
+	if atOrBefore {
 		slog.Info("slot already at or beyond target, no advance needed",
 			"slot", slotName, "target", targetLSN, "current", currentLSN)
 		return nil
