@@ -62,10 +62,10 @@ func Connect(ctx context.Context, host, dbName, user string) (*pgx.Conn, error) 
 	return pgx.ConnectConfig(ctx, cfg)
 }
 
-// ConnectPool creates a new pgxpool connection pool to the given host.
-// The pool is safe for concurrent use from multiple goroutines.
-func ConnectPool(ctx context.Context, host, dbName, user string) (*pgxpool.Pool, error) {
-	connCfg, err := buildConnConfig(host, dbName, user, defaultCertPath, defaultKeyPath)
+// buildPoolConfig creates a pgxpool config, preferring internalHostname when set.
+func buildPoolConfig(hostname, internalHostname, dbName, user, certPath, keyPath string) (*pgxpool.Config, error) {
+	host := connectHost(hostname, internalHostname)
+	connCfg, err := buildConnConfig(host, dbName, user, certPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +74,17 @@ func ConnectPool(ctx context.Context, host, dbName, user string) (*pgxpool.Pool,
 		return nil, fmt.Errorf("parse pool config: %w", err)
 	}
 	poolCfg.ConnConfig = connCfg
+	return poolCfg, nil
+}
+
+// ConnectPool creates a new pgxpool connection pool to the node.
+// Uses internalHostname if set, otherwise falls back to hostname.
+// The pool is safe for concurrent use from multiple goroutines.
+func ConnectPool(ctx context.Context, hostname, internalHostname, dbName, user string) (*pgxpool.Pool, error) {
+	poolCfg, err := buildPoolConfig(hostname, internalHostname, dbName, user, defaultCertPath, defaultKeyPath)
+	if err != nil {
+		return nil, err
+	}
 	return pgxpool.NewWithConfig(ctx, poolCfg)
 }
 

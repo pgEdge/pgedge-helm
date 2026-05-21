@@ -1,0 +1,3 @@
+kind: Fixed
+body: Fixed init-spock admin connection pool to honor internalHostname for cluster-local routing, matching the existing health check behavior
+time: 2026-05-20T16:09:51.217497-05:00
