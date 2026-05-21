@@ -22,6 +22,8 @@ const (
 	ResourceTypeLagTrackerCommitTS            = "spock.lag_tracker_commit_ts"
 	ResourceTypeReplicationSlotAdvanceFromCTS = "spock.replication_slot_advance_from_cts"
 	ResourceTypeDisabledSubscription          = "spock.disabled_subscription"
+	ResourceTypeReplicationOriginAdvance      = "spock.replication_origin_advance"
+	ResourceTypePeerCatchup                   = "spock.peer_catchup"
 )
 
 // ComputeDesired builds the full resource graph from node config.
@@ -73,9 +75,11 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 			var extraDeps []resource.Identifier
 
 			if _, isNewDst := newNodes[dst.Name]; isNewDst {
-				// Peer→new: wait for slot advance
+				// Peer→new: wait for origin advance (which itself waits on slot
+				// advance — both must complete before enabling the subscription
+				// to keep slot LSN and origin LSN in lockstep).
 				extraDeps = append(extraDeps, resource.Identifier{
-					Type: ResourceTypeReplicationSlotAdvanceFromCTS,
+					Type: ResourceTypeReplicationOriginAdvance,
 					ID:   fmt.Sprintf("%s_%s", src.Name, dst.Name),
 				})
 			}
@@ -97,8 +101,8 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 }
 
 // addPopulateResources emits the populate resource chain for a new node.
-// Returns the identifiers of peer WaitForSyncEvent resources (used to
-// gate the source→new subscription).
+// Returns the identifiers of peer-side gates (WaitForSyncEvent + PeerCatchup
+// per peer) that the source→new subscription must wait on before COPY.
 func addPopulateResources(
 	resources map[resource.Identifier]resource.Resource,
 	cfg *config.Config,
@@ -131,6 +135,13 @@ func addPopulateResources(
 		resources[peerWaitEvt.Identifier()] = peerWaitEvt
 		peerWaitForSync = append(peerWaitForSync, peerWaitEvt.Identifier())
 
+		// Belt-and-suspenders: also wait on apply progress via
+		// spock.progress.remote_lsn, which tracks actual commit application
+		// rather than WAL receipt. Gates the source→new COPY.
+		peerCatchup := NewPeerCatchup(peer.Name, sourceNode, peerSyncEvt, conns[sourceNode])
+		resources[peerCatchup.Identifier()] = peerCatchup
+		peerWaitForSync = append(peerWaitForSync, peerCatchup.Identifier())
+
 		lagTracker := NewLagTrackerCommitTimestamp(peer.Name, newNode.Name, conns[newNode.Name],
 			resource.Identifier{Type: ResourceTypeWaitForSyncEvent, ID: fmt.Sprintf("%s_%s", sourceNode, newNode.Name)},
 		)
@@ -138,6 +149,13 @@ func addPopulateResources(
 
 		slotAdvance := NewReplicationSlotAdvanceFromCTS(peer.Name, newNode.Name, cfg.DBName, lagTracker, conns[peer.Name])
 		resources[slotAdvance.Identifier()] = slotAdvance
+
+		// Subscriber-side origin advance. Separate from slot advance because
+		// the slot lives on the provider and the origin on the subscriber —
+		// different connections. Both must agree to prevent the apply worker
+		// from replaying historical WAL from 0/0.
+		originAdvance := NewReplicationOriginAdvance(peer.Name, newNode.Name, cfg.DBName, slotAdvance, conns[newNode.Name])
+		resources[originAdvance.Identifier()] = originAdvance
 	}
 
 	// Source sync event + wait

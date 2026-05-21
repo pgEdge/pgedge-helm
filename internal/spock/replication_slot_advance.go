@@ -11,9 +11,16 @@ import (
 	"github.com/pgEdge/pgedge-helm/internal/resource"
 )
 
-// ReplicationSlotAdvanceFromCTS advances a peer's replication slot to skip
-// WAL already synced via the source. Reads the commit timestamp from the
-// paired LagTrackerCommitTimestamp via struct pointer.
+// ReplicationSlotAdvanceFromCTS advances the provider-side replication slot
+// to the LSN derived from the commit timestamp captured by the paired
+// LagTrackerCommitTimestamp. Used during add-node populate to skip WAL the
+// subscriber has already received via the source path, preventing
+// double-apply when the peer→new subscription is enabled.
+//
+// AdvancedToLSN is set to the new LSN on a successful advance, empty when
+// skipped. ReplicationOriginAdvance reads it to keep the subscriber-side
+// origin in lockstep.
+//
 // Ephemeral resource — re-executes every run.
 type ReplicationSlotAdvanceFromCTS struct {
 	providerName   string // peer node (slot lives here)
@@ -22,6 +29,12 @@ type ReplicationSlotAdvanceFromCTS struct {
 	lagTracker     *LagTrackerCommitTimestamp
 	conn           *pgxpool.Pool // peer's connection
 	status         resource.Status
+
+	// AdvancedToLSN records the LSN the slot was advanced to.
+	// Empty when the advance was skipped (slot active, no commit_ts,
+	// or target ≤ current). Read by ReplicationOriginAdvance to keep
+	// the subscriber-side origin in lockstep with the provider-side slot.
+	AdvancedToLSN string
 }
 
 func NewReplicationSlotAdvanceFromCTS(providerName, subscriberName, dbName string, lagTracker *LagTrackerCommitTimestamp, conn *pgxpool.Pool) *ReplicationSlotAdvanceFromCTS {
@@ -60,6 +73,10 @@ func (r *ReplicationSlotAdvanceFromCTS) Refresh(_ context.Context) error {
 func (r *ReplicationSlotAdvanceFromCTS) Status() resource.Status { return r.status }
 
 func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
+	// Reset before each invocation so the empty-when-skipped contract
+	// holds for every skip path (no commit_ts, active slot, target ≤ current).
+	r.AdvancedToLSN = ""
+
 	slotName := r.slotName()
 
 	if r.lagTracker == nil || r.lagTracker.CommitTS == nil || r.lagTracker.CommitTS.IsZero() {
@@ -78,7 +95,8 @@ func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
 		return fmt.Errorf("get target LSN from commit_ts for %s: %w", slotName, err)
 	}
 
-	// Check if slot is actively used by a subscription — skip if yes
+	// Skip if slot is actively used by a subscription — subscription is
+	// already replicating and will advance the slot itself.
 	var isActive bool
 	err = r.conn.QueryRow(ctx,
 		"SELECT EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name = $1 AND active_pid IS NOT NULL)",
@@ -92,29 +110,53 @@ func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
 		return nil
 	}
 
-	// Compare and advance atomically in a single query, matching the
-	// control-plane's CTE pattern. This handles NULL confirmed_flush_lsn
-	// on freshly created slots and avoids a TOCTOU race.
-	var newLSN string
-	err = r.conn.QueryRow(ctx, `
+	// Read current slot position. Skip if target is at or before current
+	// (slots never go backwards, so this is safe without a transaction).
+	// Compare via pg_lsn casts because LSN strings (e.g. "F/FFFFFFF" vs
+	// "10/0") do not order correctly under Go string comparison.
+	var currentLSN string
+	err = r.conn.QueryRow(ctx,
+		"SELECT restart_lsn::text FROM pg_replication_slots WHERE slot_name = $1",
+		slotName,
+	).Scan(&currentLSN)
+	if err != nil {
+		return fmt.Errorf("read current slot lsn %s: %w", slotName, err)
+	}
+	var atOrBefore bool
+	err = r.conn.QueryRow(ctx,
+		"SELECT $1::pg_lsn <= $2::pg_lsn",
+		targetLSN, currentLSN,
+	).Scan(&atOrBefore)
+	if err != nil {
+		return fmt.Errorf("compare slot lsn %s: %w", slotName, err)
+	}
+	if atOrBefore {
+		slog.Info("slot already at or beyond target, no advance needed",
+			"slot", slotName, "target", targetLSN, "current", currentLSN)
+		return nil
+	}
+
+	// Advance the slot.
+	_, err = r.conn.Exec(ctx, `
 		WITH current AS (
 			SELECT confirmed_flush_lsn
 			FROM pg_replication_slots
 			WHERE slot_name = $1
 		)
 		SELECT CASE
-			WHEN $2::pg_lsn > COALESCE(confirmed_flush_lsn, '0/0'::pg_lsn)
+			WHEN $2::pg_lsn > confirmed_flush_lsn
 			THEN (pg_replication_slot_advance($1, $2::pg_lsn)).end_lsn
 			ELSE confirmed_flush_lsn
 		END AS new_lsn
 		FROM current`,
 		slotName, targetLSN,
-	).Scan(&newLSN)
+	)
 	if err != nil {
 		return fmt.Errorf("advance slot %s to %s: %w", slotName, targetLSN, err)
 	}
 
-	slog.Info("advanced replication slot", "slot", slotName, "to", newLSN)
+	r.AdvancedToLSN = targetLSN
+	slog.Info("advanced replication slot", "slot", slotName, "to", targetLSN)
 	return nil
 }
 
