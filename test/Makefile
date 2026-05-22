@@ -22,6 +22,14 @@ export HELM_REPO
 export INIT_SPOCK_IMAGE
 export TIMEOUT
 
+# ---- Tools ----
+
+GOTESTSUM := $(shell which gotestsum 2>/dev/null)
+
+.PHONY: install-gotestsum
+install-gotestsum:
+	go install gotest.tools/gotestsum@latest
+
 # ---- Unit Tests ----
 
 .PHONY: test-unit
@@ -39,9 +47,9 @@ kind-up:
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f \
 		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
-		-n cnpg-system cnpg-controller-manager --timeout=120s
+		-n cnpg-system cnpg-controller-manager --timeout=300s
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
-		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
+		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=300s
 
 .PHONY: kind-down
 kind-down:
@@ -54,9 +62,14 @@ kind-load-image:
 
 # ---- Integration Tests ----
 
+GOTESTSUM_CMD = cd $(root_dir) && gotestsum --format testname --
+
+# GO_TIMEOUT is derived from TIMEOUT, adding 10m buffer for go test overhead
+GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk -F'm' '{print ($$1 + 10) "m"}' 2>/dev/null || echo "120m")
+
 .PHONY: test-integration
 test-integration:
-	cd $(root_dir) && go test -tags integration -v -timeout 30m ./test/integration/...
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -69,32 +82,32 @@ test-integration-kind: kind-up kind-load-image
 
 .PHONY: test-run
 test-run: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "$(RUN)" ./test/integration/...
 
 .PHONY: test-install
 test-install: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestDistributedInstall|TestSingleNodeInstall" ./test/integration/...
 
 .PHONY: test-nodes
 test-nodes: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestNodes" ./test/integration/...
 
 .PHONY: test-recovery
 test-recovery: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent" ./test/integration/...
 
 .PHONY: test-reset
 test-reset: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestResetSpock" ./test/integration/...
 
 .PHONY: test-failover
 test-failover: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestUnplannedFailover" ./test/integration/...
 
 # ---- All ----
