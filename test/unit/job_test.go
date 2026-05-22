@@ -53,7 +53,7 @@ func TestInitSpockJobDefaultImage(t *testing.T) {
 	}
 	container := containers[0].(map[string]interface{})
 	image, _, _ := unstructured.NestedString(container, "image")
-	expected := "ghcr.io/pgedge/pgedge-helm-utils:v0.2.0"
+	expected := "ghcr.io/pgedge/pgedge-helm-utils:v" + chartVersion(t)
 	if image != expected {
 		t.Errorf("expected default image %q, got %q", expected, image)
 	}
