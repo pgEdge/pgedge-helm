@@ -30,6 +30,10 @@ GOTESTSUM := $(shell which gotestsum 2>/dev/null)
 install-gotestsum:
 	go install gotest.tools/gotestsum@latest
 
+.PHONY: ensure-gotestsum
+ensure-gotestsum:
+	@command -v gotestsum >/dev/null 2>&1 || $(MAKE) install-gotestsum
+
 # ---- Unit Tests ----
 
 .PHONY: test-unit
@@ -64,11 +68,25 @@ kind-load-image:
 
 GOTESTSUM_CMD = cd $(root_dir) && gotestsum --format testname --
 
-# GO_TIMEOUT is derived from TIMEOUT, adding 10m buffer for go test overhead
-GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk -F'm' '{print ($$1 + 10) "m"}' 2>/dev/null || echo "120m")
+# GO_TIMEOUT is derived from TIMEOUT, adding 10m (600s) buffer for go test overhead.
+# Handles suffixes: s, m, h (defaults to m if no suffix). Falls back to 120m on parse failure.
+GO_TIMEOUT := $(shell \
+  t="$(TIMEOUT)"; \
+  n=$$(echo "$$t" | sed 's/[smh]$$//'); \
+  u=$$(echo "$$t" | grep -o '[smh]$$' || echo m); \
+  if echo "$$n" | grep -qE '^[0-9]+$$' 2>/dev/null; then \
+    case "$$u" in \
+      s) tot=$$(($$n + 600)) ;; \
+      h) tot=$$(($$n * 3600 + 600)) ;; \
+      *) tot=$$(($$n * 60 + 600)) ;; \
+    esac; \
+    echo "$$(($$tot / 60))m"; \
+  else \
+    echo "120m"; \
+  fi)
 
 .PHONY: test-integration
-test-integration:
+test-integration: ensure-gotestsum
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
 
 .PHONY: test-integration-kind
@@ -81,34 +99,48 @@ test-integration-kind: kind-up kind-load-image
 #        make test-run RUN="TestSlotLoss|TestNodesRemoveNode"
 
 .PHONY: test-run
-test-run: kind-load-image
+test-run: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "$(RUN)" ./test/integration/...
 
 .PHONY: test-install
-test-install: kind-load-image
+test-install: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestDistributedInstall|TestSingleNodeInstall" ./test/integration/...
 
 .PHONY: test-nodes
-test-nodes: kind-load-image
+test-nodes: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestNodes" ./test/integration/...
 
 .PHONY: test-recovery
-test-recovery: kind-load-image
+test-recovery: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent" ./test/integration/...
 
 .PHONY: test-reset
-test-reset: kind-load-image
+test-reset: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestResetSpock" ./test/integration/...
 
 .PHONY: test-failover
-test-failover: kind-load-image
+test-failover: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestUnplannedFailover" ./test/integration/...
+
+# ---- Chart Testing (ct) ----
+
+.PHONY: test-ct-lint
+test-ct-lint:
+	ct lint --chart-dirs $(root_dir) --charts $(root_dir)
+
+.PHONY: test-ct
+test-ct: kind-up kind-load-image
+	ct install --chart-dirs $(root_dir) --charts $(root_dir) \
+		--target-branch main \
+		--skip-missing-values \
+		--helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+	$(MAKE) kind-down
 
 # ---- All ----
 

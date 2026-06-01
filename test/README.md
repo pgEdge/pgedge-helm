@@ -2,6 +2,8 @@
 
 The test suite includes unit tests and integration tests. Integration tests run against a real Kubernetes cluster using [kind](https://kind.sigs.k8s.io).
 
+In CI, these tests are run automatically on every push and pull request via the [GitHub Actions workflow](../.github/workflows/test.yaml). The workflow runs unit tests, chart-testing (`ct`), and integration tests in parallel jobs against a kind cluster.
+
 ## Prerequisites
 
 ### Mac
@@ -12,9 +14,11 @@ The test suite includes unit tests and integration tests. Integration tests run 
 
 # 2. Install tools
 brew install go kind helm kubectl
+# Or from the repo root:
+# make setup
 
 # 3. Install gotestsum
-go install gotest.tools/gotestsum@latest
+make -C test install-gotestsum
 echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.zshrc
 source ~/.zshrc
 ```
@@ -59,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 |
 sudo ln -sf /usr/local/bin/helm /usr/bin/helm
 
 # gotestsum
-go install gotest.tools/gotestsum@latest
+make -C test install-gotestsum
 sudo ln -sf $(go env GOPATH)/bin/gotestsum /usr/local/bin/gotestsum
 ```
 
@@ -102,3 +106,21 @@ make -C test test-run RUN=TestNodesAddNodeZeroDowntime TIMEOUT=120m
 ```shell
 make -C test test-run RUN="TestNodesRemoveNode|TestResetSpock" TIMEOUT=120m
 ```
+
+## Chart Testing (ct)
+
+[chart-testing](https://github.com/helm/chart-testing) is used for basic chart lint and install/upgrade testing. These targets require a kind cluster.
+
+### Lint only (no cluster required)
+
+```shell
+make -C test test-ct-lint
+```
+
+### Chart install test
+
+```shell
+make -C test test-ct
+```
+
+This creates a kind cluster, runs `ct install` against the chart, then tears the cluster down.
