@@ -70,20 +70,7 @@ GOTESTSUM_CMD = cd $(root_dir) && gotestsum --format testname --
 
 # GO_TIMEOUT is derived from TIMEOUT, adding 10m (600s) buffer for go test overhead.
 # Handles suffixes: s, m, h (defaults to m if no suffix). Falls back to 120m on parse failure.
-GO_TIMEOUT := $(shell \
-  t="$(TIMEOUT)"; \
-  n=$$(echo "$$t" | sed 's/[smh]$$//'); \
-  u=$$(echo "$$t" | grep -o '[smh]$$' || echo m); \
-  if echo "$$n" | grep -qE '^[0-9]+$$' 2>/dev/null; then \
-    case "$$u" in \
-      s) tot=$$(($$n + 600)) ;; \
-      h) tot=$$(($$n * 3600 + 600)) ;; \
-      *) tot=$$(($$n * 60 + 600)) ;; \
-    esac; \
-    echo "$$(($$tot / 60))m"; \
-  else \
-    echo "120m"; \
-  fi)
+GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){print "120m"; exit} u=substr(t,length(n)+1); if(u=="s") tot=n+600; else if(u=="h") tot=n*3600+600; else tot=n*60+600; print int(tot/60) "m"}')
 
 .PHONY: test-integration
 test-integration: ensure-gotestsum
