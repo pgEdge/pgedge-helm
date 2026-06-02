@@ -22,6 +22,18 @@ export HELM_REPO
 export INIT_SPOCK_IMAGE
 export TIMEOUT
 
+# ---- Tools ----
+
+GOTESTSUM := $(shell which gotestsum 2>/dev/null)
+
+.PHONY: install-gotestsum
+install-gotestsum:
+	go install gotest.tools/gotestsum@v1.13.0
+
+.PHONY: ensure-gotestsum
+ensure-gotestsum:
+	@command -v gotestsum >/dev/null 2>&1 || $(MAKE) install-gotestsum
+
 # ---- Unit Tests ----
 
 .PHONY: test-unit
@@ -39,9 +51,9 @@ kind-up:
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f \
 		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
-		-n cnpg-system cnpg-controller-manager --timeout=120s
+		-n cnpg-system cnpg-controller-manager --timeout=300s
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
-		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=120s
+		-n cert-manager cert-manager cert-manager-cainjector cert-manager-webhook --timeout=300s
 
 .PHONY: kind-down
 kind-down:
@@ -54,9 +66,15 @@ kind-load-image:
 
 # ---- Integration Tests ----
 
+GOTESTSUM_CMD = cd $(root_dir) && gotestsum --format testname --
+
+# GO_TIMEOUT is derived from TIMEOUT, adding 10m (600s) buffer for go test overhead.
+# Handles suffixes: s, m, h (defaults to m if no suffix). Falls back to 120m on parse failure.
+GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){print "120m"; exit} u=substr(t,length(n)+1); if(u=="s") tot=n+600; else if(u=="h") tot=n*3600+600; else tot=n*60+600; print int(tot/60) "m"}')
+
 .PHONY: test-integration
-test-integration:
-	cd $(root_dir) && go test -tags integration -v -timeout 30m ./test/integration/...
+test-integration: ensure-gotestsum
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -68,34 +86,48 @@ test-integration-kind: kind-up kind-load-image
 #        make test-run RUN="TestSlotLoss|TestNodesRemoveNode"
 
 .PHONY: test-run
-test-run: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-run: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "$(RUN)" ./test/integration/...
 
 .PHONY: test-install
-test-install: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-install: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestDistributedInstall|TestSingleNodeInstall" ./test/integration/...
 
 .PHONY: test-nodes
-test-nodes: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-nodes: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestNodes" ./test/integration/...
 
 .PHONY: test-recovery
-test-recovery: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-recovery: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent" ./test/integration/...
 
 .PHONY: test-reset
-test-reset: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-reset: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestResetSpock" ./test/integration/...
 
 .PHONY: test-failover
-test-failover: kind-load-image
-	cd $(root_dir) && go test -tags integration -v -timeout 30m \
+test-failover: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "TestUnplannedFailover" ./test/integration/...
+
+# ---- Chart Testing (ct) ----
+
+.PHONY: test-ct-lint
+test-ct-lint:
+	ct lint --chart-dirs $(root_dir) --charts $(root_dir)
+
+.PHONY: test-ct
+test-ct: kind-up kind-load-image
+	ct install --chart-dirs $(root_dir) --charts $(root_dir) \
+		--target-branch main \
+		--skip-missing-values \
+		--helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+	$(MAKE) kind-down
 
 # ---- All ----
 
