@@ -28,7 +28,7 @@ GOTESTSUM := $(shell which gotestsum 2>/dev/null)
 
 .PHONY: install-gotestsum
 install-gotestsum:
-	go install gotest.tools/gotestsum@latest
+	go install gotest.tools/gotestsum@v1.13.0
 
 .PHONY: ensure-gotestsum
 ensure-gotestsum:
