@@ -9,6 +9,7 @@ CHART_REF ?= $(root_dir)
 CHART_VERSION ?=
 HELM_REPO ?=
 INIT_SPOCK_IMAGE ?= pgedge-helm-utils:dev
+POSTGRES_IMAGE ?=
 TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
@@ -20,6 +21,7 @@ export CHART_REF
 export CHART_VERSION
 export HELM_REPO
 export INIT_SPOCK_IMAGE
+export POSTGRES_IMAGE
 export TIMEOUT
 
 # ---- Tools ----
@@ -62,7 +64,7 @@ kind-down:
 .PHONY: kind-load-image
 kind-load-image:
 	$(MAKE) -C $(root_dir) docker-build-dev
-	kind load docker-image pgedge-helm-utils:dev --name $(KIND_CLUSTER_NAME)
+	kind load docker-image $(INIT_SPOCK_IMAGE) --name $(KIND_CLUSTER_NAME)
 
 # ---- Integration Tests ----
 
@@ -78,7 +80,7 @@ test-integration: ensure-gotestsum
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
-	$(MAKE) test-integration KUBECONTEXT=kind-$(KIND_CLUSTER_NAME) INIT_SPOCK_IMAGE=pgedge-helm-utils:dev
+	$(MAKE) test-integration KUBECONTEXT=kind-$(KIND_CLUSTER_NAME) INIT_SPOCK_IMAGE=$(INIT_SPOCK_IMAGE)
 	$(MAKE) kind-down
 
 # ---- Selective Test Runs ----
@@ -126,7 +128,7 @@ test-ct: kind-up kind-load-image
 	ct install --chart-dirs $(root_dir) --charts $(root_dir) \
 		--target-branch main \
 		--skip-missing-values \
-		--helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+		--helm-extra-set-args "--set pgEdge.initSpockImageName=$(INIT_SPOCK_IMAGE)"
 	$(MAKE) kind-down
 
 # ---- All ----
