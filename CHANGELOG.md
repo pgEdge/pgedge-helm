@@ -5,6 +5,24 @@ All notable changes to pgEdge Helm will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0 - 2026-05-22
+
+### Added
+
+- Added support for zero-downtime node addition using a Spock populate pipeline. Writes can continue uninterrupted on existing nodes while a new node syncs via logical replication, replacing the previous behavior which required stopping writes during `helm upgrade` (#52)
+- Added a guided walkthrough that progressively builds an active-active PostgreSQL deployment, available as documentation, an interactive terminal guide, and a one-click GitHub Codespaces environment (#48)
+- Added the ability to configure the database name, owner, and admin role via Helm values (`initdb.database`, `initdb.owner`, `pgEdge.adminUser`). Also added documentation covering all managed users, their authentication methods, and how to create additional users or disable passwords (#54)
+
+### Changed
+
+- Rewrote the quickstart documentation for experienced Kubernetes users with a streamlined, copy-paste-and-go guide that assumes a working cluster (#46)
+- Updated default Postgres image to 18, CloudNativePG to 1.29, and cert-manager to use the latest release (#51)
+- Rewrote the init-spock job from Python to Go with a declarative resource engine that inspects actual state and converges toward desired state. Includes parallel execution within dependency phases and reduces the Docker image from ~150MB to ~15MB (#50)
+
+### Fixed
+
+- Fixed init-spock admin connection pool to honor internalHostname for cluster-local routing, matching the existing health check behavior
+
 ## v0.2.0 - 2026-02-11
 
 ### Added
@@ -23,8 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed duplicate `privateKey` key in client-ca Certificate resource
-
-
 ## v0.1.0 - 2025-12-19
 
 ### Added

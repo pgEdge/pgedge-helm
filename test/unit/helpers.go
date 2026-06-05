@@ -3,6 +3,7 @@
 package unit
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -25,6 +26,22 @@ func testdataPath(t *testing.T, name string) string {
 	t.Helper()
 	_, filename, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(filename), "testdata", name)
+}
+
+// chartVersion returns the version field from Chart.yaml.
+func chartVersion(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(chartPath(t), "Chart.yaml"))
+	if err != nil {
+		t.Fatalf("failed to read Chart.yaml: %v", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "version:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "version:"))
+		}
+	}
+	t.Fatal("version field not found in Chart.yaml")
+	return ""
 }
 
 // renderTemplate runs helm template with the given values file and returns parsed objects.
