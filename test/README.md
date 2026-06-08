@@ -107,6 +107,18 @@ make -C test test-run RUN=TestNodesAddNodeZeroDowntime TIMEOUT=120m
 make -C test test-run RUN="TestNodesRemoveNode|TestResetSpock" TIMEOUT=120m
 ```
 
+## Using a Custom Postgres Image
+
+Pass `POSTGRES_IMAGE` to override the default image from `values.yaml`:
+
+```shell
+make -C test test-all \
+  POSTGRES_IMAGE=ghcr.io/pgedge/pgedge-postgres-internal:18.4-spock5.0.9-standard \
+  TIMEOUT=120m
+```
+
+The image in use is printed at test startup under `POSTGRES_IMAGE`. If not set, `(chart default)` is shown.
+
 ## Chart Testing (ct)
 
 [chart-testing](https://github.com/helm/chart-testing) is used for basic chart lint and install/upgrade testing. These targets require a kind cluster.
