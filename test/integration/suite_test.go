@@ -16,19 +16,23 @@ import (
 )
 
 var (
-	kubeContext   string
+	kubeContext  string
 	helmRelease  string
 	namespace    string
 	chartRef     string
 	chartVersion string
 	helmRepo     string
 	initSpockImg string
+	postgresImg  string
 	timeout      time.Duration
 	testHelm     *helm.Helm
 	testKube     *kube.Kubectl
 )
 
 func TestMain(m *testing.M) {
+
+	fmt.Fprintf(os.Stdout, "DEBUG os.Getenv POSTGRES_IMAGE=%q\n", os.Getenv("POSTGRES_IMAGE"))
+
 	kubeContext = envOrDefault("KUBECONTEXT", "kind-pgedge-test")
 	helmRelease = envOrDefault("HELM_RELEASE", "pgedge")
 	namespace = envOrDefault("NAMESPACE", "default")
@@ -36,6 +40,7 @@ func TestMain(m *testing.M) {
 	chartVersion = os.Getenv("CHART_VERSION")
 	helmRepo = os.Getenv("HELM_REPO")
 	initSpockImg = os.Getenv("INIT_SPOCK_IMAGE")
+	postgresImg = os.Getenv("POSTGRES_IMAGE")
 
 	timeoutStr := envOrDefault("TIMEOUT", "10m")
 	var err error
@@ -47,6 +52,13 @@ func TestMain(m *testing.M) {
 
 	testHelm = &helm.Helm{KubeContext: kubeContext, Namespace: namespace}
 	testKube = &kube.Kubectl{Context: kubeContext, Namespace: namespace}
+
+	fmt.Fprintf(os.Stdout, "Test configuration:\n")
+	fmt.Fprintf(os.Stdout, "  CHART_REF:        %s\n", chartRef)
+	fmt.Fprintf(os.Stdout, "  CHART_VERSION:    %s\n", envOrDefault("CHART_VERSION", "(local)"))
+	fmt.Fprintf(os.Stdout, "  HELM_REPO:        %s\n", envOrDefault("HELM_REPO", "(local)"))
+	fmt.Fprintf(os.Stdout, "  INIT_SPOCK_IMAGE: %s\n", envOrDefault("INIT_SPOCK_IMAGE", "(chart default)"))
+	fmt.Fprintf(os.Stdout, "  POSTGRES_IMAGE:   %s\n", envOrDefault("POSTGRES_IMAGE", "(chart default)"))
 
 	if helmRepo != "" {
 		repoName := strings.Split(chartRef, "/")[0]
@@ -107,7 +119,10 @@ func installChart(t *testing.T, valuesFile string) {
 		Timeout:     timeout.String(),
 	}
 	if initSpockImg != "" {
-		opts.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg))
+	}
+	if postgresImg != "" {
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.clusterSpec.imageName=%s", postgresImg))
 	}
 	if err := testHelm.Install(helmRelease, opts); err != nil {
 		t.Fatalf("helm install failed: %v", err)
@@ -130,7 +145,10 @@ func tryUpgradeChart(valuesFile string) error {
 		Timeout:     timeout.String(),
 	}
 	if initSpockImg != "" {
-		opts.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg))
+	}
+	if postgresImg != "" {
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.clusterSpec.imageName=%s", postgresImg))
 	}
 	return testHelm.Upgrade(helmRelease, opts)
 }
