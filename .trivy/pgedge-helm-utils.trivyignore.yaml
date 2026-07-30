@@ -28,8 +28,15 @@
 # whatever else was in the +4 Medium/+1 Low findings not itemised here.
 #
 # Verified: `trivy image --ignorefile .trivy/pgedge-helm-utils.trivyignore.yaml
-# <image>` against a freshly-built image reports 0 findings at every
-# severity, and `govulncheck ./...` reports no reachable vulnerabilities.
+# <image>` against an image built locally from this fix reports 0
+# findings at every severity, and `govulncheck ./...` reports no
+# reachable vulnerabilities. This does NOT mean the published
+# ghcr.io/pgedge/pgedge-helm-utils:v1.0.0 tag is fixed: that image was
+# already built and pushed before this change, and go.mod edits can't
+# retroactively alter it. The vulnerable :v1.0.0 binary remains
+# published and pullable until a new image is built from this fix and
+# released under a new tag (see .github/workflows/release.yaml);
+# until then, deployments pinned to :v1.0.0 are still exposed.
 #
 # If a future scan surfaces something with no available fix, add it
 # here in the same form used in the sibling repos:
