@@ -1,0 +1,49 @@
+# Trivy ignore file for ghcr.io/pgedge/pgedge-helm-utils.
+#
+# Nothing is currently suppressed here. The published :v1.0.0 image
+# reported 2 Critical, 5 High, 4 Medium, and 1 Low finding, entirely
+# from outdated Go dependencies (pgx v5.8.0, golang.org/x/net v0.47.0,
+# golang.org/x/text v0.31.0, and a stale Go stdlib). This image's
+# runtime stage is `FROM scratch` (see docker/pgedge-helm-utils/Dockerfile),
+# so there is no OS package layer at all; every finding in the report
+# was a Go module or stdlib CVE, and bumping the affected dependencies
+# resolved all of them without needing any risk acceptance:
+#
+#   - github.com/jackc/pgx/v5: 5.8.0 -> 5.9.2 (CVE-2026-33815,
+#     CVE-2026-33816, and GO-2026-5004, a SQL injection advisory not in
+#     the original report but found via govulncheck; reachable from
+#     internal/spock/replication_slot_advance.go, though not actually
+#     exploitable here since every query uses bind parameters and this
+#     codebase never sets QueryExecModeSimpleProtocol)
+#   - golang.org/x/net: 0.47.0 -> 0.56.0 (CVE-2026-25681, CVE-2026-27136,
+#     CVE-2026-33814, CVE-2026-39821, and several golang.org/x/net/html
+#     and dns/dnsmessage advisories not individually broken out in the
+#     Codacy/Trivy report)
+#   - golang.org/x/text: 0.31.0 -> 0.39.0 (GO-2026-5970, reachable via
+#     the Kubernetes dynamic client and pgx.ConnectConfig)
+#
+# Rebuilding with `go 1.25` (the Dockerfile's builder stage floats on
+# the "1.25" tag) also picks up the current Go stdlib patch release,
+# resolving the reported os.Root symlink CVE (CVE-2026-39822) and
+# whatever else was in the +4 Medium/+1 Low findings not itemised here.
+#
+# Verified: `trivy image --ignorefile .trivy/pgedge-helm-utils.trivyignore.yaml
+# <image>` against an image built locally from this fix reports 0
+# findings at every severity, and `govulncheck ./...` reports no
+# reachable vulnerabilities. This does NOT mean the published
+# ghcr.io/pgedge/pgedge-helm-utils:v1.0.0 tag is fixed: that image was
+# already built and pushed before this change, and go.mod edits can't
+# retroactively alter it. The vulnerable :v1.0.0 binary remains
+# published and pullable until a new image is built from this fix and
+# released under a new tag (see .github/workflows/release.yaml);
+# until then, deployments pinned to :v1.0.0 are still exposed.
+#
+# If a future scan surfaces something with no available fix, add it
+# here in the same form used in the sibling repos:
+#
+# vulnerabilities:
+#   - id: CVE-XXXX-YYYY
+#     purls:
+#       - "pkg:golang/example/package@1.2.3"
+#     statement: "Why this doesn't apply / isn't reachable here."
+vulnerabilities: []
