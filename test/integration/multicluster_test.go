@@ -86,7 +86,10 @@ func TestMultiClusterInstall(t *testing.T) {
 		CreateNamespace: true,
 	}
 	if initSpockImg != "" {
-		opts.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg))
+	}
+	if postgresImg != "" {
+		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.clusterSpec.imageName=%s", postgresImg))
 	}
 	if err := helmA.Install(helmRelease, opts); err != nil {
 		t.Fatalf("helm install cluster-a failed: %v", err)
@@ -141,7 +144,10 @@ func TestMultiClusterInstall(t *testing.T) {
 		Timeout:     timeout.String(),
 	}
 	if initSpockImg != "" {
-		optsB.SetValues = []string{fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg)}
+		optsB.SetValues = append(optsB.SetValues, fmt.Sprintf("pgEdge.initSpockImageName=%s", initSpockImg))
+	}
+	if postgresImg != "" {
+		optsB.SetValues = append(optsB.SetValues, fmt.Sprintf("pgEdge.clusterSpec.imageName=%s", postgresImg))
 	}
 	if err := helmB.Install(helmRelease, optsB); err != nil {
 		t.Fatalf("helm install cluster-b failed: %v", err)

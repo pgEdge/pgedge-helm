@@ -1,0 +1,12 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        postgresql:
+          parameters:
+            output_plugin_libraries: null
+  clusterSpec:
+    storage:
+      size: 1Gi

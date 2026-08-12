@@ -9,6 +9,16 @@ on:
     branches:
       - main
 
+env:
+  # Temporary: the chart's default Postgres image (18-spock5-standard)
+  # currently resolves to a minor version that predates the
+  # output_plugin_libraries GUC (PLAT-722). Point tests at the same tag
+  # from pgEdge's internal image repo, which already has a patched
+  # version, so CI can pass while the public tag catches up. Remove this
+  # (and its two references below) once pgEdge/postgres-images#28 ships
+  # and the public tag moves.
+  TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres-internal:18-spock5-standard
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
@@ -73,7 +83,7 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Chart install test
-        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev"
+        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev --set pgEdge.clusterSpec.imageName=${{ env.TEST_POSTGRES_IMAGE }}"
 
       - name: Teardown
         if: always()
@@ -120,7 +130,7 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Integration tests
-        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev TIMEOUT=15m
+        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE }} TIMEOUT=15m
 
       - name: Collect debug artifacts on failure
         if: failure()

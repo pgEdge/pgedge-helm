@@ -78,6 +78,9 @@ pgEdge:
         track_commit_timestamp: "on"
         hot_standby_feedback: "on"
         track_io_timing: "on"
+        # See "output_plugin_libraries and older PostgreSQL minor versions"
+        # in docs/configuration.md for what this is and how to override it.
+        output_plugin_libraries: "pgoutput, test_decoding, spock_output"
         spock.enable_ddl_replication: "on"
         spock.include_ddl_repset: "on"
         spock.allow_ddl_from_functions: "on"

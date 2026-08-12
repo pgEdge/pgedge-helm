@@ -125,12 +125,58 @@ func TestClusterDefaultPostgreSQLParameters(t *testing.T) {
 		"spock.enable_ddl_replication":   "on",
 		"spock.include_ddl_repset":       "on",
 		"spock.allow_ddl_from_functions": "on",
+		"output_plugin_libraries":        "pgoutput, test_decoding, spock_output",
 	}
 	for key, want := range params {
 		got := getNestedString(cluster, "spec", "postgresql", "parameters", key)
 		if got != want {
 			t.Errorf("expected %s=%q, got %q", key, want, got)
 		}
+	}
+}
+
+func TestOutputPluginLibrariesGlobalNullOverride(t *testing.T) {
+	objects := renderTemplate(t, "output-plugin-libraries-global-null-values.yaml")
+	cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if cluster == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+
+	params, found, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+	if !found {
+		t.Fatal("expected postgresql.parameters to be set")
+	}
+	if _, present := params["output_plugin_libraries"]; present {
+		t.Errorf("expected output_plugin_libraries to be absent, got %v", params["output_plugin_libraries"])
+	}
+}
+
+// Unlike the global override, a per-node clusterSpec merges onto the
+// default via Sprig's mergeOverwrite, which copies a nil value into the
+// map instead of deleting the key — so the key is present but nil here,
+// not absent as in TestOutputPluginLibrariesGlobalNullOverride. This is
+// NOT a safe substitute for the global override: confirmed live, the
+// Kubernetes API stores that nil as an empty string rather than dropping
+// the key, and a pre-patch PostgreSQL still rejects the parameter with an
+// empty value exactly as it would any other value. A template-only test
+// can't see that far, so this only pins the divergence at this layer.
+func TestOutputPluginLibrariesPerNodeNullOverride(t *testing.T) {
+	objects := renderTemplate(t, "output-plugin-libraries-null-values.yaml")
+	cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if cluster == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+
+	params, found, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+	if !found {
+		t.Fatal("expected postgresql.parameters to be set")
+	}
+	value, present := params["output_plugin_libraries"]
+	if !present {
+		t.Fatal("expected output_plugin_libraries key to be present (as nil) in the rendered manifest, but it was absent")
+	}
+	if value != nil {
+		t.Errorf("expected output_plugin_libraries to be nil, got %v", value)
 	}
 }
 
