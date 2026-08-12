@@ -221,13 +221,13 @@ By default, `shared_preload_libraries` contains `pg_stat_statements`, `snowflake
 
 ### output_plugin_libraries and older PostgreSQL minor versions
 
-PostgreSQL 16.15, 17.11, 18.5, and newer minor versions add a new `output_plugin_libraries` allow-list that gates which logical decoding output plugins a server accepts. Its built-in default is `pgoutput, test_decoding`, which does not include `spock_output`. Without it on the list, Spock cannot create its replication slot and replication stops on the provider node.
+PostgreSQL 16.15, 17.11, 18.6, and newer minor versions add a new `output_plugin_libraries` allow-list that gates which logical decoding output plugins a server accepts. Its built-in default is `pgoutput, test_decoding`, which does not include `spock_output`. Without it on the list, Spock cannot create its replication slot and replication stops on the provider node.
 
 This chart sets `postgresql.parameters.output_plugin_libraries` to `pgoutput, test_decoding, spock_output` by default, so that Spock keeps working once a node is running one of the patched minor versions. Since the chart defaults to a mutable image tag, a fresh install picks up a patched version automatically.
 
 !!! warning
 
-    `output_plugin_libraries` is a core PostgreSQL setting, not an extension GUC. A minor version older than 16.15 / 17.11 / 18.5 does not recognize it at all, and refuses to start with `unrecognized configuration parameter "output_plugin_libraries"` if it is set to any value, including an empty one. Setting this parameter is only safe once every node in your cluster is on a patched minor version.
+    `output_plugin_libraries` is a core PostgreSQL setting, not an extension GUC. A minor version older than 16.15 / 17.11 / 18.6 does not recognize it at all, and refuses to start with `unrecognized configuration parameter "output_plugin_libraries"` if it is set to any value, including an empty one. Setting this parameter is only safe once every node in your cluster is on a patched minor version.
 
 If you pin `clusterSpec.imageName` to a minor version older than the patched ones, override the parameter to `null` at the chart-wide level in your values file rather than removing the line:
 

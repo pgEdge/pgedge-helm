@@ -78,7 +78,7 @@ pgEdge:
         track_commit_timestamp: "on"
         hot_standby_feedback: "on"
         track_io_timing: "on"
-        # PostgreSQL 16.15, 17.11, 18.5, and newer minor versions gate which
+        # PostgreSQL 16.15, 17.11, 18.6, and newer minor versions gate which
         # logical decoding output plugins may be used via the new
         # output_plugin_libraries allow-list (default "pgoutput,
         # test_decoding"). Without spock_output on that list, Spock cannot
