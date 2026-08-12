@@ -5,6 +5,12 @@ All notable changes to pgEdge Helm will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.1.0 - 2026-08-12
+
+### Added
+
+- Added a default for `postgresql.parameters.output_plugin_libraries` (`pgoutput, test_decoding, spock_output`) so Spock keeps replicating once a node is running PostgreSQL 16.15, 17.11, 18.6, or newer, which otherwise reject `spock_output` by default. Documented overriding it to `null` at the chart-wide level for clusters pinned to an older minor (#64)
+
 ## v1.0.0 - 2026-05-22
 
 ### Added
