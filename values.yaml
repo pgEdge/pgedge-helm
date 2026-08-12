@@ -78,33 +78,8 @@ pgEdge:
         track_commit_timestamp: "on"
         hot_standby_feedback: "on"
         track_io_timing: "on"
-        # PostgreSQL 16.15, 17.11, 18.6, and newer minor versions gate which
-        # logical decoding output plugins may be used via the new
-        # output_plugin_libraries allow-list (default "pgoutput,
-        # test_decoding"). Without spock_output on that list, Spock cannot
-        # create its replication slot and replication stops on the provider.
-        # This chart defaults to a mutable PG image tag, so it will pick up
-        # a patched minor version, and this default keeps that working out
-        # of the box rather than failing on the version users try first.
-        #
-        # Unlike Spock's own GUCs, this is a core PostgreSQL setting with no
-        # extension namespace, so a version that predates it rejects it
-        # outright at startup ("unrecognized configuration parameter")
-        # rather than ignoring it — setting it unconditionally is only safe
-        # once every node is on a patched minor version.
-        #
-        # If you need to add further output plugins, override this value
-        # rather than unsetting it. To run against a PG version that
-        # predates this GUC, override this same key with `null` at THIS
-        # (chart-wide) level — Helm's own values merging deletes a key
-        # whose value is explicitly null before rendering, so the
-        # parameter is omitted entirely rather than sent as an empty
-        # value. The same null override on a single node's clusterSpec
-        # does NOT work: that merge goes through Sprig's mergeOverwrite
-        # and then the Kubernetes API's map[string]string handling, both
-        # of which keep the key with an empty string rather than dropping
-        # it, which a pre-patch PG version rejects exactly like any other
-        # value.
+        # See "output_plugin_libraries and older PostgreSQL minor versions"
+        # in docs/configuration.md for what this is and how to override it.
         output_plugin_libraries: "pgoutput, test_decoding, spock_output"
         spock.enable_ddl_replication: "on"
         spock.include_ddl_repset: "on"
