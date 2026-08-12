@@ -219,6 +219,32 @@ By default, `shared_preload_libraries` contains `pg_stat_statements`, `snowflake
 
     Always include `spock` in `shared_preload_libraries`, as it is required for core functionality provided by this chart. This chart will call `CREATE EXTENSION` for spock when initializing each CloudNativePG Cluster.
 
+### output_plugin_libraries and older PostgreSQL minor versions
+
+PostgreSQL 16.15, 17.11, 18.5, and newer minor versions add a new `output_plugin_libraries` allow-list that gates which logical decoding output plugins a server accepts. Its built-in default is `pgoutput, test_decoding`, which does not include `spock_output`. Without it on the list, Spock cannot create its replication slot and replication stops on the provider node.
+
+This chart sets `postgresql.parameters.output_plugin_libraries` to `pgoutput, test_decoding, spock_output` by default, so that Spock keeps working once a node is running one of the patched minor versions. Since the chart defaults to a mutable image tag, a fresh install picks up a patched version automatically.
+
+!!! warning
+
+    `output_plugin_libraries` is a core PostgreSQL setting, not an extension GUC. A minor version older than 16.15 / 17.11 / 18.5 does not recognize it at all, and refuses to start with `unrecognized configuration parameter "output_plugin_libraries"` if it is set to any value, including an empty one. Setting this parameter is only safe once every node in your cluster is on a patched minor version.
+
+If you pin `clusterSpec.imageName` to a minor version older than the patched ones, override the parameter to `null` at the chart-wide level in your values file rather than removing the line:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    postgresql:
+      parameters:
+        output_plugin_libraries: null
+```
+
+A YAML value of `null` here deletes the corresponding key before Helm ever renders the manifest, so the parameter is omitted entirely rather than sent through as an empty string. If you need additional output plugins beyond `spock_output`, override the parameter with the full list you need instead of unsetting it.
+
+!!! warning
+
+    This `null` override only works at the chart-wide `pgEdge.clusterSpec` level. Setting it to `null` on a single node's `clusterSpec` does not omit the parameter: that override is merged onto the chart-wide default with Sprig's `mergeOverwrite` rather than through Helm's own values merging, and Kubernetes stores a `null` value for a `map[string]string` entry as an empty string rather than dropping the key. An empty value is still rejected exactly like any other value on a PostgreSQL version that predates this GUC. There is currently no values-only way to exempt a single node from this default while keeping it for the rest of the cluster — pin every node's image consistently instead.
+
 ## Values reference
 
 You can customize this Helm chart by specifying configuration parameters in your `values.yaml` file.
@@ -229,7 +255,7 @@ The following table lists all available options and their descriptions.
 |-----|------|---------|-------------|
 | pgEdge.adminUser | string | `"admin"` | The name of the admin role used for database management and init-spock connections. |
 | pgEdge.appName | string | `"pgedge"` | Determines the name of resources in the pgEdge cluster. Many other values are derived from this name, so it must be less than or equal to 26 characters in length. |
-| pgEdge.clusterSpec | object | `{"bootstrap":{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;"],"postInitSQL":[],"postInitTemplateSQL":[]}},"certificates":{"clientCASecret":"client-ca-key-pair","replicationTLSSecret":"streaming-replica-client-cert"},"imageName":"ghcr.io/pgedge/pgedge-postgres:18-spock5-standard","imagePullPolicy":"Always","instances":1,"managed":{"roles":[{"comment":"Admin role","ensure":"present","login":true,"name":"admin","superuser":true}]},"postgresql":{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"pg_hba":["hostssl app pgedge 0.0.0.0/0 cert","hostssl app admin 0.0.0.0/0 cert","hostssl app app 0.0.0.0/0 cert","hostssl all streaming_replica all cert map=cnpg_streaming_replica"],"pg_ident":["local postgres admin","local postgres app"],"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]},"projectedVolumeTemplate":{"sources":[{"secret":{"items":[{"key":"tls.crt","mode":384,"path":"pgedge/certificates/tls.crt"},{"key":"tls.key","mode":384,"path":"pgedge/certificates/tls.key"},{"key":"ca.crt","mode":384,"path":"pgedge/certificates/ca.crt"}],"name":"pgedge-client-cert"}}]}}` | Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis using the `clusterSpec` field in each node definition. |
+| pgEdge.clusterSpec | object | `{"bootstrap":{"initdb":{"database":"app","encoding":"UTF8","owner":"app","postInitApplicationSQL":["CREATE EXTENSION spock;"],"postInitSQL":[],"postInitTemplateSQL":[]}},"certificates":{"clientCASecret":"client-ca-key-pair","replicationTLSSecret":"streaming-replica-client-cert"},"imageName":"ghcr.io/pgedge/pgedge-postgres:18-spock5-standard","imagePullPolicy":"Always","instances":1,"managed":{"roles":[{"comment":"Admin role","ensure":"present","login":true,"name":"admin","superuser":true}]},"postgresql":{"parameters":{"checkpoint_completion_target":"0.9","checkpoint_timeout":"15min","dynamic_shared_memory_type":"posix","hot_standby_feedback":"on","output_plugin_libraries":"pgoutput, test_decoding, spock_output","spock.allow_ddl_from_functions":"on","spock.conflict_log_level":"DEBUG","spock.conflict_resolution":"last_update_wins","spock.enable_ddl_replication":"on","spock.include_ddl_repset":"on","spock.save_resolutions":"on","track_commit_timestamp":"on","track_io_timing":"on","wal_level":"logical","wal_sender_timeout":"5s"},"pg_hba":["hostssl app pgedge 0.0.0.0/0 cert","hostssl app admin 0.0.0.0/0 cert","hostssl app app 0.0.0.0/0 cert","hostssl all streaming_replica all cert map=cnpg_streaming_replica"],"pg_ident":["local postgres admin","local postgres app"],"shared_preload_libraries":["pg_stat_statements","snowflake","spock"]},"projectedVolumeTemplate":{"sources":[{"secret":{"items":[{"key":"tls.crt","mode":384,"path":"pgedge/certificates/tls.crt"},{"key":"tls.key","mode":384,"path":"pgedge/certificates/tls.key"},{"key":"ca.crt","mode":384,"path":"pgedge/certificates/ca.crt"}],"name":"pgedge-client-cert"}}]}}` | Default CloudNativePG Cluster specification applied to all nodes, which can be overridden on a per-node basis using the `clusterSpec` field in each node definition. |
 | pgEdge.externalNodes | list | `[]` | Configuration for nodes that are part of the pgEdge cluster, but managed externally to this Helm chart. This can be leveraged for multi-cluster deployments or to wire up existing CloudNativePG Clusters to a pgEdge cluster. |
 | pgEdge.extraResources | list | `[]` | Array of extra Kubernetes resources to deploy alongside pgEdge (evaluated as templates). Useful for deploying NetworkPolicies, PodMonitors, ConfigMaps, etc. |
 | pgEdge.initSpock | bool | `true` | Whether or not to run the init-spock job to initialize the pgEdge nodes and subscriptions In multi-cluster deployments, this should only be set to true on the last cluster to be deployed. |

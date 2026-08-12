@@ -219,6 +219,32 @@ By default, `shared_preload_libraries` contains `pg_stat_statements`, `snowflake
 
     Always include `spock` in `shared_preload_libraries`, as it is required for core functionality provided by this chart. This chart will call `CREATE EXTENSION` for spock when initializing each CloudNativePG Cluster.
 
+### output_plugin_libraries and older PostgreSQL minor versions
+
+PostgreSQL 16.15, 17.11, 18.5, and newer minor versions add a new `output_plugin_libraries` allow-list that gates which logical decoding output plugins a server accepts. Its built-in default is `pgoutput, test_decoding`, which does not include `spock_output`. Without it on the list, Spock cannot create its replication slot and replication stops on the provider node.
+
+This chart sets `postgresql.parameters.output_plugin_libraries` to `pgoutput, test_decoding, spock_output` by default, so that Spock keeps working once a node is running one of the patched minor versions. Since the chart defaults to a mutable image tag, a fresh install picks up a patched version automatically.
+
+!!! warning
+
+    `output_plugin_libraries` is a core PostgreSQL setting, not an extension GUC. A minor version older than 16.15 / 17.11 / 18.5 does not recognize it at all, and refuses to start with `unrecognized configuration parameter "output_plugin_libraries"` if it is set to any value, including an empty one. Setting this parameter is only safe once every node in your cluster is on a patched minor version.
+
+If you pin `clusterSpec.imageName` to a minor version older than the patched ones, override the parameter to `null` at the chart-wide level in your values file rather than removing the line:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    postgresql:
+      parameters:
+        output_plugin_libraries: null
+```
+
+A YAML value of `null` here deletes the corresponding key before Helm ever renders the manifest, so the parameter is omitted entirely rather than sent through as an empty string. If you need additional output plugins beyond `spock_output`, override the parameter with the full list you need instead of unsetting it.
+
+!!! warning
+
+    This `null` override only works at the chart-wide `pgEdge.clusterSpec` level. Setting it to `null` on a single node's `clusterSpec` does not omit the parameter: that override is merged onto the chart-wide default with Sprig's `mergeOverwrite` rather than through Helm's own values merging, and Kubernetes stores a `null` value for a `map[string]string` entry as an empty string rather than dropping the key. An empty value is still rejected exactly like any other value on a PostgreSQL version that predates this GUC. There is currently no values-only way to exempt a single node from this default while keeping it for the rest of the cluster — pin every node's image consistently instead.
+
 ## Values reference
 
 You can customize this Helm chart by specifying configuration parameters in your `values.yaml` file. 
