@@ -9,6 +9,12 @@ on:
       version:
         required: true
         type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v1.1.0). The tag must already exist.'
+        required: true
+        type: string
 
 jobs:
   release:
@@ -48,7 +54,7 @@ jobs:
           targets: release
           set: |
             *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
+            *.cache-to=type=gha,mode=max,ignore-error=true
         env:
           CHART_VERSION: ${{ steps.version.outputs.chart_version }}
 
