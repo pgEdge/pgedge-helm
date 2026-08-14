@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.version || github.ref_name }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -47,6 +49,15 @@ jobs:
           # Strip any RC suffix for release notes lookup (e.g., v0.2.0-rc.1 -> v0.2.0)
           RELEASE_VERSION=${VERSION%-rc.*}
           echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Refuse to overwrite a published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release ${{ steps.version.outputs.version }} already exists — refusing to rebuild/overwrite. Delete the release first to re-publish."
+            exit 1
+          fi
 
       - name: Build and push pgedge-helm-utils image
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
@@ -131,7 +142,7 @@ jobs:
           fi
 
           # Note: VERSION has v prefix (for git tag), CHART_VERSION does not (for artifacts)
-          gh release create "${VERSION}" \
+          gh release create "${VERSION}" --verify-tag \
             --title "${VERSION}" \
             ${NOTES_FLAG} \
             ${PRERELEASE_FLAG} \
