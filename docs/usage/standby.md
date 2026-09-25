@@ -27,6 +27,32 @@ pgEdge:
       size: 1Gi
 ```
 
+## Spock 6 and standby instances
+
+On Spock 6, this failover-slots worker no longer runs on PostgreSQL 18+ (it
+is only used on PostgreSQL 16/17). Instead, Spock 6 relies on PostgreSQL's
+own native logical-slot synchronization, which this chart does not enable by
+default because it requires PostgreSQL 17 or later — setting it on an older
+minor version causes that node to refuse to start with `unrecognized
+configuration parameter "sync_replication_slots"`.
+
+If you're running Spock 6 with `instances > 1` on PostgreSQL 17+, enable it
+explicitly per node:
+
+```yaml
+clusterSpec:
+  instances: 3
+  postgresql:
+    parameters:
+      sync_replication_slots: "on"
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+```
+
+Without this, a promoted standby has no Spock replication slot and
+replication does not resume after a promotion.
+
 ## Promoting a replica
 
 If you have configured a node with more than one instance, you can perform a promotion using the `kubectl cnpg` plugin.
