@@ -35,9 +35,10 @@ In order to perform minor version upgrades for Postgres or Spock, simply update 
 Spock 6 is available as a preview image, paired with Postgres 18:
 
 ```yaml
-clusterSpec:
-  imagePullPolicy: Always
-  imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+pgEdge:
+  clusterSpec:
+    imagePullPolicy: Always
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
 ```
 
 !!! note

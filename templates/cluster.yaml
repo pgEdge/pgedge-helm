@@ -27,26 +27,6 @@
 {{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
-{{- /*
-Standby instances need Postgres's native logical-slot sync (PG17+) for
-Spock's replication slots to survive a promotion — without it a promoted
-standby has no Spock slot and replication breaks. Only relevant when this
-node actually has standbys; skip it for the common single-instance case,
-and never override a value the user set explicitly.
-*/ -}}
-{{- if gt (int $merged.instances) 1 }}
-  {{- if not (hasKey $merged.postgresql.parameters "sync_replication_slots") -}}
-    {{- $_ := set $merged.postgresql.parameters "sync_replication_slots" "on" -}}
-  {{- end -}}
-  {{- if not (hasKey $merged "replicationSlots") -}}
-    {{- $_ := set $merged "replicationSlots" (dict "highAvailability" (dict "synchronizeLogicalDecoding" true)) -}}
-  {{- else if not (hasKey $merged.replicationSlots "highAvailability") -}}
-    {{- $_ := set $merged.replicationSlots "highAvailability" (dict "synchronizeLogicalDecoding" true) -}}
-  {{- else if not (hasKey $merged.replicationSlots.highAvailability "synchronizeLogicalDecoding") -}}
-    {{- $_ := set $merged.replicationSlots.highAvailability "synchronizeLogicalDecoding" true -}}
-  {{- end -}}
-{{- end -}}
-
 {{- if gt $i 0 }}
 ---
 {{- end }}
