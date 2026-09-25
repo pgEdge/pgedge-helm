@@ -30,6 +30,28 @@ clusterSpec:
 
 In order to perform minor version upgrades for Postgres or Spock, simply update the `imageName` and perform a `helm upgrade`. CloudNativePG will handle rolling out the new image across your nodes.
 
+## Spock 6 Preview
+
+Spock 6 is available as a preview image, paired with Postgres 18:
+
+```yaml
+clusterSpec:
+  imagePullPolicy: Always
+  imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+```
+
+!!! note
+
+    The Spock 6 preview image tracks the latest Spock 6 build against Postgres 18, so its resolved Postgres and Spock minor versions can advance between pulls.
+
+!!! warning
+
+    This preview supports only bootstrapping new nodes on Spock 6 — it does not support upgrading an existing node from Spock 5.x to Spock 6 in place. A Spock 6 node cannot subscribe to a Spock 5.x peer, so all nodes in a pgEdge cluster must run the same Spock major version.
+
+!!! warning
+
+    Preview images are for evaluation, not production use.
+
 ## Major Version Upgrades
 
 For Postgres major version upgrades, this chart supports two strategies:
