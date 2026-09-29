@@ -153,6 +153,9 @@ command selects the latest completed plugin backup, creates a temporary
 single-instance Cluster, runs the SQL check in a read-only transaction, and
 reports recovery time and cleanup:
 
+By default, `plan` rejects a selected backup older than eight days. Set
+`maxBackupAgeSeconds` in the JSON config if you need to check an older backup.
+
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install 'git+https://github.com/danielgaskins/cnpg-drill.git@v0.1.1'
