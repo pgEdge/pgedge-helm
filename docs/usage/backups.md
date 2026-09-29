@@ -137,3 +137,47 @@ You can follow these steps to setup scheduled backups to an AWS S3 bucket using 
             pluginConfiguration:
               name: barman-cloud.cloudnative-pg.io
     ```
+
+
+## Verify a backup with a restore
+
+A completed `Backup` shows that base backup creation finished. To check that
+one of those backups can be recovered, run a disposable restore of a single
+CloudNativePG node. The example below uses `pgedge-n1` from the configuration
+above and checks that the `spock` extension is present in its `app` database.
+Run it only after `kubectl get backups` shows a completed Barman plugin backup
+for that node.
+
+The optional [cnpg-drill](https://github.com/danielgaskins/cnpg-drill)
+command selects the latest completed plugin backup, creates a temporary
+single-instance Cluster, runs the SQL check in a read-only transaction, and
+reports recovery time and cleanup:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install 'git+https://github.com/danielgaskins/cnpg-drill.git@v0.1.1'
+cat > pgedge-backup-drill.json <<'JSON'
+{
+  "namespace": "default",
+  "cluster": "pgedge-n1",
+  "checks": [
+    {
+      "name": "spock-extension-restored",
+      "database": "app",
+      "query": "SELECT count(*) FROM pg_extension WHERE extname = 'spock'",
+      "expected": "1"
+    }
+  ]
+}
+JSON
+.venv/bin/cnpg-drill plan --config pgedge-backup-drill.json
+.venv/bin/cnpg-drill run --config pgedge-backup-drill.json --report pgedge-backup-drill-result.json
+```
+
+Set `namespace` to the namespace of the pgEdge release and inspect the
+manifest from `plan` before running the restore. Use a separate read-only
+recovery `ObjectStore` for production; `recoveryObjectStore` in the JSON config
+can name one that points to the same archive. Replace or extend the SQL check
+with an invariant from your own application data. This verifies one node's
+physical backup and the selected SQL assertion. It does not verify Spock
+subscriptions, cross-node replication, or failover.
