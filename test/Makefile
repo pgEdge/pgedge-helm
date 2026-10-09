@@ -10,6 +10,10 @@ CHART_VERSION ?=
 HELM_REPO ?=
 INIT_SPOCK_IMAGE ?= pgedge-helm-utils:dev
 POSTGRES_IMAGE ?=
+# Regex of test names to skip (passed to `go test -skip`). Used in CI to
+# exclude tests that hit known, upstream-unresolved Spock/Postgres issues
+# under a specific Spock major version (see .github/workflows/test.yaml).
+SKIP_TESTS ?=
 TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
@@ -76,7 +80,7 @@ GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){prin
 
 .PHONY: test-integration
 test-integration: ensure-gotestsum
-	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) $(if $(SKIP_TESTS),-skip "$(SKIP_TESTS)") ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image

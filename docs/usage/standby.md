@@ -40,18 +40,45 @@ If you're running Spock 6 with `instances > 1` on PostgreSQL 17+, enable it
 explicitly per node:
 
 ```yaml
-clusterSpec:
-  instances: 3
-  postgresql:
-    parameters:
-      sync_replication_slots: "on"
-  replicationSlots:
-    highAvailability:
-      synchronizeLogicalDecoding: true
+pgEdge:
+  clusterSpec:
+    instances: 3
+    postgresql:
+      parameters:
+        sync_replication_slots: "on"
+    replicationSlots:
+      highAvailability:
+        synchronizeLogicalDecoding: true
 ```
 
 Without this, a promoted standby has no Spock replication slot and
 replication does not resume after a promotion.
+
+!!! note
+
+    PostgreSQL's native slot sync also needs `synchronized_standby_slots` set
+    on the primary, naming the physical slot(s) of the standby(s) a logical
+    slot must be confirmed on before it's considered synced. You do not need
+    to set this yourself — once `replicationSlots.highAvailability.synchronizeLogicalDecoding`
+    is enabled, CloudNativePG computes and maintains `synchronized_standby_slots`
+    for you from its own physical replication slot names (`_cnpg_<node>-<ordinal>`)
+    as instances join or leave.
+
+When this chart pre-creates a replication slot for a new node during
+add-node (`internal/spock/replication_slot_create.go`), it detects the live
+Spock and PostgreSQL versions on that connection and sets the slot's
+`FAILOVER` flag to match — the same condition (Spock 6+ and PostgreSQL 17+)
+that requires the settings above. No extra configuration is needed for this
+part.
+
+!!! warning
+
+    A known, upstream Postgres/Spock limitation remains: an unplanned
+    failover doesn't yet reliably survive on Spock 6, due to a race in
+    PostgreSQL's native slot-sync worker (it can refuse to sync a slot right
+    before promotion if the standby's catalog xmin has already advanced past
+    what the slot needs, leaving the promoted node with no slot). This isn't
+    something this chart's configuration can work around.
 
 ## Promoting a replica
 

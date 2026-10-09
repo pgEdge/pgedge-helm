@@ -59,6 +59,27 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
     For large databases, the initial sync may take significant time. You can configure the timeout via `pgEdge.initSpockJobConfig.timeout` (default: 7200 seconds / 2 hours). If the job fails or times out, see [Recovering from a failed add](#recovering-from-a-failed-add).
 
+### Adding a node running a different Spock version
+
+A new node must run the same Spock major version as every existing node.
+Upstream Spock has a fallback that in principle lets a newer add-node sync
+worker read an older peer's pre-6.0 progress table directly, but as of the
+current `ghcr.io/pgedge/pgedge-postgres:18-spock6-standard` preview image,
+that fallback isn't present: adding a Spock 6 node to a Spock 5 cluster
+crash-loops the new node's apply worker (`function
+spock.read_peer_progress(...) does not exist`, called directly against the
+Spock 5 peer with no fallback). The `init-spock` job checks the Spock major
+version of every node before making any changes and fails with a clear error
+on any mismatch, in either direction. This is a limitation of the currently
+published preview image, not a permanent restriction — it may be lifted in a
+future preview build.
+
+This preview does not provide a supported Spock 5-to-6 upgrade procedure for
+an existing cluster. The validation above only covers add-node; it does not
+verify that changing an existing node's image in place, one node at a time,
+keeps replication working across the version gap in between — that path is
+untested and not recommended.
+
 !!! warning
 
     Remove the `bootstrap` block from the new node's configuration after a successful add. If left in place, subsequent `helm upgrade` runs will re-execute the populate pipeline, which may interfere with active replication.
