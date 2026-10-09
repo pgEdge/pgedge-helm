@@ -18,6 +18,9 @@ env:
   # (and its two references below) once pgEdge/postgres-images#28 ships
   # and the public tag moves.
   TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres-internal:18-spock5-standard
+  # Spock 6 preview image. Unlike the spock5 tag above, this one does not
+  # need the -internal/patched substitution.
+  TEST_POSTGRES_IMAGE_SPOCK6: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
 
 jobs:
   unit-tests:
@@ -49,6 +52,10 @@ jobs:
   chart-testing:
     runs-on: ubuntu-latest
     needs: unit-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        spock: [spock5, spock6]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -82,8 +89,16 @@ jobs:
       - name: Load image into Kind
         run: make -C test kind-load-image
 
+      - name: Select Postgres image for ${{ matrix.spock }}
+        run: |
+          if [ "${{ matrix.spock }}" = "spock6" ]; then
+            echo "POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE_SPOCK6 }}" >> "$GITHUB_ENV"
+          else
+            echo "POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Chart install test
-        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev --set pgEdge.clusterSpec.imageName=${{ env.TEST_POSTGRES_IMAGE }}"
+        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev --set pgEdge.clusterSpec.imageName=${{ env.POSTGRES_IMAGE }}"
 
       - name: Teardown
         if: always()
@@ -92,6 +107,21 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     needs: unit-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - spock: spock5
+            skip_tests: ''
+          - spock: spock6
+            # TestUnplannedFailover hits a known, upstream-unresolved Spock 6 +
+            # PostgreSQL native-slot-sync race on promotion (catalog_xmin
+            # mismatch) — not something this chart can work around. See
+            # docs/usage/standby.md.
+            #
+            # TestNodesAddNodeZeroDowntime hits SPOC-648: spock.get_lsn_from_commit_ts().
+            # Remove this skip once a preview image with the fix ships.
+            skip_tests: 'TestUnplannedFailover|TestNodesAddNodeZeroDowntime'
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -129,8 +159,16 @@ jobs:
       - name: Load image into Kind
         run: make -C test kind-load-image
 
+      - name: Select Postgres image for ${{ matrix.spock }}
+        run: |
+          if [ "${{ matrix.spock }}" = "spock6" ]; then
+            echo "POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE_SPOCK6 }}" >> "$GITHUB_ENV"
+          else
+            echo "POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Integration tests
-        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE }} TIMEOUT=15m
+        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev POSTGRES_IMAGE=${{ env.POSTGRES_IMAGE }} SKIP_TESTS="${{ matrix.skip_tests }}" TIMEOUT=15m
 
       - name: Collect debug artifacts on failure
         if: failure()
@@ -157,7 +195,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: debug-logs
+          name: debug-logs-${{ matrix.spock }}
           path: /tmp/artifacts
 
       - name: Teardown

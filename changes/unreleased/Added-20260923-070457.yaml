@@ -1,3 +1,3 @@
 kind: Added
-body: Added support for Spock 6 preview images (e.g. `18-spock6-standard`), including correct add-node peer catchup. See `docs/usage/standby.md` for the extra config `instances > 1` clusters need on Spock 6.
+body: Added support for Spock 6 preview images (e.g. `18-spock6-standard`), including correct add-node peer catchup, failover-aware replication slots, and Spock version-mismatch validation. See `docs/usage/standby.md` and `docs/usage/adding_nodes.md` for details.
 time: 2026-09-23T07:04:57.000000+00:00
