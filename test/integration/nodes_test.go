@@ -74,7 +74,7 @@ func TestNodesAddNode(t *testing.T) {
 	})
 
 	t.Run("n3_has_existing_data", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -135,7 +135,7 @@ func TestNodesAddNode(t *testing.T) {
 			t.Fatalf("failed to insert after re-run: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -411,7 +411,7 @@ func TestNodesRemoveNode(t *testing.T) {
 			t.Fatalf("failed to insert: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {

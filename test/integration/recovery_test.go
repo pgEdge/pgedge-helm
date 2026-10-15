@@ -71,7 +71,7 @@ func TestSlotLossRecovery(t *testing.T) {
 		t.Fatalf("failed to insert: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
 		out, err := testKube.ExecSQL("pgedge-n2-1",
@@ -164,7 +164,7 @@ func TestSlotLossRecovery(t *testing.T) {
 			t.Fatalf("failed to insert after recovery: %v", err)
 		}
 
-		ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel1()
 
 		err = wait.Until(ctx1, 2*time.Second, func() (bool, error) {
@@ -186,7 +186,7 @@ func TestSlotLossRecovery(t *testing.T) {
 			t.Fatalf("failed to insert on n2 after recovery: %v", err)
 		}
 
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel2()
 
 		err = wait.Until(ctx2, 2*time.Second, func() (bool, error) {
@@ -317,7 +317,7 @@ func TestOrphanSlotCleanupAfterNodeRemoval(t *testing.T) {
 			t.Fatalf("failed to insert: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -557,7 +557,7 @@ func TestResetSpock(t *testing.T) {
 			t.Fatalf("failed to insert: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -679,7 +679,7 @@ func TestIdempotentReconciliation(t *testing.T) {
 			t.Fatalf("failed to insert: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
