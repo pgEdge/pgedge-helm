@@ -100,6 +100,15 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 5: Reconcile Spock resources
+	// Step 5: Fail loudly if a node needs native replication-slot sync for
+	// standby failover (Spock 6+/PostgreSQL 17+ with instances > 1) but
+	// doesn't have it — rather than leaving a promoted standby silently
+	// missing its Spock slot. Runs after the reset step above so a node
+	// mid-recovery has its spock extension back before being checked.
+	if err := spock.ValidateNativeSlotSync(ctx, cfg, conns); err != nil {
+		return err
+	}
+
+	// Step 6: Reconcile Spock resources
 	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
 }

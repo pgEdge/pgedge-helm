@@ -14,6 +14,11 @@ POSTGRES_IMAGE ?=
 # exclude tests that hit known, upstream-unresolved Spock/Postgres issues
 # under a specific Spock major version (see .github/workflows/test.yaml).
 SKIP_TESTS ?=
+# Regex of top-level test names to run (passed to `go test -run`). Used in CI
+# to split the integration suite into smaller parallel jobs, each creating
+# fewer Kind/CNPG clusters, instead of running every test sequentially in one
+# job (see .github/workflows/test.yaml).
+RUN_TESTS ?=
 TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
@@ -80,7 +85,7 @@ GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){prin
 
 .PHONY: test-integration
 test-integration: ensure-gotestsum
-	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) $(if $(SKIP_TESTS),-skip "$(SKIP_TESTS)") ./test/integration/...
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) $(if $(RUN_TESTS),-run "$(RUN_TESTS)") $(if $(SKIP_TESTS),-skip "$(SKIP_TESTS)") ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -99,7 +104,12 @@ test-run: ensure-gotestsum kind-load-image
 .PHONY: test-install
 test-install: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
-		-run "TestDistributedInstall|TestSingleNodeInstall" ./test/integration/...
+		-run "TestDistributedInstall|TestSingleNodeInstall|TestCustomDatabaseInstall" ./test/integration/...
+
+.PHONY: test-install-ha
+test-install-ha: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
+		-run "TestDistributedHAInstall|TestMultiClusterInstall" ./test/integration/...
 
 .PHONY: test-nodes
 test-nodes: ensure-gotestsum kind-load-image

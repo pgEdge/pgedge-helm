@@ -1,0 +1,10 @@
+pgEdge:
+  appName: pgedge
+  nativeSlotSync: true
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres@sha256:abcdef1234567890
+    storage:
+      size: 1Gi
