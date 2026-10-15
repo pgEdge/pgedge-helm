@@ -140,9 +140,9 @@ jobs:
           - spock: spock6
             group: nodes
             run_tests: 'TestNodes'
-            # TestNodesAddNodeZeroDowntime hits SPOC-648: spock.get_lsn_from_commit_ts().
+            # TestNodesAddNode(ZeroDowntime) hit SPOC-648: spock.get_lsn_from_commit_ts().
             # Remove this skip once a preview image with the fix ships.
-            skip_tests: 'TestNodesAddNodeZeroDowntime'
+            skip_tests: 'TestNodesAddNode'
           - spock: spock6
             group: recovery
             run_tests: 'TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent'
