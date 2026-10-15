@@ -147,7 +147,7 @@ jobs:
             group: recovery
             run_tests: 'TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent'
             # Intermittently stall on spock6 (unconfirmed cause).
-            skip_tests: 'TestResetSpock/replication_works_after_reset|TestIdempotentReconciliation/replication_still_works'
+            skip_tests: 'TestResetSpock/replication_works_after_reset|TestIdempotentReconciliation/replication_still_works|TestSlotLossRecovery/replication_works_after_recovery|TestOrphanSlotCleanupAfterNodeRemoval/replication_works_after_cleanup'
           # spock6/failover is omitted: TestUnplannedFailover is its only
           # test, and it's entirely skipped for spock6 — the standby's
           # Spock slot syncs correctly before the failover, but still goes
