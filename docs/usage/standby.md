@@ -29,56 +29,40 @@ pgEdge:
 
 ## Spock 6 and standby instances
 
-On Spock 6, this failover-slots worker no longer runs on PostgreSQL 18+ (it
-is only used on PostgreSQL 16/17). Instead, Spock 6 relies on PostgreSQL's
-own native logical-slot synchronization, which this chart does not enable by
-default because it requires PostgreSQL 17 or later — setting it on an older
-minor version causes that node to refuse to start with `unrecognized
-configuration parameter "sync_replication_slots"`.
+On PostgreSQL 16 or an older version, Spock 6 uses the same failover-slots
+worker as Spock 5. On PostgreSQL 17 and 18, this chart instead uses
+PostgreSQL's own native logical-slot synchronization — on 18, Spock 6 no
+longer runs its failover-slots worker at all, and this chart opts 17 into
+the same native path too, for consistent behavior across both.
 
-If you're running Spock 6 with `instances > 1` on PostgreSQL 17+, enable it
-explicitly per node:
-
-```yaml
-pgEdge:
-  clusterSpec:
-    instances: 3
-    postgresql:
-      parameters:
-        sync_replication_slots: "on"
-    replicationSlots:
-      highAvailability:
-        synchronizeLogicalDecoding: true
-```
-
-Without this, a promoted standby has no Spock replication slot and
-replication does not resume after a promotion.
-
-!!! note
-
-    PostgreSQL's native slot sync also needs `synchronized_standby_slots` set
-    on the primary, naming the physical slot(s) of the standby(s) a logical
-    slot must be confirmed on before it's considered synced. You do not need
-    to set this yourself — once `replicationSlots.highAvailability.synchronizeLogicalDecoding`
-    is enabled, CloudNativePG computes and maintains `synchronized_standby_slots`
-    for you from its own physical replication slot names (`_cnpg_<node>-<ordinal>`)
-    as instances join or leave.
+**This is handled automatically.** `pgEdge.nativeSlotSync` (default `auto`)
+reads each node's `imageName` tag (e.g. `18-spock6-standard`) and enables
+native slot sync whenever it's Spock 6+ and PostgreSQL 17+. You don't need
+to set anything yourself in the normal case. It falls back to off if a
+node's image tag doesn't follow that convention (a digest reference or a
+custom tag), since turning it on for an unsupported Postgres version
+prevents that node from starting — set `pgEdge.nativeSlotSync: true` to
+force it on for such a node, or `false` to force it off. The `init-spock`
+job separately verifies this is on wherever it's actually required (Spock
+6+, PostgreSQL 17+, `instances > 1`) and fails with a clear error if not, so
+a tag auto-detection can't parse doesn't silently leave a cluster
+unprotected.
 
 When this chart pre-creates a replication slot for a new node during
 add-node (`internal/spock/replication_slot_create.go`), it detects the live
 Spock and PostgreSQL versions on that connection and sets the slot's
-`FAILOVER` flag to match — the same condition (Spock 6+ and PostgreSQL 17+)
-that requires the settings above. No extra configuration is needed for this
-part.
+`FAILOVER` flag to match, under the same condition. No configuration is
+needed for this part either.
 
 !!! warning
 
-    A known, upstream Postgres/Spock limitation remains: an unplanned
-    failover doesn't yet reliably survive on Spock 6, due to a race in
-    PostgreSQL's native slot-sync worker (it can refuse to sync a slot right
-    before promotion if the standby's catalog xmin has already advanced past
-    what the slot needs, leaving the promoted node with no slot). This isn't
-    something this chart's configuration can work around.
+    A Postgres/Spock-internal race remains: an unplanned failover doesn't
+    yet reliably survive on Spock 6, because PostgreSQL's native slot-sync
+    worker can refuse to sync a slot right before promotion if the
+    standby's catalog xmin has already advanced past what the slot needs,
+    leaving the promoted node with no slot. This is untracked upstream as
+    of this writing and isn't something this chart's configuration can work
+    around.
 
 ## Promoting a replica
 

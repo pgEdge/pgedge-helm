@@ -16,6 +16,21 @@ pgEdge:
   initSpock: true
   # -- The name of the admin role used for database management and init-spock connections.
   adminUser: admin
+  # -- Controls whether Postgres's native replication-slot sync is enabled for each
+  # node, which Spock 6 needs on PostgreSQL 17+ to keep a promoted standby's Spock
+  # slot (see docs/usage/standby.md). One of:
+  #   - "auto" (default): read the Postgres and Spock major versions from each
+  #     node's `imageName` tag (e.g. `18-spock6-standard`) and enable it only when
+  #     they're Spock 6+ and PostgreSQL 17+. Left off if the tag can't be parsed
+  #     (e.g. a digest-pinned or custom-format image), since enabling it on an
+  #     unsupported Postgres version prevents that node from starting.
+  #   - true: always enable it, regardless of the image tag. Use this if your
+  #     images don't follow the `{pg}-spock{N}-...` tag convention.
+  #   - false: never enable it automatically.
+  # The init-spock job separately verifies this is actually on wherever it's
+  # required and fails with a clear error if not, so a tag "auto" can't parse
+  # doesn't silently leave a cluster unprotected.
+  nativeSlotSync: auto
   # -- Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>.
   # Override this for local development or to use a custom image.
   initSpockImageName: ""

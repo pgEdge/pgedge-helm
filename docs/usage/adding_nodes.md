@@ -62,23 +62,9 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 ### Adding a node running a different Spock version
 
 A new node must run the same Spock major version as every existing node.
-Upstream Spock has a fallback that in principle lets a newer add-node sync
-worker read an older peer's pre-6.0 progress table directly, but as of the
-current `ghcr.io/pgedge/pgedge-postgres:18-spock6-standard` preview image,
-that fallback isn't present: adding a Spock 6 node to a Spock 5 cluster
-crash-loops the new node's apply worker (`function
-spock.read_peer_progress(...) does not exist`, called directly against the
-Spock 5 peer with no fallback). The `init-spock` job checks the Spock major
-version of every node before making any changes and fails with a clear error
-on any mismatch, in either direction. This is a limitation of the currently
-published preview image, not a permanent restriction — it may be lifted in a
-future preview build.
-
-This preview does not provide a supported Spock 5-to-6 upgrade procedure for
-an existing cluster. The validation above only covers add-node; it does not
-verify that changing an existing node's image in place, one node at a time,
-keeps replication working across the version gap in between — that path is
-untested and not recommended.
+The `init-spock` job checks this before making any changes and fails with a
+clear error on a mismatch. Spock 6 is supported for new deployments only —
+see [Spock 6 Preview](postgres_upgrades.md#spock-6-preview).
 
 !!! warning
 

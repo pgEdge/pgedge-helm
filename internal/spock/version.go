@@ -60,7 +60,7 @@ func pgMajorVersion(ctx context.Context, conn *pgxpool.Pool) (uint64, error) {
 	return uint64(versionNum) / 10000, nil
 }
 
-// needsNativeFailoverSlots reports whether conn needs the FAILOVER flag on slot creation, since Spock 6 drops its own failover-slot worker on PostgreSQL 18+; see docs/usage/standby.md.
+// needsNativeFailoverSlots reports whether conn needs the FAILOVER flag on slot creation: required on PostgreSQL 18+, where Spock 6 drops its own failover-slot worker entirely, and used on 17+ as well for consistency; see docs/usage/standby.md.
 func needsNativeFailoverSlots(ctx context.Context, conn *pgxpool.Pool) (bool, error) {
 	spockMajor, err := spockMajorVersion(ctx, conn)
 	if err != nil {
