@@ -19,8 +19,10 @@ const peerCatchupPollInterval = 500 * time.Millisecond
 // COPY snapshot includes all peer writes up to the slot creation point,
 // preventing data loss on add-node.
 //
-// Uses spock.progress.remote_lsn (apply progress at last committed
-// transaction) rather than received_lsn, which can advance on keepalive
+// Uses spock.progress apply-progress-at-last-committed-transaction column
+// (remote_lsn on Spock < 6, remote_commit_lsn on Spock >= 6 — spock.progress
+// became a view over apply_group_progress() in Spock 6 and the column was
+// renamed) rather than received_lsn, which can advance on keepalive
 // messages before commits have been applied.
 //
 // Reads the target LSN from the paired SyncEvent (peer→source) via
@@ -70,6 +72,24 @@ func (r *PeerCatchup) Create(ctx context.Context) error {
 			r.peerName, r.sourceName)
 	}
 
+	spockMajor, err := spockMajorVersion(ctx, r.conn)
+	if err != nil {
+		return fmt.Errorf("check spock version on %s: %w", r.sourceName, err)
+	}
+	progressColumn := "remote_lsn"
+	if spockMajor >= 6 {
+		progressColumn = "remote_commit_lsn"
+	}
+	query := fmt.Sprintf(`
+		SELECT COALESCE(
+			(SELECT p.%s >= $1::pg_lsn
+			 FROM spock.progress p
+			 JOIN spock.node n ON n.node_id = p.remote_node_id
+			 WHERE p.node_id = (SELECT node_id FROM spock.node_info())
+			   AND n.node_name = $2),
+			false
+		)`, progressColumn)
+
 	slog.Info("waiting for peer apply to catch up",
 		"peer", r.peerName, "source", r.sourceName, "target_lsn", r.syncEvent.LSN)
 
@@ -79,16 +99,7 @@ func (r *PeerCatchup) Create(ctx context.Context) error {
 		}
 
 		var reached bool
-		err := r.conn.QueryRow(ctx, `
-			SELECT COALESCE(
-				(SELECT p.remote_lsn >= $1::pg_lsn
-				 FROM spock.progress p
-				 JOIN spock.node n ON n.node_id = p.remote_node_id
-				 WHERE p.node_id = (SELECT node_id FROM spock.node_info())
-				   AND n.node_name = $2),
-				false
-			)`, r.syncEvent.LSN, r.peerName,
-		).Scan(&reached)
+		err := r.conn.QueryRow(ctx, query, r.syncEvent.LSN, r.peerName).Scan(&reached)
 		if err != nil {
 			return fmt.Errorf("query spock.progress on %s for peer %s: %w",
 				r.sourceName, r.peerName, err)
