@@ -243,7 +243,7 @@ func TestMultiClusterInstall(t *testing.T) {
 			t.Fatalf("failed to insert on n1: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		t.Run("a_to_b", func(t *testing.T) {

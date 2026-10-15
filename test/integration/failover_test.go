@@ -74,7 +74,7 @@ func TestUnplannedFailover(t *testing.T) {
 	}
 
 	t.Run("no_data_loss", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		err := wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -100,7 +100,7 @@ func TestUnplannedFailover(t *testing.T) {
 			t.Fatalf("insert on n2: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
@@ -124,7 +124,7 @@ func TestUnplannedFailover(t *testing.T) {
 			t.Fatalf("insert on new n1 primary %s: %v", newPrimary, err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		err = wait.Until(ctx, 2*time.Second, func() (bool, error) {
