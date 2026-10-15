@@ -47,7 +47,7 @@ pgEdge:
 
 !!! warning
 
-    This preview supports only bootstrapping new nodes on Spock 6 — it does not support upgrading an existing node from Spock 5.x to Spock 6 in place. A Spock 6 node cannot subscribe to a Spock 5.x peer, so all nodes in a pgEdge cluster must run the same Spock major version.
+    Spock 6 is supported for new deployments only. Upgrading an existing Spock 5 deployment to Spock 6 isn't supported yet.
 
 !!! warning
 

@@ -10,16 +10,7 @@ on:
       - main
 
 env:
-  # Temporary: the chart's default Postgres image (18-spock5-standard)
-  # currently resolves to a minor version that predates the
-  # output_plugin_libraries GUC (PLAT-722). Point tests at the same tag
-  # from pgEdge's internal image repo, which already has a patched
-  # version, so CI can pass while the public tag catches up. Remove this
-  # (and its two references below) once pgEdge/postgres-images#28 ships
-  # and the public tag moves.
-  TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres-internal:18-spock5-standard
-  # Spock 6 preview image. Unlike the spock5 tag above, this one does not
-  # need the -internal/patched substitution.
+  TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
   TEST_POSTGRES_IMAGE_SPOCK6: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
 
 jobs:
@@ -114,10 +105,13 @@ jobs:
           - spock: spock5
             skip_tests: ''
           - spock: spock6
-            # TestUnplannedFailover hits a known, upstream-unresolved Spock 6 +
-            # PostgreSQL native-slot-sync race on promotion (catalog_xmin
-            # mismatch) — not something this chart can work around. See
-            # docs/usage/standby.md.
+            # TestUnplannedFailover: re-verified with pgEdge.nativeSlotSync's
+            # automatic detection in place (no manual config needed) — the
+            # standby's Spock slot syncs correctly before the failover, but
+            # still goes inactive after promotion. This is a Postgres/Spock
+            # -internal race (catalog xmin), untracked upstream as of this
+            # writing, not something this chart's configuration can work
+            # around. See docs/usage/standby.md.
             #
             # TestNodesAddNodeZeroDowntime hits SPOC-648: spock.get_lsn_from_commit_ts().
             # Remove this skip once a preview image with the fix ships.
