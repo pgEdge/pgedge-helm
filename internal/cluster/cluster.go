@@ -75,13 +75,49 @@ func waitForAll(ctx context.Context, client dynamic.Interface, namespace, appNam
 
 // WaitForAll creates an in-cluster K8s client and waits for all CNPG clusters.
 func WaitForAll(ctx context.Context, namespace, appName string) error {
+	client, err := newClient()
+	if err != nil {
+		return err
+	}
+	return waitForAll(ctx, client, namespace, appName)
+}
+
+// instanceCounts returns each CNPG cluster's configured instance count,
+// keyed by cluster name, for clusters matching the app label.
+func instanceCounts(ctx context.Context, client dynamic.Interface, namespace, appName string) (map[string]int64, error) {
+	list, err := client.Resource(cnpgGVR).Namespace(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("pgedge.com/app-name=%s", appName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list CNPG clusters: %w", err)
+	}
+
+	counts := make(map[string]int64, len(list.Items))
+	for _, item := range list.Items {
+		instances, _, _ := unstructured.NestedInt64(item.Object, "spec", "instances")
+		counts[item.GetName()] = instances
+	}
+	return counts, nil
+}
+
+// InstanceCounts creates an in-cluster K8s client and returns each CNPG
+// cluster's configured instance count, keyed by cluster name.
+func InstanceCounts(ctx context.Context, namespace, appName string) (map[string]int64, error) {
+	client, err := newClient()
+	if err != nil {
+		return nil, err
+	}
+	return instanceCounts(ctx, client, namespace, appName)
+}
+
+func newClient() (dynamic.Interface, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("k8s in-cluster config: %w", err)
+		return nil, fmt.Errorf("k8s in-cluster config: %w", err)
 	}
 	client, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		return fmt.Errorf("k8s dynamic client: %w", err)
+		return nil, fmt.Errorf("k8s dynamic client: %w", err)
 	}
-	return waitForAll(ctx, client, namespace, appName)
+	return client, nil
 }
