@@ -167,10 +167,13 @@ already in the PostgreSQL container.
     and capacity, and any separate WAL-storage settings. Keep the source's
     `snowflake.node` and `lolor.node` values in this isolated copy.
 
-2.  Create a separate recovery `ObjectStore` named `pgedge-restore-store` in
-    that namespace, using the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster).
-    Point it at the same archive, but use credentials limited to reading the
-    required base backups and WAL. Match the endpoint, compression, encryption,
+2.  Create a recovery-only Secret named `pgedge-restore-creds` in that namespace
+    with credentials limited to reading the required base backups and WAL.
+    Create a separate recovery `ObjectStore` named `pgedge-restore-store`, using
+    the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster).
+    Point it at the same archive and reference `pgedge-restore-creds` in its
+    credential selectors, with keys matching those in the Secret. Do not reuse
+    the normal backup Secret. Match the endpoint, compression, encryption,
     and any required noncredential S3 compatibility settings.
 
 3.  Save the following as `pgedge-restore-check.yaml`. Replace `<SOURCE_IMAGE>`,
@@ -236,11 +239,12 @@ already in the PostgreSQL container.
     kubectl describe cluster pgedge-restore-check
     ```
 
-5.  Read the restored database, using the primary Pod name reported by the Cluster:
+5.  Read the restored database, using the primary Pod name reported by the Cluster.
+    Replace `<APPLICATION_DATABASE>` with the source application database name:
 
     ```sh
     RESTORE_POD=$(kubectl get cluster pgedge-restore-check -o jsonpath='{.status.currentPrimary}')
-    kubectl exec "$RESTORE_POD" -c postgres -- psql -X -v ON_ERROR_STOP=1 -d app -c \
+    kubectl exec "$RESTORE_POD" -c postgres -- psql -X -v ON_ERROR_STOP=1 -d "<APPLICATION_DATABASE>" -c \
       "BEGIN READ ONLY; SELECT pg_is_in_recovery(), EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'spock') AS spock_present; COMMIT;"
     ```
 
@@ -249,14 +253,19 @@ already in the PostgreSQL container.
     A ready Pod and an installed extension alone do not verify application data.
     Keep the chosen backup ID, SQL results and recovery duration with your test record.
 
-6.  Remove only the disposable Cluster and its PVCs after reviewing the results:
+6.  Remove the disposable Cluster, its PVCs, the recovery ObjectStore and the
+    recovery-only Secret after reviewing the results:
 
     ```sh
     kubectl delete cluster pgedge-restore-check --wait=true
     kubectl delete pvc -l cnpg.io/cluster=pgedge-restore-check
     kubectl get pods,pvc -l cnpg.io/cluster=pgedge-restore-check
+    kubectl delete objectstore.barmancloud.cnpg.io pgedge-restore-store --wait=true
+    kubectl delete secret pgedge-restore-creds
     ```
 
     Check that no matching resources remain. Storage reclaim policies determine
     whether deleting a PVC also removes its backing volume; check retained volumes
-    separately. Keep the source Cluster, its backups and archive unchanged.
+    separately. Revoke temporary recovery credentials at the storage provider;
+    deleting the Kubernetes Secret does not revoke them. Keep the source Cluster,
+    its backup Secret, backups and archive unchanged.
