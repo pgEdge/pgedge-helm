@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:1.25 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.10 AS builder
 ARG TARGETOS TARGETARCH
 WORKDIR /build
 COPY go.mod go.sum ./
