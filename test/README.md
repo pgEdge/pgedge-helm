@@ -43,7 +43,7 @@ Install tools:
 sudo dnf install -y make git
 
 # Go
-curl -Lo /tmp/go.tar.gz https://go.dev/dl/go1.25.9.linux-amd64.tar.gz
+curl -Lo /tmp/go.tar.gz https://go.dev/dl/go1.26.10.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf /tmp/go.tar.gz
 echo 'export PATH=$PATH:/usr/local/bin:/usr/local/go/bin:$(go env GOPATH)/bin' >> ~/.bashrc
 source ~/.bashrc
