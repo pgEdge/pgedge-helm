@@ -201,6 +201,8 @@ already in the PostgreSQL container.
     Create a separate recovery `ObjectStore` named `pgedge-restore-store` in the
     same namespace, using
     the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster).
+    Pass `--context="$RESTORE_CONTEXT" -n pgedge-restore-check` to the
+    `create` or `apply` commands for both the Secret and ObjectStore.
     Point it at the same archive and reference `pgedge-restore-creds` in its
     credential selectors, with keys matching those in the Secret. Do not reuse
     the normal backup Secret. Use an archive endpoint reachable from the restore
