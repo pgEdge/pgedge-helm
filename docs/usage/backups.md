@@ -149,6 +149,11 @@ already in the PostgreSQL container.
 !!! warning
 
     Use an isolated test environment that cannot connect to live pgEdge nodes.
+    The commands below use explicit source and restore contexts and a new
+    `pgedge-restore-check` namespace. A separate namespace alone does not block
+    network traffic; establish and verify network isolation before creating the
+    restored Cluster.
+
     The restored database also contains Spock metadata. This check does not
     rebuild the multi-active topology, verify replication, or rejoin a failed
     node. Do not add this disposable Cluster to `pgEdge.nodes` or run the
@@ -158,23 +163,51 @@ already in the PostgreSQL container.
     which is different from the Kubernetes Backup resource name:
 
     ```sh
-    kubectl get backups -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.cluster.name,METHOD:.spec.method,PHASE:.status.phase,BACKUP_ID:.status.backupId
-    kubectl get cluster pgedge-n1 -o yaml
+    SOURCE_CONTEXT="<SOURCE_CONTEXT>"
+    SOURCE_NAMESPACE="<SOURCE_NAMESPACE>"
+    RESTORE_CONTEXT="<RESTORE_CONTEXT>"
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get backups -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.cluster.name,METHOD:.spec.method,PHASE:.status.phase,BACKUP_ID:.status.backupId
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get cluster pgedge-n1 -o yaml
     ```
 
-    Commands assume the namespace of the pgEdge release; add `-n <namespace>`
-    if needed. Copy the source image, PostgreSQL configuration, storage class
-    and capacity, and any separate WAL-storage settings. Keep the source's
-    `snowflake.node` and `lolor.node` values in this isolated copy.
+    Replace the placeholders with the source context and release namespace,
+    and the intended isolated restore context. Copy the source image, PostgreSQL
+    configuration, storage class and capacity, and any separate WAL-storage
+    settings. Keep the source's `snowflake.node` and `lolor.node` values in this
+    isolated copy.
 
-2.  Create a recovery-only Secret named `pgedge-restore-creds` in that namespace
-    with credentials limited to reading the required base backups and WAL.
-    Create a separate recovery `ObjectStore` named `pgedge-restore-store`, using
+2.  The restore context needs CloudNativePG and the Barman Cloud plugin installed.
+    Create a new namespace there; do not reuse the source release namespace:
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" create namespace pgedge-restore-check
+    ```
+
+    Before creating restore Pods, configure network isolation. Prefer a separate
+    test cluster with no route to live pgEdge endpoints. If using a namespace in
+    a shared cluster, require a CNI that enforces [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/).
+    Start with [default-deny ingress and egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-and-all-egress-traffic),
+    then allow only the DNS,
+    Kubernetes API, operator/plugin traffic and backup storage access needed by
+    your deployment. Keep live pgEdge Pod, Service and external replication
+    endpoints blocked. Policies are additive: review every policy that selects
+    these Pods, and verify allowed dependencies work and live endpoints are
+    unreachable from a probe Pod under the same policies before restoring.
+    An accepted policy manifest alone does not verify enforcement.
+
+    Create a recovery-only Secret named `pgedge-restore-creds` in
+    `pgedge-restore-check`, with credentials limited to reading the required
+    base backups and WAL.
+    Create a separate recovery `ObjectStore` named `pgedge-restore-store` in the
+    same namespace, using
     the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster).
     Point it at the same archive and reference `pgedge-restore-creds` in its
     credential selectors, with keys matching those in the Secret. Do not reuse
-    the normal backup Secret. Match the endpoint, compression, encryption,
-    and any required noncredential S3 compatibility settings.
+    the normal backup Secret. Use an archive endpoint reachable from the restore
+    context and namespace. Qualify Kubernetes Service names with their namespace,
+    or use the storage service's external address for a different cluster.
+    Match compression, encryption and any required noncredential S3
+    compatibility settings.
 
 3.  Save the following as `pgedge-restore-check.yaml`. Replace `<SOURCE_IMAGE>`,
     `<SOURCE_STORAGE_SIZE>` and `<BACKUP_ID>` with the values recorded above.
@@ -187,6 +220,7 @@ already in the PostgreSQL container.
     kind: Cluster
     metadata:
       name: pgedge-restore-check
+      namespace: pgedge-restore-check
     spec:
       instances: 1
       imageName: "<SOURCE_IMAGE>"
@@ -226,25 +260,25 @@ already in the PostgreSQL container.
 4.  Create the restore and watch it become ready:
 
     ```sh
-    kubectl apply --dry-run=server -f pgedge-restore-check.yaml
-    kubectl apply -f pgedge-restore-check.yaml
-    kubectl get pods -l cnpg.io/cluster=pgedge-restore-check -w
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply --dry-run=server -f pgedge-restore-check.yaml
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply -f pgedge-restore-check.yaml
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get pods -l cnpg.io/cluster=pgedge-restore-check -w
     ```
 
     Stop watching with Ctrl-C, then check readiness. Increase the timeout for
     larger databases; inspect the Cluster events and recovery Pod logs if it fails.
 
     ```sh
-    kubectl wait --for=condition=Ready cluster/pgedge-restore-check --timeout=10m
-    kubectl describe cluster pgedge-restore-check
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check wait --for=condition=Ready cluster/pgedge-restore-check --timeout=10m
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check describe cluster pgedge-restore-check
     ```
 
 5.  Read the restored database, using the primary Pod name reported by the Cluster.
     Replace `<APPLICATION_DATABASE>` with the source application database name:
 
     ```sh
-    RESTORE_POD=$(kubectl get cluster pgedge-restore-check -o jsonpath='{.status.currentPrimary}')
-    kubectl exec "$RESTORE_POD" -c postgres -- psql -X -v ON_ERROR_STOP=1 -d "<APPLICATION_DATABASE>" -c \
+    RESTORE_POD=$(kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get cluster pgedge-restore-check -o jsonpath='{.status.currentPrimary}')
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check exec "$RESTORE_POD" -c postgres -- psql -X -v ON_ERROR_STOP=1 -d "<APPLICATION_DATABASE>" -c \
       "BEGIN READ ONLY; SELECT pg_is_in_recovery(), EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'spock') AS spock_present; COMMIT;"
     ```
 
@@ -253,15 +287,16 @@ already in the PostgreSQL container.
     A ready Pod and an installed extension alone do not verify application data.
     Keep the chosen backup ID, SQL results and recovery duration with your test record.
 
-6.  Remove the disposable Cluster, its PVCs, the recovery ObjectStore and the
-    recovery-only Secret after reviewing the results:
+6.  Remove the disposable Cluster, its PVCs, the recovery ObjectStore, the
+    recovery-only Secret and the test namespace after reviewing the results:
 
     ```sh
-    kubectl delete cluster pgedge-restore-check --wait=true
-    kubectl delete pvc -l cnpg.io/cluster=pgedge-restore-check
-    kubectl get pods,pvc -l cnpg.io/cluster=pgedge-restore-check
-    kubectl delete objectstore.barmancloud.cnpg.io pgedge-restore-store --wait=true
-    kubectl delete secret pgedge-restore-creds
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete cluster pgedge-restore-check --wait=true
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete pvc -l cnpg.io/cluster=pgedge-restore-check
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get pods,pvc -l cnpg.io/cluster=pgedge-restore-check
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete objectstore.barmancloud.cnpg.io pgedge-restore-store --wait=true
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete secret pgedge-restore-creds
+    kubectl --context="$RESTORE_CONTEXT" delete namespace pgedge-restore-check --wait=true
     ```
 
     Check that no matching resources remain. Storage reclaim policies determine
