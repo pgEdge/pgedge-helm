@@ -137,3 +137,198 @@ You can follow these steps to setup scheduled backups to an AWS S3 bucket using 
             pluginConfiguration:
               name: barman-cloud.cloudnative-pg.io
     ```
+
+
+## Verify a backup with a restore
+
+Use CloudNativePG's native [recovery procedure](https://cloudnative-pg.io/docs/1.29/recovery/)
+to check a single node's physical backup. The steps below use `pgedge-n1` from
+the configuration above and require only `kubectl`, including the `psql` client
+already in the PostgreSQL container.
+
+!!! warning
+
+    Use an isolated test environment that cannot connect to live pgEdge nodes.
+    The commands below use explicit source and restore contexts and a new
+    `pgedge-restore-check` namespace. A separate namespace alone does not block
+    network traffic; establish and verify network isolation before creating the
+    restored Cluster.
+
+    The restored database also contains Spock metadata. This check does not
+    rebuild the multi-active topology, verify replication, or rejoin a failed
+    node. Do not add this disposable Cluster to `pgEdge.nodes` or run the
+    chart's Spock initialization job against it.
+
+1.  Choose a completed plugin backup for `pgedge-n1` and record its **backup ID**,
+    which is different from the Kubernetes Backup resource name:
+
+    ```sh
+    SOURCE_CONTEXT="<SOURCE_CONTEXT>"
+    SOURCE_NAMESPACE="<SOURCE_NAMESPACE>"
+    RESTORE_CONTEXT="<RESTORE_CONTEXT>"
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get backups -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.cluster.name,METHOD:.spec.method,PHASE:.status.phase,BACKUP_ID:.status.backupId
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get cluster pgedge-n1 -o yaml
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get objectstore s3-store -o yaml
+    ```
+
+    Replace the placeholders with the source context and release namespace,
+    and the intended isolated restore context. Copy the source image, PostgreSQL
+    configuration, storage class and capacity, and any separate WAL-storage
+    settings. Keep the source's `snowflake.node` and `lolor.node` values in this
+    isolated copy.
+
+2.  The restore context needs CloudNativePG and the Barman Cloud plugin installed.
+    Create a new namespace there; do not reuse the source release namespace:
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" create namespace pgedge-restore-check
+    ```
+
+    Before creating restore Pods, configure network isolation. Prefer a separate
+    test cluster with no route to live pgEdge endpoints. If using a namespace in
+    a shared cluster, require a CNI that enforces [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/).
+    Start with [default-deny ingress and egress](https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-and-all-egress-traffic),
+    then allow only the DNS,
+    Kubernetes API, operator/plugin traffic and backup storage access needed by
+    your deployment. Keep live pgEdge Pod, Service and external replication
+    endpoints blocked. Policies are additive: review every policy that selects
+    these Pods, and verify allowed dependencies work and live endpoints are
+    unreachable from a probe Pod under the same policies before restoring.
+    An accepted policy manifest alone does not verify enforcement.
+
+    Create a recovery-only Secret and ObjectStore before creating the Cluster.
+    The following example uses the S3 access-key setup above. Replace
+    `<READ_ONLY_ACCESS_KEY_ID>` and `<READ_ONLY_SECRET_ACCESS_KEY>` with credentials
+    limited to reading the required base backups and WAL, and `<SOURCE_ARCHIVE>`
+    with the source ObjectStore's `destinationPath` (including its bucket and
+    prefix). Do not reuse the normal backup Secret.
+
+    Use an archive endpoint reachable from the restore context and namespace.
+    For S3-compatible storage, add the source's `endpointURL` under
+    `configuration`. Qualify Kubernetes Service names with their namespace, or
+    use the storage service's external address for a different cluster. Copy any
+    required noncredential settings, such as `endpointCA`, compression and
+    encryption, from the source ObjectStore before applying this example. If
+    `endpointCA` references a Secret, also create that CA Secret in the restore
+    namespace.
+    Adapt the credential fields for other providers or authentication methods
+    using the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check create secret generic pgedge-restore-creds \
+      --from-literal=ACCESS_KEY_ID="<READ_ONLY_ACCESS_KEY_ID>" \
+      --from-literal=ACCESS_SECRET_KEY="<READ_ONLY_SECRET_ACCESS_KEY>"
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply -f - <<'YAML'
+    apiVersion: barmancloud.cnpg.io/v1
+    kind: ObjectStore
+    metadata:
+      name: pgedge-restore-store
+      namespace: pgedge-restore-check
+    spec:
+      configuration:
+        destinationPath: "<SOURCE_ARCHIVE>"
+        s3Credentials:
+          accessKeyId:
+            name: pgedge-restore-creds
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: pgedge-restore-creds
+            key: ACCESS_SECRET_KEY
+    YAML
+    ```
+
+3.  Save the following as `pgedge-restore-check.yaml`. Replace `<SOURCE_IMAGE>`,
+    `<SOURCE_STORAGE_SIZE>` and `<BACKUP_ID>` with the values recorded above.
+    The PostgreSQL settings shown are for this chart's default `n1` configuration;
+    adjust them to match the source, including its shared libraries. Set a
+    suitable storage class and separate WAL storage if the source uses them.
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: pgedge-restore-check
+      namespace: pgedge-restore-check
+    spec:
+      instances: 1
+      imageName: "<SOURCE_IMAGE>"
+      storage:
+        size: "<SOURCE_STORAGE_SIZE>"
+      postgresql:
+        parameters:
+          snowflake.node: "1"
+          lolor.node: "1"
+          track_commit_timestamp: "on"
+          wal_level: logical
+        shared_preload_libraries:
+          - pg_stat_statements
+          - snowflake
+          - spock
+      bootstrap:
+        recovery:
+          source: pgedge-n1
+          recoveryTarget:
+            backupID: "<BACKUP_ID>"
+            targetImmediate: true
+      externalClusters:
+        - name: pgedge-n1
+          plugin:
+            name: barman-cloud.cloudnative-pg.io
+            parameters:
+              barmanObjectName: pgedge-restore-store
+              serverName: pgedge-n1
+    ```
+
+    `serverName` is the source's archive server name, normally `pgedge-n1`.
+    Use the source plugin's override if it has one, not the disposable Cluster's
+    name. `backupID` pins the chosen base backup; `targetImmediate` stops recovery
+    when that backup first reaches consistency. No WAL archiver is configured
+    for the restored Cluster.
+
+4.  Create the restore and watch it become ready:
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply --dry-run=server -f pgedge-restore-check.yaml
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply -f pgedge-restore-check.yaml
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get pods -l cnpg.io/cluster=pgedge-restore-check -w
+    ```
+
+    Stop watching with Ctrl-C, then check readiness. Increase the timeout for
+    larger databases; inspect the Cluster events and recovery Pod logs if it fails.
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check wait --for=condition=Ready cluster/pgedge-restore-check --timeout=10m
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check describe cluster pgedge-restore-check
+    ```
+
+5.  Read the restored database, using the primary Pod name reported by the Cluster.
+    Replace `<APPLICATION_DATABASE>` with the source application database name:
+
+    ```sh
+    RESTORE_POD=$(kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get cluster pgedge-restore-check -o jsonpath='{.status.currentPrimary}')
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check exec "$RESTORE_POD" -c postgres -- psql -X -v ON_ERROR_STOP=1 -d "<APPLICATION_DATABASE>" -c \
+      "BEGIN READ ONLY; SELECT pg_is_in_recovery(), EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'spock') AS spock_present; COMMIT;"
+    ```
+
+    Expect `pg_is_in_recovery` to be `f` and `spock_present` to be `t`. Also run
+    read-only assertions against known application records from before the backup.
+    A ready Pod and an installed extension alone do not verify application data.
+    Keep the chosen backup ID, SQL results and recovery duration with your test record.
+
+6.  Remove the disposable Cluster, its PVCs, the recovery ObjectStore, the
+    recovery-only Secret and the test namespace after reviewing the results:
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete cluster pgedge-restore-check --wait=true
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete pvc -l cnpg.io/cluster=pgedge-restore-check
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check get pods,pvc -l cnpg.io/cluster=pgedge-restore-check
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete objectstore.barmancloud.cnpg.io pgedge-restore-store --wait=true
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check delete secret pgedge-restore-creds
+    kubectl --context="$RESTORE_CONTEXT" delete namespace pgedge-restore-check --wait=true
+    ```
+
+    Check that no matching resources remain. Storage reclaim policies determine
+    whether deleting a PVC also removes its backing volume; check retained volumes
+    separately. Revoke temporary recovery credentials at the storage provider;
+    deleting the Kubernetes Secret does not revoke them. Keep the source Cluster,
+    its backup Secret, backups and archive unchanged.
