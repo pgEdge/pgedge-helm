@@ -142,3 +142,12 @@ func getNestedString(obj *unstructured.Unstructured, fields ...string) string {
 	}
 	return val
 }
+
+// getNestedBool is a convenience wrapper for unstructured field access.
+func getNestedBool(obj *unstructured.Unstructured, fields ...string) bool {
+	val, found, err := unstructured.NestedBool(obj.Object, fields...)
+	if err != nil || !found {
+		return false
+	}
+	return val
+}

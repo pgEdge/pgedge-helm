@@ -27,6 +27,40 @@
 {{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
+{{- /*
+Spock 6 needs Postgres's native replication-slot sync on PG17+ to keep a
+promoted standby's Spock slot (see docs/usage/standby.md). Enable it
+per-node based on pgEdge.nativeSlotSync: "auto" detects from the image
+tag (0/unknown never enables), true/false force it on or off. Never
+override a value the user already set explicitly.
+*/ -}}
+{{- /* not `| default "auto"`: sprig's default treats an explicit false as unset */ -}}
+{{- $nativeSlotSyncMode := "auto" -}}
+{{- if hasKey $.Values.pgEdge "nativeSlotSync" -}}
+  {{- $nativeSlotSyncMode = toString $.Values.pgEdge.nativeSlotSync -}}
+{{- end -}}
+{{- $enableNativeSlotSync := false -}}
+{{- if eq $nativeSlotSyncMode "true" -}}
+  {{- $enableNativeSlotSync = true -}}
+{{- else if eq $nativeSlotSyncMode "auto" -}}
+  {{- $versions := fromYaml (include "pgedge.imageTagVersions" $merged.imageName) -}}
+  {{- if and (ge (int $versions.spockMajor) 6) (ge (int $versions.pgMajor) 17) -}}
+    {{- $enableNativeSlotSync = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if $enableNativeSlotSync -}}
+  {{- if not (hasKey $merged.postgresql.parameters "sync_replication_slots") -}}
+    {{- $_ := set $merged.postgresql.parameters "sync_replication_slots" "on" -}}
+  {{- end -}}
+  {{- if not (hasKey $merged "replicationSlots") -}}
+    {{- $_ := set $merged "replicationSlots" (dict "highAvailability" (dict "synchronizeLogicalDecoding" true)) -}}
+  {{- else if not (hasKey $merged.replicationSlots "highAvailability") -}}
+    {{- $_ := set $merged.replicationSlots "highAvailability" (dict "synchronizeLogicalDecoding" true) -}}
+  {{- else if not (hasKey $merged.replicationSlots.highAvailability "synchronizeLogicalDecoding") -}}
+    {{- $_ := set $merged.replicationSlots.highAvailability "synchronizeLogicalDecoding" true -}}
+  {{- end -}}
+{{- end -}}
+
 {{- if gt $i 0 }}
 ---
 {{- end }}

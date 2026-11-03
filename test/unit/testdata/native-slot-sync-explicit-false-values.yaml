@@ -1,0 +1,10 @@
+pgEdge:
+  appName: pgedge
+  nativeSlotSync: false
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+    storage:
+      size: 1Gi
