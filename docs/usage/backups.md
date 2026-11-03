@@ -168,6 +168,7 @@ already in the PostgreSQL container.
     RESTORE_CONTEXT="<RESTORE_CONTEXT>"
     kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get backups -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.cluster.name,METHOD:.spec.method,PHASE:.status.phase,BACKUP_ID:.status.backupId
     kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get cluster pgedge-n1 -o yaml
+    kubectl --context="$SOURCE_CONTEXT" -n "$SOURCE_NAMESPACE" get objectstore s3-store -o yaml
     ```
 
     Replace the placeholders with the source context and release namespace,
@@ -195,21 +196,46 @@ already in the PostgreSQL container.
     unreachable from a probe Pod under the same policies before restoring.
     An accepted policy manifest alone does not verify enforcement.
 
-    Create a recovery-only Secret named `pgedge-restore-creds` in
-    `pgedge-restore-check`, with credentials limited to reading the required
-    base backups and WAL.
-    Create a separate recovery `ObjectStore` named `pgedge-restore-store` in the
-    same namespace, using
-    the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/#restoring-a-cluster).
-    Pass `--context="$RESTORE_CONTEXT" -n pgedge-restore-check` to the
-    `create` or `apply` commands for both the Secret and ObjectStore.
-    Point it at the same archive and reference `pgedge-restore-creds` in its
-    credential selectors, with keys matching those in the Secret. Do not reuse
-    the normal backup Secret. Use an archive endpoint reachable from the restore
-    context and namespace. Qualify Kubernetes Service names with their namespace,
-    or use the storage service's external address for a different cluster.
-    Match compression, encryption and any required noncredential S3
-    compatibility settings.
+    Create a recovery-only Secret and ObjectStore before creating the Cluster.
+    The following example uses the S3 access-key setup above. Replace
+    `<READ_ONLY_ACCESS_KEY_ID>` and `<READ_ONLY_SECRET_ACCESS_KEY>` with credentials
+    limited to reading the required base backups and WAL, and `<SOURCE_ARCHIVE>`
+    with the source ObjectStore's `destinationPath` (including its bucket and
+    prefix). Do not reuse the normal backup Secret.
+
+    Use an archive endpoint reachable from the restore context and namespace.
+    For S3-compatible storage, add the source's `endpointURL` under
+    `configuration`. Qualify Kubernetes Service names with their namespace, or
+    use the storage service's external address for a different cluster. Copy any
+    required noncredential settings, such as `endpointCA`, compression and
+    encryption, from the source ObjectStore before applying this example. If
+    `endpointCA` references a Secret, also create that CA Secret in the restore
+    namespace.
+    Adapt the credential fields for other providers or authentication methods
+    using the [Barman plugin configuration](https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/).
+
+    ```sh
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check create secret generic pgedge-restore-creds \
+      --from-literal=ACCESS_KEY_ID="<READ_ONLY_ACCESS_KEY_ID>" \
+      --from-literal=ACCESS_SECRET_KEY="<READ_ONLY_SECRET_ACCESS_KEY>"
+    kubectl --context="$RESTORE_CONTEXT" -n pgedge-restore-check apply -f - <<'YAML'
+    apiVersion: barmancloud.cnpg.io/v1
+    kind: ObjectStore
+    metadata:
+      name: pgedge-restore-store
+      namespace: pgedge-restore-check
+    spec:
+      configuration:
+        destinationPath: "<SOURCE_ARCHIVE>"
+        s3Credentials:
+          accessKeyId:
+            name: pgedge-restore-creds
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: pgedge-restore-creds
+            key: ACCESS_SECRET_KEY
+    YAML
+    ```
 
 3.  Save the following as `pgedge-restore-check.yaml`. Replace `<SOURCE_IMAGE>`,
     `<SOURCE_STORAGE_SIZE>` and `<BACKUP_ID>` with the values recorded above.
