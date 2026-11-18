@@ -28,9 +28,14 @@
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
 {{- /* point Spock's failover slot worker (5.0.14+) at the Spock database,
-       unless the user set spock.failover_slots_database explicitly */ -}}
+       unless the user set spock.failover_slots_database explicitly. Use the
+       chart-wide initdb database, which is the database init-spock
+       configures on every node, so nodes bootstrapped with initdb: null
+       (e.g. recovery) still get it */ -}}
 {{- if not (hasKey $merged.postgresql.parameters "spock.failover_slots_database") -}}
-  {{- $dbName := dig "bootstrap" "initdb" "database" "" $merged -}}
+  {{- $bootstrap := $defaults.bootstrap | default dict -}}
+  {{- $initdb := $bootstrap.initdb | default dict -}}
+  {{- $dbName := $initdb.database | default "" -}}
   {{- if $dbName -}}
     {{- $_ := set $merged.postgresql.parameters "spock.failover_slots_database" $dbName -}}
   {{- end -}}

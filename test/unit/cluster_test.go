@@ -181,8 +181,8 @@ func TestOutputPluginLibrariesPerNodeNullOverride(t *testing.T) {
 }
 
 // spock.failover_slots_database (Spock 5.0.14+) is derived from the
-// initdb database so the failover slot worker decodes slot copies in the
-// Spock database.
+// chart-wide initdb database, the database init-spock configures Spock in,
+// so the failover slot worker decodes slot copies in the Spock database.
 func TestFailoverSlotsDatabaseDefaultsToInitdbDatabase(t *testing.T) {
 	for _, tc := range []struct {
 		values string
@@ -202,6 +202,23 @@ func TestFailoverSlotsDatabaseDefaultsToInitdbDatabase(t *testing.T) {
 				t.Errorf("expected spock.failover_slots_database=%q, got %q", tc.want, got)
 			}
 		})
+	}
+}
+
+// A node bootstrapped from a backup sets bootstrap.initdb to null. It must
+// still render, and still get the chart-wide Spock database that init-spock
+// configures on every node.
+func TestFailoverSlotsDatabaseRecoveryNode(t *testing.T) {
+	objects := renderTemplate(t, "recovery-node-values.yaml")
+	for _, name := range []string{"pgedge-n1", "pgedge-n2"} {
+		cluster := findByKindAndName(objects, "Cluster", name)
+		if cluster == nil {
+			t.Fatalf("%s Cluster not found", name)
+		}
+		got := getNestedString(cluster, "spec", "postgresql", "parameters", "spock.failover_slots_database")
+		if got != "app" {
+			t.Errorf("%s: expected spock.failover_slots_database=%q, got %q", name, "app", got)
+		}
 	}
 }
 
