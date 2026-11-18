@@ -133,32 +133,23 @@ jobs:
           - spock: spock6
             group: install
             run_tests: 'TestDistributedInstall|TestSingleNodeInstall|TestCustomDatabaseInstall'
-            # Intermittently stall on spock6 (unconfirmed cause).
-            skip_tests: 'TestDistributedInstall/data_replicates|TestDistributedInstall/idempotent_upgrade'
+            skip_tests: ''
           - spock: spock6
             group: install-ha
             run_tests: 'TestDistributedHAInstall|TestMultiClusterInstall'
-            # Intermittently stalls on spock6 (unconfirmed cause).
-            skip_tests: 'TestMultiClusterInstall/data_replicates_cross_namespace/b_to_a'
+            skip_tests: ''
           - spock: spock6
             group: nodes
             run_tests: 'TestNodes'
-            # TestNodesRemoveNode's replication check intermittently stalls
-            # (unconfirmed cause).
-            skip_tests: 'TestNodesRemoveNode/replication_still_works'
+            skip_tests: ''
           - spock: spock6
             group: recovery
             run_tests: 'TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent'
-            # Intermittently stall on spock6 (unconfirmed cause). TestSlotLossRecovery
-            # fails in inline setup code, not a subtest, so it's skipped whole.
-            skip_tests: 'TestSlotLossRecovery|TestIdempotentReconciliation'
-          # spock6/failover is omitted: TestUnplannedFailover is its only
-          # test. It used to promote the standby while its native-slot-sync
-          # copy of the Spock slot was still temporary, so promotion dropped
-          # it. waitForStandbySlotSync now waits for a persistent copy (and
-          # nudges the primary with pg_log_standby_snapshot()); add this
-          # group back once that's confirmed on a spock6 image. See
-          # docs/usage/standby.md.
+            skip_tests: ''
+          - spock: spock6
+            group: failover
+            run_tests: 'TestUnplannedFailover'
+            skip_tests: ''
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
