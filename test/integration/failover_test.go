@@ -54,12 +54,15 @@ func TestUnplannedFailover(t *testing.T) {
 	}
 
 	// Wait for Spock's failover_slots worker to sync logical slots from
-	// each primary to its standby. Without this, killing the primary before
-	// the worker's first successful sync leaves the promoted standby with no
-	// Spock slot, which breaks replication. The worker runs on an interval
-	// (~60s) so the first sync can take up to ~2 minutes from cluster init.
-	waitForStandbySlotSync(t, testKube,
-		[]string{"pgedge-n1-2", "pgedge-n2-2"}, 3*time.Minute)
+	// each primary to its standby, and (Spock 5.0.14+) for those copies to
+	// become permanent. Without this, killing the primary before then leaves
+	// the promoted standby with no Spock slot, which breaks replication. The
+	// worker runs on an interval (~60s) so the first sync can take up to ~2
+	// minutes from cluster init.
+	waitForStandbySlotSync(t, testKube, []standbySlotSync{
+		{primary: "pgedge-n1-1", standbys: []string{"pgedge-n1-2"}},
+		{primary: "pgedge-n2-1", standbys: []string{"pgedge-n2-2"}},
+	}, 3*time.Minute)
 
 	oldPrimary := killPrimary(t, testKube, "pgedge-n1")
 	waitForPromotion(t, testKube, "pgedge-n1", oldPrimary, timeout)

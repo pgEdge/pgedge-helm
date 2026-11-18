@@ -27,6 +27,15 @@
 {{- $_ := set $merged.postgresql.parameters "snowflake.node" $ordStr -}}
 {{- $_ := set $merged.postgresql.parameters "lolor.node" $ordStr -}}
 
+{{- /* point Spock's failover slot worker (5.0.14+) at the Spock database,
+       unless the user set spock.failover_slots_database explicitly */ -}}
+{{- if not (hasKey $merged.postgresql.parameters "spock.failover_slots_database") -}}
+  {{- $dbName := dig "bootstrap" "initdb" "database" "" $merged -}}
+  {{- if $dbName -}}
+    {{- $_ := set $merged.postgresql.parameters "spock.failover_slots_database" $dbName -}}
+  {{- end -}}
+{{- end -}}
+
 {{- if gt $i 0 }}
 ---
 {{- end }}

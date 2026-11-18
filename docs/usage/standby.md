@@ -27,6 +27,18 @@ pgEdge:
       size: 1Gi
 ```
 
+## Replication slot readiness
+
+Other nodes replicate from a node through Spock replication slots on its primary. Spock's failover slot worker copies these slots to each standby about once a minute. Since Spock 5.0.14, a new copy starts out as a temporary slot and only becomes permanent once the primary's slot has advanced past the standby's position, which needs some write activity on the primary. Promotion drops temporary slots, so if a standby is promoted before its copies are permanent, the other nodes stop replicating from this node.
+
+This mainly matters right after a node or standby is created, or after several promotions in quick succession. Before promoting a replica, check on the standby that every Spock slot on the primary has a copy with `temporary` set to `f`:
+
+```sql
+SELECT slot_name, temporary FROM pg_replication_slots WHERE plugin = 'spock_output';
+```
+
+If a copy is still temporary on an idle primary, run `SELECT pg_log_standby_snapshot();` on the primary (or any write transaction), then check again.
+
 ## Promoting a replica
 
 If you have configured a node with more than one instance, you can perform a promotion using the `kubectl cnpg` plugin.

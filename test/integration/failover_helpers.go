@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -67,33 +68,81 @@ func killPrimary(t *testing.T, k *kube.Kubectl, cluster string) string {
 	return primary
 }
 
-// waitForStandbySlotSync blocks until each given standby pod has at least
-// one logical spk_* slot in pg_replication_slots. Spock's failover_slots
-// worker syncs logical slots from primary to standby on an interval (~60s).
-// Without this wait, a primary kill that happens before the first sync will
-// promote a standby that has no Spock slot, breaking replication.
-func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, standbyPods []string, timeout time.Duration) {
+// standbySlotSync names a CNPG cluster's primary pod and the standby pods
+// that must hold copies of its Spock slots before a failover.
+type standbySlotSync struct {
+	primary  string
+	standbys []string
+}
+
+// spockSlotNames returns the sorted names of the logical spk_* slots on pod,
+// optionally limited to permanent (non-temporary) ones.
+func spockSlotNames(k *kube.Kubectl, pod string, permanentOnly bool) ([]string, error) {
+	sql := "SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%'"
+	if permanentOnly {
+		sql += " AND NOT temporary"
+	}
+	out, err := k.ExecSQL(pod, sql+" ORDER BY slot_name;")
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if name := strings.TrimSpace(line); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
+// waitForStandbySlotSync blocks until each standby holds a permanent copy of
+// every logical spk_* slot on its primary. Spock's failover_slots worker
+// syncs logical slots from primary to standby on an interval (~60s), so a
+// primary kill that happens before the first sync promotes a standby with no
+// Spock slot and breaks replication.
+//
+// Since Spock 5.0.14 a new copy starts out as a temporary slot and only
+// becomes permanent once the primary's slot has advanced past the standby's
+// position. Promotion drops temporary slots, so a copy that merely exists is
+// not enough. On an idle primary the slot doesn't advance on its own, so each
+// poll calls pg_log_standby_snapshot() on the primary to write a little WAL
+// that the subscribers confirm, moving the slot forward.
+func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, syncs []standbySlotSync, timeout time.Duration) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	for _, pod := range standbyPods {
-		pod := pod
-		err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
-			out, err := k.ExecSQL(pod,
-				"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
+	for _, sync := range syncs {
+		for _, pod := range sync.standbys {
+			var missing []string
+			err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
+				if _, err := k.ExecSQL(sync.primary, "SELECT pg_log_standby_snapshot();"); err != nil {
+					return false, nil
+				}
+				want, err := spockSlotNames(k, sync.primary, true)
+				if err != nil || len(want) == 0 {
+					return false, nil
+				}
+				have, err := spockSlotNames(k, pod, true)
+				if err != nil {
+					return false, nil
+				}
+				missing = missing[:0]
+				for _, name := range want {
+					if !slices.Contains(have, name) {
+						missing = append(missing, name)
+					}
+				}
+				return len(missing) == 0, nil
+			})
 			if err != nil {
-				return false, nil
+				out, _ := k.ExecSQL(pod,
+					"SELECT slot_name, temporary FROM pg_replication_slots WHERE slot_type = 'logical';")
+				t.Fatalf("standby %s never received permanent copies of %s's spk_* slots (missing: %v): %v (slots present: %q)",
+					pod, sync.primary, missing, err, strings.TrimSpace(out))
 			}
-			return strings.TrimSpace(out) != "0", nil
-		})
-		if err != nil {
-			out, _ := k.ExecSQL(pod,
-				"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical';")
-			t.Fatalf("standby %s never received a logical spk_* slot: %v (slots present: %q)",
-				pod, err, strings.TrimSpace(out))
+			t.Logf("standby %s has permanent copies of %s's spk_* slots", pod, sync.primary)
 		}
-		t.Logf("standby %s has logical spk_* slot synced", pod)
 	}
 }
 
