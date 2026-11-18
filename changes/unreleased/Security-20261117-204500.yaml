@@ -1,0 +1,3 @@
+kind: Security
+body: Updated Go and Go module dependencies in the init-spock job (pgedge-helm-utils image) to address security vulnerabilities (#71, #73)
+time: 2026-11-17T20:45:00.000000+05:00
