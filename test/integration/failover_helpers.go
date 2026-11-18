@@ -68,11 +68,22 @@ func killPrimary(t *testing.T, k *kube.Kubectl, cluster string) string {
 }
 
 // waitForStandbySlotSync blocks until each given standby pod has at least
-// one logical spk_* slot in pg_replication_slots. Spock's failover_slots
-// worker syncs logical slots from primary to standby on an interval (~60s).
-// Without this wait, a primary kill that happens before the first sync will
-// promote a standby that has no Spock slot, breaking replication.
-func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, standbyPods []string, timeout time.Duration) {
+// one persistent (non-temporary) logical spk_* slot in pg_replication_slots.
+//
+// The slot copy on a standby is made by Spock's failover_slots worker (Spock
+// 5, and Spock 6 on PG16 and older) or by PostgreSQL's native slot sync
+// (Spock 6 on PG17+). Either way, the copy starts out temporary and only
+// becomes persistent once the slot's consumer on the primary has confirmed
+// past the standby's position: Spock 5.0.14+ does this for the worker's
+// copies, and native slot sync always has. Promotion drops temporary copies,
+// so killing the primary while the copy is still temporary leaves the
+// promoted standby with no Spock slot and breaks replication, the same as
+// killing it before the first sync.
+//
+// On an idle cluster nothing moves the consumer forward, so each poll calls
+// pg_log_standby_snapshot() on primaryPods to write a running-xacts record
+// for the subscribers to decode and confirm.
+func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, primaryPods, standbyPods []string, timeout time.Duration) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -80,8 +91,13 @@ func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, standbyPods []string,
 	for _, pod := range standbyPods {
 		pod := pod
 		err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
+			for _, primary := range primaryPods {
+				// Best effort: a failed nudge only delays the copy
+				// becoming persistent, and the next poll retries it.
+				_, _ = k.ExecSQL(primary, "SELECT pg_log_standby_snapshot();")
+			}
 			out, err := k.ExecSQL(pod,
-				"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
+				"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%' AND NOT temporary;")
 			if err != nil {
 				return false, nil
 			}
@@ -89,11 +105,11 @@ func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, standbyPods []string,
 		})
 		if err != nil {
 			out, _ := k.ExecSQL(pod,
-				"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical';")
-			t.Fatalf("standby %s never received a logical spk_* slot: %v (slots present: %q)",
+				"SELECT slot_name, temporary FROM pg_replication_slots WHERE slot_type = 'logical';")
+			t.Fatalf("standby %s never received a persistent logical spk_* slot: %v (slots present: %q)",
 				pod, err, strings.TrimSpace(out))
 		}
-		t.Logf("standby %s has logical spk_* slot synced", pod)
+		t.Logf("standby %s has persistent logical spk_* slot synced", pod)
 	}
 }
 

@@ -56,13 +56,27 @@ needed for this part either.
 
 !!! warning
 
-    A Postgres/Spock-internal race remains: an unplanned failover doesn't
-    yet reliably survive on Spock 6, because PostgreSQL's native slot-sync
-    worker can refuse to sync a slot right before promotion if the
-    standby's catalog xmin has already advanced past what the slot needs,
-    leaving the promoted node with no slot. This is untracked upstream as
-    of this writing and isn't something this chart's configuration can work
-    around.
+    A standby isn't ready to be promoted until its copy of each Spock slot
+    is persistent. A new copy on a standby starts out temporary and only
+    becomes persistent after the slot's consumer on the primary (the
+    subscribing node) has confirmed past the standby's position. This
+    applies to PostgreSQL's native slot sync, and to Spock's
+    failover-slots worker from Spock 5.0.14. Promotion drops temporary
+    copies, so a failover shortly after a node or standby is created, while
+    the primary is still idle, can leave the promoted node with no Spock
+    slot and break replication.
+
+    Before you promote a standby, check that its copies are persistent:
+
+    ```sql
+    SELECT slot_name, temporary
+    FROM pg_replication_slots
+    WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';
+    ```
+
+    If `temporary` is still `t` on an idle cluster, run
+    `SELECT pg_log_standby_snapshot();` on the primary, or write to it,
+    and check again.
 
 ## Promoting a replica
 
