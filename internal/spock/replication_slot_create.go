@@ -65,14 +65,26 @@ func (r *ReplicationSlotCreate) Create(ctx context.Context) error {
 		return nil
 	}
 
-	_, err = r.conn.Exec(ctx,
-		"SELECT pg_create_logical_replication_slot($1, 'spock_output')",
-		r.slotName(),
-	)
+	failover, err := needsNativeFailoverSlots(ctx, r.conn)
+	if err != nil {
+		return fmt.Errorf("check native failover slot support on %s: %w", r.providerName, err)
+	}
+
+	query := "SELECT pg_create_logical_replication_slot($1, 'spock_output')"
+	if failover {
+		// failover=true so this slot survives a standby promotion via
+		// Postgres's native logical-slot sync. Spock creates its own
+		// slots with this flag on Spock 6 + PG17+ (see
+		// needsNativeFailoverSlots); this slot is pre-created by us
+		// outside of Spock's own node/sub creation flow, so it needs the
+		// same flag set explicitly.
+		query = "SELECT pg_create_logical_replication_slot($1, 'spock_output', false, false, true)"
+	}
+	_, err = r.conn.Exec(ctx, query, r.slotName())
 	if err != nil {
 		return fmt.Errorf("create replication slot %s: %w", r.slotName(), err)
 	}
-	slog.Info("created replication slot", "slot", r.slotName())
+	slog.Info("created replication slot", "slot", r.slotName(), "failover", failover)
 	return nil
 }
 

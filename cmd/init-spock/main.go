@@ -79,7 +79,16 @@ func run(ctx context.Context) error {
 		conns[node.Name] = pool
 	}
 
-	// Step 3: Reset Spock state where needed
+	// Step 3: Reject add-node attempts Spock cannot safely bridge (a Spock
+	// major version mismatch between the new node and a peer), before the
+	// reset step below makes any persistent change. Checks the version
+	// available to install rather than any live-created extension, so this
+	// doesn't depend on the reset/recovery step below having already run.
+	if err := spock.ValidateVersionCompatibility(ctx, cfg, conns); err != nil {
+		return err
+	}
+
+	// Step 4: Reset Spock state where needed
 	if cfg.ResetSpock {
 		slog.Info("resetSpock enabled — dropping and recreating spock on all nodes")
 		if err := spock.ResetSpock(ctx, cfg, conns); err != nil {
@@ -91,6 +100,15 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Reconcile Spock resources
+	// Step 5: Fail loudly if a node needs native replication-slot sync for
+	// standby failover (Spock 6+/PostgreSQL 17+ with instances > 1) but
+	// doesn't have it — rather than leaving a promoted standby silently
+	// missing its Spock slot. Runs after the reset step above so a node
+	// mid-recovery has its spock extension back before being checked.
+	if err := spock.ValidateNativeSlotSync(ctx, cfg, conns); err != nil {
+		return err
+	}
+
+	// Step 6: Reconcile Spock resources
 	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
 }

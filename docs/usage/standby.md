@@ -27,6 +27,57 @@ pgEdge:
       size: 1Gi
 ```
 
+## Spock 6 and standby instances
+
+On PostgreSQL 16 or an older version, Spock 6 uses the same failover-slots
+worker as Spock 5. On PostgreSQL 17 and 18, this chart instead uses
+PostgreSQL's own native logical-slot synchronization — on 18, Spock 6 no
+longer runs its failover-slots worker at all, and this chart opts 17 into
+the same native path too, for consistent behavior across both.
+
+**This is handled automatically.** `pgEdge.nativeSlotSync` (default `auto`)
+reads each node's `imageName` tag (e.g. `18-spock6-standard`) and enables
+native slot sync whenever it's Spock 6+ and PostgreSQL 17+. You don't need
+to set anything yourself in the normal case. It falls back to off if a
+node's image tag doesn't follow that convention (a digest reference or a
+custom tag), since turning it on for an unsupported Postgres version
+prevents that node from starting — set `pgEdge.nativeSlotSync: true` to
+force it on for such a node, or `false` to force it off. The `init-spock`
+job separately verifies this is on wherever it's actually required (Spock
+6+, PostgreSQL 17+, `instances > 1`) and fails with a clear error if not, so
+a tag auto-detection can't parse doesn't silently leave a cluster
+unprotected.
+
+When this chart pre-creates a replication slot for a new node during
+add-node (`internal/spock/replication_slot_create.go`), it detects the live
+Spock and PostgreSQL versions on that connection and sets the slot's
+`FAILOVER` flag to match, under the same condition. No configuration is
+needed for this part either.
+
+!!! warning
+
+    A standby isn't ready to be promoted until its copy of each Spock slot
+    is persistent. A new copy on a standby starts out temporary and only
+    becomes persistent after the slot's consumer on the primary (the
+    subscribing node) has confirmed past the standby's position. This
+    applies to PostgreSQL's native slot sync, and to Spock's
+    failover-slots worker from Spock 5.0.14. Promotion drops temporary
+    copies, so a failover shortly after a node or standby is created, while
+    the primary is still idle, can leave the promoted node with no Spock
+    slot and break replication.
+
+    Before you promote a standby, check that its copies are persistent:
+
+    ```sql
+    SELECT slot_name, temporary
+    FROM pg_replication_slots
+    WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';
+    ```
+
+    If `temporary` is still `t` on an idle cluster, run
+    `SELECT pg_log_standby_snapshot();` on the primary, or write to it,
+    and check again.
+
 ## Promoting a replica
 
 If you have configured a node with more than one instance, you can perform a promotion using the `kubectl cnpg` plugin.
