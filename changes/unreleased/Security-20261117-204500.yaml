@@ -1,3 +1,3 @@
 kind: Security
-body: Updated Go to 1.26.11, golang.org/x/net to 0.62.0 and golang.org/x/text to 0.43.0 in the init-spock job (pgedge-helm-utils image) to fix Go standard library and dependency vulnerabilities, including GO-2026-6859 / CVE-2026-97054 in net/http (#71)
+body: Updated Go and Go module dependencies in the init-spock job (pgedge-helm-utils image) to address security vulnerabilities (#71, #73)
 time: 2026-11-17T20:45:00.000000+05:00
