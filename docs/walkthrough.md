@@ -552,4 +552,5 @@ on Kubernetes:
 - [Adding Nodes](usage/adding_nodes.md)
 - [Removing Nodes](usage/removing_nodes.md)
 - [pgEdge Kubernetes Documentation](https://docs.pgedge.com/kubernetes/) — Installation, upgrades, and support.
-- [Spock Documentation](https://docs.pgedge.com/spock/spock5/) — Active-active replication, conflict resolution, and more.
+- [Spock Documentation](https://docs.pgedge.com/spock-v5/) — Active-active replication, conflict resolution, and more.
+- [Spock 6.0 Documentation](https://docs.pgedge.com/spock-v6/) — Spock 6.0 (beta); see [Using Spock 6.0](usage/spock6.md) for deploying it with this chart.

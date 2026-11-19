@@ -65,15 +65,44 @@ func (r *ReplicationSlotCreate) Create(ctx context.Context) error {
 		return nil
 	}
 
-	_, err = r.conn.Exec(ctx,
-		"SELECT pg_create_logical_replication_slot($1, 'spock_output')",
-		r.slotName(),
-	)
+	var serverVersionNum int
+	err = r.conn.QueryRow(ctx,
+		"SELECT current_setting('server_version_num')::int",
+	).Scan(&serverVersionNum)
+	if err != nil {
+		return fmt.Errorf("read server version on %s: %w", r.providerName, err)
+	}
+
+	_, err = r.conn.Exec(ctx, createLogicalSlotSQL(serverVersionNum), r.slotName())
 	if err != nil {
 		return fmt.Errorf("create replication slot %s: %w", r.slotName(), err)
 	}
-	slog.Info("created replication slot", "slot", r.slotName())
+	slog.Info("created replication slot", "slot", r.slotName(),
+		"failover", slotFailoverSupported(serverVersionNum))
 	return nil
+}
+
+// slotFailoverSupported reports whether the server can mark a logical slot
+// for failover (PostgreSQL 17 and later).
+func slotFailoverSupported(serverVersionNum int) bool {
+	return serverVersionNum >= 170000
+}
+
+// createLogicalSlotSQL returns the statement that creates a Spock logical
+// slot, with $1 as the slot name.
+//
+// On PostgreSQL 17 and later the slot is created with failover = true, as
+// Spock 6.0 does for the slots it creates itself, so PostgreSQL's native slot
+// sync (sync_replication_slots) copies it to physical standbys. Native slot
+// sync is the only mechanism on PostgreSQL 18 with Spock 6.0, which no longer
+// runs its own failover-slots worker there. The flag is harmless where Spock's
+// worker syncs the slots instead, which copies every Spock slot regardless.
+func createLogicalSlotSQL(serverVersionNum int) string {
+	if slotFailoverSupported(serverVersionNum) {
+		return "SELECT pg_create_logical_replication_slot($1, 'spock_output', " +
+			"temporary := false, twophase := false, failover := true)"
+	}
+	return "SELECT pg_create_logical_replication_slot($1, 'spock_output')"
 }
 
 func (r *ReplicationSlotCreate) Update(_ context.Context) error { return nil }

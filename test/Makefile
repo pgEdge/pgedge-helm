@@ -10,6 +10,11 @@ CHART_VERSION ?=
 HELM_REPO ?=
 INIT_SPOCK_IMAGE ?= pgedge-helm-utils:dev
 POSTGRES_IMAGE ?=
+# Regex of top-level test names to run (go test -run). CI uses it to split
+# the integration suite into smaller parallel jobs.
+RUN_TESTS ?=
+# Regex of test names to skip (go test -skip).
+SKIP_TESTS ?=
 TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
@@ -76,7 +81,7 @@ GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){prin
 
 .PHONY: test-integration
 test-integration: ensure-gotestsum
-	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) $(if $(RUN_TESTS),-run "$(RUN_TESTS)") $(if $(SKIP_TESTS),-skip "$(SKIP_TESTS)") ./test/integration/...
 
 .PHONY: test-integration-kind
 test-integration-kind: kind-up kind-load-image
@@ -115,7 +120,14 @@ test-reset: ensure-gotestsum kind-load-image
 .PHONY: test-failover
 test-failover: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
-		-run "TestFailoverAndSwitchover" ./test/integration/...
+		-run "TestFailoverAndSwitchover|TestSwitchoverUnderLoad|TestFailoverUnderLoad" ./test/integration/...
+
+# Needs POSTGRES_IMAGE (e.g. a Spock 6.0 image) and UPGRADE_FROM_POSTGRES_IMAGE
+# (e.g. a Spock 5.0.14 image of the same PostgreSQL major).
+.PHONY: test-spock-upgrade
+test-spock-upgrade: ensure-gotestsum kind-load-image
+	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
+		-run "TestSpockMajorUpgrade" ./test/integration/...
 
 # ---- Chart Testing (ct) ----
 

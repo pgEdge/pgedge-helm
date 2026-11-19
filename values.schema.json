@@ -8,6 +8,10 @@
           "type": "string",
           "maxLength": 26
         },
+        "nativeSlotSync": {
+          "type": ["string", "boolean"],
+          "enum": ["auto", true, false]
+        },
         "nodes": {
           "type": "array",
           "items": {

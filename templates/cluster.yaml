@@ -41,6 +41,18 @@
   {{- end -}}
 {{- end -}}
 
+{{- /* Spock 6.0 on PostgreSQL 18 no longer runs its own failover slot
+       worker, so Spock slots only reach standbys through PostgreSQL's native
+       slot sync. Turn it on through CloudNativePG, which also manages
+       synchronized_standby_slots; see pgEdge.nativeSlotSync. Not
+       `| default "auto"`: sprig's default treats an explicit false as
+       unset. */ -}}
+{{- $nativeSlotSyncMode := "auto" -}}
+{{- if and (hasKey $.Values.pgEdge "nativeSlotSync") (not (kindIs "invalid" $.Values.pgEdge.nativeSlotSync)) -}}
+  {{- $nativeSlotSyncMode = toString $.Values.pgEdge.nativeSlotSync -}}
+{{- end -}}
+{{- include "pgedge.nativeSlotSync" (dict "spec" $merged "mode" $nativeSlotSyncMode) -}}
+
 {{- if gt $i 0 }}
 ---
 {{- end }}

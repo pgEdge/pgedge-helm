@@ -59,6 +59,10 @@ The `init-spock` job will run during the upgrade, ensuring that replication conf
 
     For large databases, the initial sync may take significant time. You can configure the timeout via `pgEdge.initSpockJobConfig.timeout` (default: 7200 seconds / 2 hours). If the job fails or times out, see [Recovering from a failed add](#recovering-from-a-failed-add).
 
+!!! note
+
+    A new node must run the same Spock major version as every existing node. The `init-spock` job checks this before it changes anything, and fails with an error naming both nodes if they differ. To move to Spock 6.0, upgrade the existing nodes first, as described in [Using Spock 6.0](spock6.md#upgrading-from-spock-50x), then add the node.
+
 !!! warning
 
     Remove the `bootstrap` block from the new node's configuration after a successful add. If left in place, subsequent `helm upgrade` runs will re-execute the populate pipeline, which may interfere with active replication.

@@ -1,6 +1,6 @@
 # Configuring Standby Instances
 
-This chart supports the ability to configure standby instances with automatic failover, leveraging spock's delayed feedback and failover slots worker to maintain multi-active replication across failovers / promotions.
+This chart supports the ability to configure standby instances with automatic failover, leveraging spock's delayed feedback and failover slots worker (or PostgreSQL's native slot synchronization with Spock 6.0 on PostgreSQL 18) to maintain multi-active replication across failovers / promotions.
 
 We recommend deploying at least three instances per node to ensure high availability and fault tolerance. This configuration allows each node to maintain quorum and continue operating even if one instance becomes unavailable. Adjust the number of replicas based on your workload requirements and desired level of redundancy.
 
@@ -29,26 +29,34 @@ pgEdge:
 
 ## Replication slot readiness
 
-Other nodes replicate from a node through Spock replication slots on its primary. Spock's failover slot worker copies these slots to each standby about once a minute. Since Spock 5.0.14, a new copy starts out as a temporary slot and only becomes permanent once the primary's slot has advanced past the standby's position. Promotion drops temporary slots, so if a standby is promoted before its copies are permanent, the other nodes stop replicating from this node.
+Other nodes replicate from a node through Spock replication slots on its primary. These slots are copied to each standby in one of two ways:
+
+- With Spock 5, and with Spock 6.0 on PostgreSQL 16 and 17, Spock's failover slot worker copies them, every second by default since Spock 5.0.11.
+- With Spock 6.0 on PostgreSQL 18, PostgreSQL's native slot synchronization copies them, and the chart turns it on through CloudNativePG. See [Using Spock 6.0](spock6.md#standby-instances-and-failover-slots).
+
+Since Spock 5.0.14, a new copy starts out as a temporary slot and only becomes permanent once the primary's slot has advanced past the standby's position. Native slot synchronization behaves the same way. Promotion drops temporary slots, so if a standby is promoted before its copies are permanent, the other nodes stop replicating from this node.
 
 This mainly matters right after a node or standby is created, or after several promotions in quick succession. Before promoting a replica, run this query on the current primary and on the standby you want to promote:
 
 ```sql
-SELECT slot_name, temporary, wal_status, conflicting
+SELECT slot_name, temporary, synced, wal_status, conflicting
 FROM pg_replication_slots
 WHERE plugin = 'spock_output'
 ORDER BY slot_name;
 ```
 
+On PostgreSQL 16, leave out the `synced` column, which was added in PostgreSQL 17.
+
 The standby is ready to promote only when, for every slot name returned on the primary, the standby returns a row with the same name where:
 
 - `temporary` is `f`;
+- `synced` is `t`, if native slot synchronization copies the slots (Spock 6.0 on PostgreSQL 18); a copy with `synced` set to `f` there is left over from Spock 5 and does not advance;
 - `wal_status` is not `lost`, meaning the WAL the slot needs has not been removed;
 - `conflicting` is not `t`, meaning the slot has not been invalidated by a recovery conflict.
 
 Compare the slot names on both sides, not just the rows on the standby: a slot that has no copy on the standby yet does not appear there at all. Do not promote the standby while any slot is missing or fails one of these checks.
 
-In Spock 5.0.14, a copy can stay temporary on an idle primary even after it has caught up. If that happens, run `SELECT pg_log_standby_snapshot();` on the primary (or any write transaction), then check again. A copy that is lost or conflicting is dropped and recreated from the primary by Spock's failover slot worker, after which it goes through the temporary stage again.
+In Spock 5.0.14, a copy can stay temporary on an idle primary even after it has caught up. If that happens, run `SELECT pg_log_standby_snapshot();` on the primary (or any write transaction), then check again. A copy that is lost or conflicting is dropped and recreated from the primary by the failover slot worker or by native slot synchronization, after which it goes through the temporary stage again.
 
 ### Automatic failover
 

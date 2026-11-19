@@ -1,0 +1,38 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    # PostgreSQL 18 + Spock 6 from the chart-wide image: native slot sync on.
+    - name: n1
+      hostname: pgedge-n1-rw
+    # Pinned PostgreSQL 18 minor and Spock 6 release: native slot sync on.
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres:18.7-spock6.0.0-standard
+    # PostgreSQL 17 + Spock 6 keeps Spock's own failover slot worker.
+    - name: n3
+      hostname: pgedge-n3-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres:17-spock6-standard
+    # PostgreSQL 18 + Spock 5 keeps Spock's own failover slot worker.
+    - name: n4
+      hostname: pgedge-n4-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
+    # CNPG HA replication slots turned off: nothing to sync through.
+    - name: n5
+      hostname: pgedge-n5-rw
+      clusterSpec:
+        replicationSlots:
+          highAvailability:
+            enabled: false
+    # Image by digest: versions unknown, left alone.
+    - name: n6
+      hostname: pgedge-n6-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+    instances: 2
+    storage:
+      size: 1Gi

@@ -99,3 +99,25 @@ func TestWaitForAllTimeout(t *testing.T) {
 		t.Error("expected timeout error for unhealthy cluster")
 	}
 }
+
+func TestInstanceCounts(t *testing.T) {
+	withInstances := func(name string, n int64) *unstructured.Unstructured {
+		c := newCluster(name, "default", "Cluster in healthy state")
+		c.Object["spec"] = map[string]interface{}{"instances": n}
+		return c
+	}
+	scheme := runtime.NewScheme()
+	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
+		map[schema.GroupVersionResource]string{cnpgGVR: "ClusterList"},
+		withInstances("pgedge-n1", 1),
+		withInstances("pgedge-n2", 3),
+	)
+
+	counts, err := instanceCounts(context.Background(), client, "default", "pgedge")
+	if err != nil {
+		t.Fatalf("instanceCounts: %v", err)
+	}
+	if counts["pgedge-n1"] != 1 || counts["pgedge-n2"] != 3 {
+		t.Errorf("unexpected counts: %v", counts)
+	}
+}
