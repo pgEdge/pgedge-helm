@@ -125,15 +125,26 @@ func installChart(t *testing.T, valuesFile string) {
 		opts.SetValues = append(opts.SetValues, fmt.Sprintf("pgEdge.clusterSpec.imageName=%s", postgresImg))
 	}
 	if err := testHelm.Install(helmRelease, opts); err != nil {
-		t.Fatalf("helm install failed: %v", err)
+		t.Fatalf("helm install failed: %v%s", err, initSpockLogs())
 	}
 }
 
 func upgradeChart(t *testing.T, valuesFile string) {
 	t.Helper()
 	if err := tryUpgradeChart(valuesFile); err != nil {
-		t.Fatalf("helm upgrade failed: %v", err)
+		t.Fatalf("helm upgrade failed: %v%s", err, initSpockLogs())
 	}
+}
+
+// initSpockLogs returns the init-spock job's logs for a failure message.
+// helm only reports that the hook failed, and the job's pods are gone by the
+// time CI collects debug artifacts, so this is the only place the cause shows.
+func initSpockLogs() string {
+	logs, err := testKube.Logs("job/pgedge-init-spock")
+	if err != nil {
+		return fmt.Sprintf("\n(could not read init-spock logs: %v)", err)
+	}
+	return "\ninit-spock logs:\n" + logs
 }
 
 func tryUpgradeChart(valuesFile string) error {

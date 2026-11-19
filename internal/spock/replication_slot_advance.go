@@ -12,10 +12,16 @@ import (
 )
 
 // ReplicationSlotAdvanceFromCTS advances the provider-side replication slot
-// to the LSN derived from the commit timestamp captured by the paired
+// to the position of the last commit from the provider that the new node
+// already received through the source node, as captured by the paired
 // LagTrackerCommitTimestamp. Used during add-node populate to skip WAL the
 // subscriber has already received via the source path, preventing
 // double-apply when the peer→new subscription is enabled.
+//
+// On Spock 6.0 and later the target is lag_tracker's commit_lsn, which is
+// exact and is what Spock's own add-node procedure (Zodan) uses. Spock 5.0.x
+// has no such column, so the target is derived from the commit timestamp
+// with spock.get_lsn_from_commit_ts(), as before.
 //
 // AdvancedToLSN is set to the new LSN on a successful advance, empty when
 // skipped. ReplicationOriginAdvance reads it to keep the subscriber-side
@@ -79,26 +85,29 @@ func (r *ReplicationSlotAdvanceFromCTS) Create(ctx context.Context) error {
 
 	slotName := r.slotName()
 
-	if r.lagTracker == nil || r.lagTracker.CommitTS == nil || r.lagTracker.CommitTS.IsZero() {
-		slog.Info("no commit timestamp available, skipping slot advance",
+	var targetLSN string
+	switch {
+	case r.lagTracker != nil && r.lagTracker.CommitLSN != "":
+		targetLSN = r.lagTracker.CommitLSN
+	case r.lagTracker != nil && r.lagTracker.CommitTS != nil && !r.lagTracker.CommitTS.IsZero():
+		// Convert commit_ts to target LSN
+		err := r.conn.QueryRow(ctx,
+			"SELECT spock.get_lsn_from_commit_ts($1, $2)::text",
+			slotName, *r.lagTracker.CommitTS,
+		).Scan(&targetLSN)
+		if err != nil {
+			return fmt.Errorf("get target LSN from commit_ts for %s: %w", slotName, err)
+		}
+	default:
+		slog.Info("no commit LSN or timestamp available, skipping slot advance",
 			"provider", r.providerName, "subscriber", r.subscriberName)
 		return nil
-	}
-
-	// Convert commit_ts to target LSN
-	var targetLSN string
-	err := r.conn.QueryRow(ctx,
-		"SELECT spock.get_lsn_from_commit_ts($1, $2)::text",
-		slotName, *r.lagTracker.CommitTS,
-	).Scan(&targetLSN)
-	if err != nil {
-		return fmt.Errorf("get target LSN from commit_ts for %s: %w", slotName, err)
 	}
 
 	// Skip if slot is actively used by a subscription — subscription is
 	// already replicating and will advance the slot itself.
 	var isActive bool
-	err = r.conn.QueryRow(ctx,
+	err := r.conn.QueryRow(ctx,
 		"SELECT EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name = $1 AND active_pid IS NOT NULL)",
 		slotName,
 	).Scan(&isActive)

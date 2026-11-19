@@ -18,7 +18,7 @@ At a high level, this chart features support for:
 - Best practice configuration defaults for deploying pgEdge Distributed Postgres in Kubernetes.
 - Extending / overriding configuration for CloudNativePG across all nodes, or on specific nodes.
 - Deploying additional Kubernetes resources (NetworkPolicies, PodMonitors, backups, etc.) alongside pgEdge using `extraResources`.
-- Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker to maintain active-active replication across failovers and promotions.
+- Configuring standby instances with automatic failover, leveraging Spock's delayed feedback and failover slots worker (or PostgreSQL's native slot synchronization with Spock 6.0 on PostgreSQL 18) to maintain active-active replication across failovers and promotions.
 - Zero downtime node addition via Spock, or adding nodes from backups using CloudNativePG's bootstrap capabilities.
 - Performing Postgres major and minor version upgrades.
 - Client certificate authentication for managed users, including the `pgedge` replication user.
@@ -188,6 +188,7 @@ You can run `make gen-docs` after updating the templates to generate the associa
 | pgEdge.initSpockJobConfig.podSecurityContext | object | `{"fsGroup":65532,"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod Security context for the init-spock job. Set to a Restricted profile by default. Learn more at https://kubernetes.io/docs/concepts/security/pod-security-standards/ |
 | pgEdge.initSpockJobConfig.resetSpock | bool | `false` | When true, the init-spock job will drop and recreate all Spock state on every node before reconciling. Use this when bootstrapping from a Barman backup that contains stale Spock configuration. Remove after successful initialization. |
 | pgEdge.initSpockJobConfig.timeout | int | `7200` | Maximum time (in seconds) for the init-spock job to complete. Increase for large databases where initial sync may take longer. |
+| pgEdge.nativeSlotSync | string | `"auto"` | Whether to turn on PostgreSQL's native logical slot synchronization (through CloudNativePG's `replicationSlots.highAvailability.synchronizeLogicalDecoding`) so standbys keep copies of the Spock replication slots. Spock 6.0 needs it on PostgreSQL 18, where it no longer runs its own failover slot worker. `auto` turns it on for nodes whose image tag names PostgreSQL 18+ and Spock 6+ (e.g. `18-spock6-standard`); `true` turns it on for every node, e.g. for images given by digest or to use it on PostgreSQL 17; `false` never turns it on. Nodes with a single instance are always left alone, since they have no standbys. Settings you put in a node's `clusterSpec` always win. If a node needs it but doesn't have it, the init-spock job fails. See docs/usage/spock6.md. |
 | pgEdge.nodes | list | `[]` | Configuration for each node in the pgEdge cluster. Each node will be deployed as a separate CloudNativePG Cluster. |
 | pgEdge.provisionCerts | bool | `true` | Whether to deploy cert-manager to manage TLS certificates for the cluster. If false, you must provide your own TLS certificates by creating the secrets defined in `clusterSpec.certificates.clientCASecret` and `clusterSpec.certificates.replicationTLSSecret`. |
 

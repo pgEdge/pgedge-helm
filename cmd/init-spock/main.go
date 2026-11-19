@@ -79,7 +79,24 @@ func run(ctx context.Context) error {
 		conns[node.Name] = pool
 	}
 
-	// Step 3: Reset Spock state where needed
+	// Step 3: Before changing anything, reject adding a node with a
+	// different Spock major version. Then make sure each node's Spock
+	// catalog matches its binaries (e.g. after an image change from Spock
+	// 5.0.x to 6.0), that nodes which need native slot sync for their
+	// standbys have it, and warn about settings that would stall
+	// replication.
+	if err := spock.ValidateAddNodeVersions(ctx, cfg, conns); err != nil {
+		return err
+	}
+	if err := spock.EnsureExtensionsCurrent(ctx, cfg, conns); err != nil {
+		return err
+	}
+	if err := spock.ValidateNativeSlotSync(ctx, cfg, conns); err != nil {
+		return err
+	}
+	spock.CheckStandbySlotNames(ctx, cfg, conns)
+
+	// Step 4: Reset Spock state where needed
 	if cfg.ResetSpock {
 		slog.Info("resetSpock enabled — dropping and recreating spock on all nodes")
 		if err := spock.ResetSpock(ctx, cfg, conns); err != nil {
@@ -91,6 +108,14 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Reconcile Spock resources
-	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
+	// Step 5: Reconcile Spock resources
+	if err := resource.Reconcile(ctx, spock.NewReconciler(cfg, conns)); err != nil {
+		return err
+	}
+
+	// Step 6: On PostgreSQL 17+ with Spock 6.0, make sure every Spock slot
+	// has the failover flag so native slot sync copies it to standbys. Slots
+	// carried over from Spock 5.0.x that were in use during the extension
+	// update don't have it yet.
+	return spock.EnableSlotFailover(ctx, cfg, conns)
 }

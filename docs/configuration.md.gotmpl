@@ -251,6 +251,8 @@ Spock 5.0.14 adds `spock.failover_slots_database`, which names the database that
 
 This chart sets `spock.failover_slots_database` on every node to the chart-wide `pgEdge.clusterSpec.bootstrap.initdb.database` (`app` by default), which is the database the init-spock job configures Spock in. A node's own `clusterSpec.bootstrap` does not change it, so nodes bootstrapped from a backup with `initdb: null` get the same value. The chart does not set the parameter if you set it yourself, in the chart-wide or the node's `clusterSpec`. Spock versions older than 5.0.14 don't use it: PostgreSQL keeps it as an unused placeholder setting and starts without a warning.
 
+On PostgreSQL 18 with Spock 6.0, Spock no longer runs its failover slot worker, so the setting has no effect there; the chart turns on PostgreSQL's native slot synchronization for those nodes instead. See [Using Spock 6.0](usage/spock6.md#standby-instances-and-failover-slots).
+
 While the setting is in place, the worker keeps a connection open to that database on every node, including primaries. As a result:
 
 - `DROP DATABASE` on it fails. `WITH (FORCE)` closes the worker's connection, but PostgreSQL still refuses to drop a database with active logical replication slots, which the Spock database has as long as other nodes replicate from it. To stop using a node, remove it from the cluster instead (see [Removing Nodes](usage/removing_nodes.md)).

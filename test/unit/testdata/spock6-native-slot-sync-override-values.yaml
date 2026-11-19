@@ -1,0 +1,22 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    # The user turned CNPG's logical slot sync off explicitly.
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        replicationSlots:
+          highAvailability:
+            synchronizeLogicalDecoding: false
+    # The user set sync_replication_slots themselves.
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        postgresql:
+          parameters:
+            sync_replication_slots: "off"
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+    instances: 2
+    storage:
+      size: 1Gi
