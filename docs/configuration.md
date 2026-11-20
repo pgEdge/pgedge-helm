@@ -253,7 +253,7 @@ This chart sets `spock.failover_slots_database` on every node to the chart-wide 
 
 While the setting is in place, the worker keeps a connection open to that database on every node, including primaries. As a result:
 
-- `DROP DATABASE` on it fails unless you use `DROP DATABASE ... WITH (FORCE)`.
+- `DROP DATABASE` on it fails while the worker is connected. `WITH (FORCE)` closes that connection, but PostgreSQL still refuses to drop a database that has active logical replication slots, which the Spock database has as long as other nodes replicate from it. Remove the node from the cluster first (see [Removing Nodes](usage/removing_nodes.md)), then run `DROP DATABASE ... WITH (FORCE)`.
 - `ALTER DATABASE ... RENAME` on it fails, and has no `FORCE` option. Turn the setting off first (see below), wait for the rolling restart to finish, and run the rename while connected to another database. To turn the setting back on, set it to the new database name.
 
 To turn the setting off, set it to an empty string:

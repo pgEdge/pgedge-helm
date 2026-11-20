@@ -122,45 +122,43 @@ func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, syncs []standbySlotSy
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// pending maps each standby that isn't ready yet to the reason why,
-	// as of the last round.
+	// pending maps each standby that wasn't ready in the last round to the
+	// reason why. It is rebuilt from scratch every round, so a standby that
+	// passed earlier but whose copy has since been lost or invalidated is
+	// caught: the wait only succeeds when every standby passes in the same
+	// round.
 	pending := map[string]string{}
 	for _, pair := range syncs {
 		for _, pod := range pair.standbys {
 			pending[pod] = "not checked yet"
 		}
 	}
+	logged := map[string]bool{}
 
 	err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
+		round := map[string]string{}
 		for _, pair := range syncs {
 			if _, err := k.ExecSQL(pair.primary, "SELECT pg_log_standby_snapshot();"); err != nil {
 				for _, pod := range pair.standbys {
-					if _, ok := pending[pod]; ok {
-						pending[pod] = fmt.Sprintf("pg_log_standby_snapshot() on %s failed: %v", pair.primary, err)
-					}
+					round[pod] = fmt.Sprintf("pg_log_standby_snapshot() on %s failed: %v", pair.primary, err)
 				}
 				continue
 			}
 			want, err := spockSlotNames(k, pair.primary)
 			if err != nil || len(want) == 0 {
 				for _, pod := range pair.standbys {
-					if _, ok := pending[pod]; ok {
-						if err != nil {
-							pending[pod] = fmt.Sprintf("listing slots on %s failed: %v", pair.primary, err)
-						} else {
-							pending[pod] = fmt.Sprintf("%s has no Spock slots yet", pair.primary)
-						}
+					if err != nil {
+						round[pod] = fmt.Sprintf("listing slots on %s failed: %v", pair.primary, err)
+					} else {
+						round[pod] = fmt.Sprintf("%s has no Spock slots yet", pair.primary)
 					}
 				}
 				continue
 			}
 			for _, pod := range pair.standbys {
-				if _, ok := pending[pod]; !ok {
-					continue
-				}
 				have, err := spockSlotNames(k, pod)
 				if err != nil {
-					pending[pod] = fmt.Sprintf("listing slots on %s failed: %v", pod, err)
+					round[pod] = fmt.Sprintf("listing slots on %s failed: %v", pod, err)
 					continue
 				}
 				var missing []string
@@ -170,13 +168,16 @@ func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, syncs []standbySlotSy
 					}
 				}
 				if len(missing) > 0 {
-					pending[pod] = fmt.Sprintf("no permanent, usable copy of %v from %s", missing, pair.primary)
+					round[pod] = fmt.Sprintf("no permanent, usable copy of %v from %s", missing, pair.primary)
 					continue
 				}
-				delete(pending, pod)
-				t.Logf("standby %s has permanent copies of %s's Spock slots", pod, pair.primary)
+				if !logged[pod] {
+					logged[pod] = true
+					t.Logf("standby %s has permanent copies of %s's Spock slots", pod, pair.primary)
+				}
 			}
 		}
+		pending = round
 		return len(pending) == 0, nil
 	})
 	if err != nil {
