@@ -69,6 +69,9 @@ func Load(nodesPath string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validateSourceNodes(nodes); err != nil {
+		return nil, err
+	}
 	return &Config{
 		AppName:    appName,
 		DBName:     dbName,
@@ -78,4 +81,28 @@ func Load(nodesPath string) (*Config, error) {
 		ResetSpock: resetSpock,
 		Nodes:      nodes,
 	}, nil
+}
+
+// validateSourceNodes makes sure every node added with bootstrap.mode spock
+// names a source node that is also in pgEdge.nodes. Otherwise the job has no
+// connection to the source node.
+func validateSourceNodes(nodes []Node) error {
+	names := make(map[string]bool, len(nodes))
+	for _, n := range nodes {
+		names[n.Name] = true
+	}
+	for _, n := range nodes {
+		if n.Bootstrap.Mode != "spock" || n.Bootstrap.SourceNode == "" {
+			continue
+		}
+		if n.Bootstrap.SourceNode == n.Name {
+			return fmt.Errorf("node %s: bootstrap.sourceNode cannot be the node itself", n.Name)
+		}
+		if !names[n.Bootstrap.SourceNode] {
+			return fmt.Errorf("node %s: bootstrap.sourceNode %q is not in pgEdge.nodes; "+
+				"keep the existing nodes in pgEdge.nodes when adding a node",
+				n.Name, n.Bootstrap.SourceNode)
+		}
+	}
+	return nil
 }

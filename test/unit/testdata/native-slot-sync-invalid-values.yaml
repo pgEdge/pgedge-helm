@@ -1,0 +1,6 @@
+pgEdge:
+  appName: pgedge
+  nativeSlotSync: "yes"
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -168,4 +169,37 @@ func writeTemp(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestLoadConfigRejectsMissingSourceNode(t *testing.T) {
+	yaml := `
+- name: n4
+  hostname: pgedge-n4-rw
+  bootstrap:
+    mode: spock
+    sourceNode: n1
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), `sourceNode "n1" is not in pgEdge.nodes`) {
+		t.Fatalf("expected missing sourceNode error, got %v", err)
+	}
+}
+
+func TestLoadConfigRejectsSelfSourceNode(t *testing.T) {
+	yaml := `
+- name: n1
+  hostname: pgedge-n1-rw
+  bootstrap:
+    mode: spock
+    sourceNode: n1
+`
+	path := writeTemp(t, yaml)
+	t.Setenv("APP_NAME", "pgedge")
+	t.Setenv("DB_NAME", "app")
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected error for a node that is its own sourceNode")
+	}
 }

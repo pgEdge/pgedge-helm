@@ -1,0 +1,18 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+    storage:
+      size: 1Gi
+    postgresql:
+      parameters:
+        # Spock 6.0 declares these in milliseconds, so they accept units.
+        spock.restart_delay_default: "5s"
+        spock.restart_delay_on_exception: "1min"
+        spock.output_delay: "0"
+        spock.sync_timeout: "2h"
+        spock.event_history_size: "4096"
+        spock.non_conflicting_inserts: "off"

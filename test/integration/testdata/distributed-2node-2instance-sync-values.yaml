@@ -1,0 +1,21 @@
+# Two nodes with two instances each and one synchronous standby per node, so
+# a commit acknowledged on a primary is on its standby before the client sees
+# it. The HA-under-load tests rely on that to assert that no acknowledged row
+# is lost when the primary is force-deleted. "preferred" lets the promoted
+# primary keep accepting writes while it has no standby.
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    instances: 2
+    postgresql:
+      synchronous:
+        method: any
+        number: 1
+        dataDurability: preferred
+    storage:
+      size: 1Gi

@@ -10,14 +10,13 @@ on:
       - main
 
 env:
-  # Temporary: the chart's default Postgres image (18-spock5-standard)
-  # currently resolves to a minor version that predates the
-  # output_plugin_libraries GUC (PLAT-722). Point tests at the same tag
-  # from pgEdge's internal image repo, which already has a patched
-  # version, so CI can pass while the public tag catches up. Remove this
-  # (and its two references below) once pgEdge/postgres-images#28 ships
-  # and the public tag moves.
-  TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres-internal:18-spock5-standard
+  TEST_POSTGRES_IMAGE: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
+  # Spock 6.0 is opt-in until GA. These are internal images because the
+  # public spock6 tags still have Spock 6.0.0-beta.1, which has no upgrade
+  # path from Spock 5.0.14. Switch to ghcr.io/pgedge/pgedge-postgres once a
+  # beta.2 or later build is published there.
+  TEST_POSTGRES_IMAGE_SPOCK6: ghcr.io/pgedge/pgedge-postgres-internal:18-spock6-standard
+  TEST_POSTGRES_IMAGE_SPOCK6_PG17: ghcr.io/pgedge/pgedge-postgres-internal:17-spock6-standard
 
 jobs:
   unit-tests:
@@ -47,8 +46,13 @@ jobs:
         run: make test-unit
 
   chart-testing:
+    name: chart-testing (${{ matrix.spock }})
     runs-on: ubuntu-latest
     needs: unit-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        spock: [spock5, spock6]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -83,15 +87,45 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Chart install test
-        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev --set pgEdge.clusterSpec.imageName=${{ env.TEST_POSTGRES_IMAGE }}"
+        env:
+          POSTGRES_IMAGE: ${{ matrix.spock == 'spock6' && env.TEST_POSTGRES_IMAGE_SPOCK6 || env.TEST_POSTGRES_IMAGE }}
+        run: ct install --chart-dirs . --charts . --target-branch main --skip-missing-values --github-groups --helm-extra-set-args "--set pgEdge.initSpockImageName=pgedge-helm-utils:dev --set pgEdge.clusterSpec.imageName=${POSTGRES_IMAGE}"
 
       - name: Teardown
         if: always()
         run: make -C test kind-down
 
   integration-tests:
+    name: integration-tests (${{ matrix.spock }}, ${{ matrix.group }})
     runs-on: ubuntu-latest
     needs: unit-tests
+    strategy:
+      fail-fast: false
+      # Each group runs a few tests in its own Kind cluster, rather than the
+      # whole suite (~15 CNPG installs) in one job, which caused intermittent
+      # CNPG readiness failures on GitHub-hosted runners.
+      matrix:
+        spock: [spock5, spock6]
+        group: [install, install-ha, nodes, recovery, failover]
+        include:
+          - group: install
+            run-tests: 'TestDistributedInstall|TestSingleNodeInstall|TestCustomDatabaseInstall'
+          - group: install-ha
+            run-tests: 'TestDistributedHAInstall|TestMultiClusterInstall'
+          - group: nodes
+            run-tests: 'TestNodes'
+          - group: recovery
+            run-tests: 'TestSlotLoss|TestOrphanSlot|TestResetSpock|TestIdempotent'
+          - group: failover
+            run-tests: 'TestFailoverAndSwitchover|TestSwitchoverUnderLoad|TestFailoverUnderLoad'
+          # Spock 5.0.14 -> 6.0 upgrade by changing the image.
+          - spock: spock6
+            group: upgrade
+            run-tests: 'TestSpockMajorUpgrade'
+          # PostgreSQL 17, where Spock 6.0 keeps its own failover slot worker.
+          - spock: spock6-pg17
+            group: failover
+            run-tests: 'TestFailoverAndSwitchover|TestSwitchoverUnderLoad|TestFailoverUnderLoad'
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -130,7 +164,10 @@ jobs:
         run: make -C test kind-load-image
 
       - name: Integration tests
-        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev POSTGRES_IMAGE=${{ env.TEST_POSTGRES_IMAGE }} TIMEOUT=15m
+        env:
+          POSTGRES_IMAGE: ${{ matrix.spock == 'spock6' && env.TEST_POSTGRES_IMAGE_SPOCK6 || matrix.spock == 'spock6-pg17' && env.TEST_POSTGRES_IMAGE_SPOCK6_PG17 || env.TEST_POSTGRES_IMAGE }}
+          UPGRADE_FROM_POSTGRES_IMAGE: ${{ matrix.group == 'upgrade' && env.TEST_POSTGRES_IMAGE || '' }}
+        run: make -C test test-integration KUBECONTEXT=kind-pgedge-test INIT_SPOCK_IMAGE=pgedge-helm-utils:dev POSTGRES_IMAGE="${POSTGRES_IMAGE}" RUN_TESTS="${{ matrix.run-tests }}" TIMEOUT=15m GO_TIMEOUT=60m
 
       - name: Collect debug artifacts on failure
         if: failure()
@@ -157,7 +194,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: debug-logs
+          name: debug-logs-${{ matrix.spock }}-${{ matrix.group }}
           path: /tmp/artifacts
 
       - name: Teardown

@@ -63,6 +63,7 @@ nav:
       - Configuring Backups: usage/backups.md
       - Upgrading Postgres: usage/postgres_upgrades.md
       - Configuring Standby Instances: usage/standby.md
+      - Using Spock 6.0: usage/spock6.md
   - Certificate Management: certificates.md
   - Security: security.md
   - Multi-cluster Deployments: multicluster.md
