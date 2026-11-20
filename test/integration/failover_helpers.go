@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -67,34 +68,200 @@ func killPrimary(t *testing.T, k *kube.Kubectl, cluster string) string {
 	return primary
 }
 
-// waitForStandbySlotSync blocks until each given standby pod has at least
-// one logical spk_* slot in pg_replication_slots. Spock's failover_slots
-// worker syncs logical slots from primary to standby on an interval (~60s).
-// Without this wait, a primary kill that happens before the first sync will
-// promote a standby that has no Spock slot, breaking replication.
-func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, standbyPods []string, timeout time.Duration) {
+// standbySlotSync names a CNPG cluster's primary pod and the standby pods
+// that must hold copies of its Spock slots before a failover.
+type standbySlotSync struct {
+	primary  string
+	standbys []string
+}
+
+// spockSlotNames returns the sorted names of the permanent, usable Spock
+// (spock_output) slots on pod. A slot whose WAL was removed
+// (wal_status = 'lost') or that was invalidated by a recovery conflict
+// (conflicting, Postgres 16+) can't serve a subscriber after a promotion, so
+// it doesn't count.
+func spockSlotNames(k *kube.Kubectl, pod string) ([]string, error) {
+	out, err := k.ExecSQL(pod, `
+		SELECT slot_name FROM pg_replication_slots
+		WHERE plugin = 'spock_output' AND NOT temporary
+		  AND wal_status IS DISTINCT FROM 'lost'
+		  AND conflicting IS NOT TRUE
+		ORDER BY slot_name;`)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if name := strings.TrimSpace(line); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
+// waitForStandbySlotSync blocks until each standby holds a permanent, usable
+// copy of every Spock slot on its primary. Spock's failover_slots worker
+// syncs logical slots from primary to standby on an interval (~60s), so a
+// primary kill that happens before the first sync promotes a standby with no
+// Spock slot and breaks replication.
+//
+// Since Spock 5.0.14 a new copy starts out as a temporary slot, and promotion
+// drops temporary slots, so a copy that merely exists is not enough. All
+// pairs are checked in every round so they share the timeout fairly.
+//
+// Each round also calls pg_log_standby_snapshot() on every primary. This
+// works around a known issue in Spock 5.0.14, where a copy can stay
+// temporary on an idle primary even after it has caught up: the call writes
+// a little WAL that the subscribers confirm, which moves the primary's slot
+// forward and lets the copy become permanent.
+//
+// TODO: drop the pg_log_standby_snapshot() call once the chart's default
+// image ships a Spock release that fixes the idle-primary issue.
+func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, syncs []standbySlotSync, timeout time.Duration) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	for _, pod := range standbyPods {
-		pod := pod
-		err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
-			out, err := k.ExecSQL(pod,
-				"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%';")
-			if err != nil {
-				return false, nil
-			}
-			return strings.TrimSpace(out) != "0", nil
-		})
-		if err != nil {
-			out, _ := k.ExecSQL(pod,
-				"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical';")
-			t.Fatalf("standby %s never received a logical spk_* slot: %v (slots present: %q)",
-				pod, err, strings.TrimSpace(out))
+	// pending maps each standby that wasn't ready in the last round to the
+	// reason why. It is rebuilt from scratch every round, so a standby that
+	// passed earlier but whose copy has since been lost or invalidated is
+	// caught: the wait only succeeds when every standby passes in the same
+	// round.
+	pending := map[string]string{}
+	for _, pair := range syncs {
+		for _, pod := range pair.standbys {
+			pending[pod] = "not checked yet"
 		}
-		t.Logf("standby %s has logical spk_* slot synced", pod)
 	}
+	logged := map[string]bool{}
+
+	err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
+		round := map[string]string{}
+		for _, pair := range syncs {
+			if _, err := k.ExecSQL(pair.primary, "SELECT pg_log_standby_snapshot();"); err != nil {
+				for _, pod := range pair.standbys {
+					round[pod] = fmt.Sprintf("pg_log_standby_snapshot() on %s failed: %v", pair.primary, err)
+				}
+				continue
+			}
+			want, err := spockSlotNames(k, pair.primary)
+			if err != nil || len(want) == 0 {
+				for _, pod := range pair.standbys {
+					if err != nil {
+						round[pod] = fmt.Sprintf("listing slots on %s failed: %v", pair.primary, err)
+					} else {
+						round[pod] = fmt.Sprintf("%s has no Spock slots yet", pair.primary)
+					}
+				}
+				continue
+			}
+			for _, pod := range pair.standbys {
+				have, err := spockSlotNames(k, pod)
+				if err != nil {
+					round[pod] = fmt.Sprintf("listing slots on %s failed: %v", pod, err)
+					continue
+				}
+				var missing []string
+				for _, name := range want {
+					if !slices.Contains(have, name) {
+						missing = append(missing, name)
+					}
+				}
+				if len(missing) > 0 {
+					round[pod] = fmt.Sprintf("no permanent, usable copy of %v from %s", missing, pair.primary)
+					continue
+				}
+				if !logged[pod] {
+					logged[pod] = true
+					t.Logf("standby %s has permanent copies of %s's Spock slots", pod, pair.primary)
+				}
+			}
+		}
+		pending = round
+		return len(pending) == 0, nil
+	})
+	if err != nil {
+		for pod, reason := range pending {
+			out, _ := k.ExecSQL(pod,
+				"SELECT slot_name, temporary, wal_status, conflicting FROM pg_replication_slots WHERE plugin = 'spock_output';")
+			t.Errorf("standby %s not ready: %s (slots present: %q)", pod, reason, strings.TrimSpace(out))
+		}
+		t.Fatalf("standbys never received permanent copies of their primary's Spock slots: %v", err)
+	}
+}
+
+// switchover runs `kubectl cnpg promote <cluster> <target>`, the command
+// docs/usage/standby.md gives users for a planned switchover. The test
+// Makefile installs the plugin at the same version as the CNPG operator.
+func switchover(t *testing.T, k *kube.Kubectl, cluster, target string) {
+	t.Helper()
+	if _, err := exec.LookPath("kubectl-cnpg"); err != nil {
+		t.Fatalf("the kubectl cnpg plugin is not on PATH; run `make -C test install-cnpg-plugin` and add its install directory to PATH: %v", err)
+	}
+
+	// kubectl only finds a plugin when its name comes before any flags, so
+	// pass --context and -n after the plugin arguments.
+	args := []string{"cnpg", "promote", cluster, target}
+	if k.Context != "" {
+		args = append(args, "--context", k.Context)
+	}
+	if k.Namespace != "" {
+		args = append(args, "-n", k.Namespace)
+	}
+
+	out, err := exec.Command("kubectl", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("kubectl cnpg promote %s %s: %v (%s)", cluster, target, err, string(out))
+	}
+
+	// Make sure CNPG recorded the request.
+	got, err := clusterStatusField(k, cluster, "{.status.targetPrimary}")
+	if err != nil || got != target {
+		t.Fatalf("switchover %s to %s: status.targetPrimary is %q after patch (err: %v)", cluster, target, got, err)
+	}
+	t.Logf("requested switchover of %s to %s", cluster, target)
+}
+
+// clusterStatusField reads a jsonpath expression from a CNPG Cluster.
+func clusterStatusField(k *kube.Kubectl, cluster, jsonpath string) (string, error) {
+	args := []string{}
+	if k.Context != "" {
+		args = append(args, "--context", k.Context)
+	}
+	if k.Namespace != "" {
+		args = append(args, "-n", k.Namespace)
+	}
+	args = append(args, "get", "clusters.postgresql.cnpg.io", cluster, "-o", "jsonpath="+jsonpath)
+	out, err := exec.Command("kubectl", args...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%w (%s)", err, string(out))
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// waitForStandby blocks until pod is a standby that is streaming from its
+// primary. After a failover CNPG recreates the old primary as a standby, and
+// its Spock slot copies can only become permanent once it streams again.
+func waitForStandby(t *testing.T, k *kube.Kubectl, pod string, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var last string
+	err := wait.Until(ctx, 5*time.Second, func() (bool, error) {
+		out, err := k.ExecSQL(pod,
+			"SELECT pg_is_in_recovery() AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE status = 'streaming');")
+		if err != nil {
+			last = err.Error()
+			return false, nil
+		}
+		last = strings.TrimSpace(out)
+		return last == "t", nil
+	})
+	if err != nil {
+		t.Fatalf("%s did not become a streaming standby: %v (last check: %s)", pod, err, last)
+	}
+	t.Logf("%s is a streaming standby", pod)
 }
 
 // waitForPromotion blocks until CNPG promotes a new primary for the cluster
@@ -118,7 +285,9 @@ func waitForPromotion(t *testing.T, k *kube.Kubectl, cluster, oldPrimary string,
 		return true, nil
 	})
 	if err != nil {
-		t.Fatalf("waiting for promotion of %s: %v", cluster, err)
+		status, _ := clusterStatusField(k, cluster,
+			"currentPrimary={.status.currentPrimary} targetPrimary={.status.targetPrimary} phase={.status.phase} reason={.status.phaseReason}")
+		t.Fatalf("waiting for promotion of %s: %v (%s)", cluster, err, status)
 	}
 	t.Logf("new primary elected: %s", newPrimary)
 

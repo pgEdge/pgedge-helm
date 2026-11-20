@@ -13,6 +13,13 @@ POSTGRES_IMAGE ?=
 TIMEOUT ?= 10m
 KIND_CLUSTER_NAME ?= pgedge-test
 KIND_CONFIG ?= $(test_dir)/kind.yaml
+# CNPG release installed by kind-up. The kubectl cnpg plugin is pinned to the
+# same version, so tests run the same `kubectl cnpg` commands the docs give.
+CNPG_VERSION ?= 1.29.0
+CNPG_PLUGIN_DIR ?= $(shell go env GOPATH)/bin
+# Put CNPG_PLUGIN_DIR first on PATH so kubectl picks the pinned plugin, in the
+# checks below and in the tests, even when another kubectl-cnpg is installed.
+export PATH := $(CNPG_PLUGIN_DIR):$(PATH)
 
 # Export for Go tests
 export KUBECONTEXT
@@ -36,6 +43,40 @@ install-gotestsum:
 ensure-gotestsum:
 	@command -v gotestsum >/dev/null 2>&1 || $(MAKE) install-gotestsum
 
+# Installs the kubectl cnpg plugin release that matches CNPG_VERSION into
+# CNPG_PLUGIN_DIR, after checking it against the release's checksums file.
+# CNPG_PLUGIN_DIR must be on PATH for kubectl to find the plugin.
+.PHONY: install-cnpg-plugin
+install-cnpg-plugin:
+	@set -e; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	case "$$(uname -m)" in \
+		x86_64|amd64) arch=x86_64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "unsupported architecture: $$(uname -m)" >&2; exit 1 ;; \
+	esac; \
+	tarball=kubectl-cnpg_$(CNPG_VERSION)_$${os}_$${arch}.tar.gz; \
+	base=https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v$(CNPG_VERSION); \
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	curl -sSfL -o "$$tmp/$$tarball" "$$base/$$tarball"; \
+	curl -sSfL -o "$$tmp/checksums.txt" "$$base/cnpg-$(CNPG_VERSION)-checksums.txt"; \
+	grep " $$tarball\$$" "$$tmp/checksums.txt" > "$$tmp/expected.txt"; \
+	if command -v sha256sum >/dev/null 2>&1; then \
+		(cd "$$tmp" && sha256sum -c expected.txt); \
+	else \
+		(cd "$$tmp" && shasum -a 256 -c expected.txt); \
+	fi; \
+	tar -xzf "$$tmp/$$tarball" -C "$$tmp" kubectl-cnpg; \
+	mkdir -p "$(CNPG_PLUGIN_DIR)"; \
+	install -m 0755 "$$tmp/kubectl-cnpg" "$(CNPG_PLUGIN_DIR)/kubectl-cnpg"; \
+	echo "installed kubectl-cnpg $(CNPG_VERSION) in $(CNPG_PLUGIN_DIR)"
+
+.PHONY: ensure-cnpg-plugin
+ensure-cnpg-plugin:
+	@kubectl cnpg version 2>/dev/null | grep -q "Version:$(CNPG_VERSION) " || $(MAKE) install-cnpg-plugin
+	@kubectl cnpg version | grep -q "Version:$(CNPG_VERSION) " || \
+		{ echo "kubectl cnpg is not version $(CNPG_VERSION): $$(kubectl cnpg version)" >&2; exit 1; }
+
 # ---- Unit Tests ----
 
 .PHONY: test-unit
@@ -49,7 +90,7 @@ kind-up:
 	kind delete cluster --name $(KIND_CLUSTER_NAME) 2>/dev/null || true
 	kind create cluster --config $(KIND_CONFIG) --name $(KIND_CLUSTER_NAME)
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) --server-side -f \
-		https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/refs/heads/main/manifests/cloudnative-pg/v1.29.0/cnpg-1.29.0.yaml
+		https://raw.githubusercontent.com/pgEdge/pgedge-cnpg-dist/refs/heads/main/manifests/cloudnative-pg/v$(CNPG_VERSION)/cnpg-$(CNPG_VERSION).yaml
 	kubectl apply --context kind-$(KIND_CLUSTER_NAME) -f \
 		https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=Available deployment \
@@ -75,7 +116,7 @@ GOTESTSUM_CMD = cd $(root_dir) && gotestsum --format testname --
 GO_TIMEOUT := $(shell echo "$(TIMEOUT)" | awk '{t=$$1; n=int(t+0); if(n<=0){print "120m"; exit} u=substr(t,length(n)+1); if(u=="s") tot=n+600; else if(u=="h") tot=n*3600+600; else tot=n*60+600; print int(tot/60) "m"}')
 
 .PHONY: test-integration
-test-integration: ensure-gotestsum
+test-integration: ensure-gotestsum ensure-cnpg-plugin
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) ./test/integration/...
 
 .PHONY: test-integration-kind
@@ -88,7 +129,7 @@ test-integration-kind: kind-up kind-load-image
 #        make test-run RUN="TestSlotLoss|TestNodesRemoveNode"
 
 .PHONY: test-run
-test-run: ensure-gotestsum kind-load-image
+test-run: ensure-gotestsum ensure-cnpg-plugin kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
 		-run "$(RUN)" ./test/integration/...
 
@@ -113,9 +154,9 @@ test-reset: ensure-gotestsum kind-load-image
 		-run "TestResetSpock" ./test/integration/...
 
 .PHONY: test-failover
-test-failover: ensure-gotestsum kind-load-image
+test-failover: ensure-gotestsum ensure-cnpg-plugin kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
-		-run "TestUnplannedFailover" ./test/integration/...
+		-run "TestFailoverAndSwitchover" ./test/integration/...
 
 # ---- Chart Testing (ct) ----
 

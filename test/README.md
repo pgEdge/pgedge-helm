@@ -113,7 +113,7 @@ Pass `POSTGRES_IMAGE` to override the default image from `values.yaml`:
 
 ```shell
 make -C test test-all \
-  POSTGRES_IMAGE=ghcr.io/pgedge/pgedge-postgres-internal:18.4-spock5.0.9-standard \
+  POSTGRES_IMAGE=ghcr.io/pgedge/pgedge-postgres-internal:18.7-spock5.0.14-standard \
   TIMEOUT=120m
 ```
 
