@@ -153,9 +153,14 @@ func standbyPod(t *testing.T, cluster, primary string) string {
 // runHAUnderLoad installs two nodes with two instances each, keeps writing
 // to both nodes, changes n1's primary with promote, and checks that no
 // committed row is lost and that replication works both ways afterwards.
+//
+// Each node has a synchronous standby, so every acknowledged commit is on
+// the standby before the primary goes away. With asynchronous replication a
+// force-deleted primary can lose acknowledged commits by design, and the
+// zero-loss check would fail without any fault in Spock or the chart.
 func runHAUnderLoad(t *testing.T, promote func(t *testing.T, oldPrimary string)) {
 	t.Cleanup(func() { uninstallChart(t) })
-	installChart(t, "distributed-2node-2instance-values.yaml")
+	installChart(t, "distributed-2node-2instance-sync-values.yaml")
 
 	for _, name := range []string{"pgedge-n1", "pgedge-n2"} {
 		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {

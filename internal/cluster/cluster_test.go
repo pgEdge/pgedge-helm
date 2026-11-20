@@ -100,24 +100,46 @@ func TestWaitForAllTimeout(t *testing.T) {
 	}
 }
 
-func TestInstanceCounts(t *testing.T) {
-	withInstances := func(name string, n int64) *unstructured.Unstructured {
+func TestHASpecs(t *testing.T) {
+	withSpec := func(name string, spec map[string]interface{}) *unstructured.Unstructured {
 		c := newCluster(name, "default", "Cluster in healthy state")
-		c.Object["spec"] = map[string]interface{}{"instances": n}
+		c.Object["spec"] = spec
 		return c
 	}
 	scheme := runtime.NewScheme()
 	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
 		map[schema.GroupVersionResource]string{cnpgGVR: "ClusterList"},
-		withInstances("pgedge-n1", 1),
-		withInstances("pgedge-n2", 3),
+		withSpec("pgedge-n1", map[string]interface{}{"instances": int64(1)}),
+		withSpec("pgedge-n2", map[string]interface{}{
+			"instances": int64(3),
+			"replicationSlots": map[string]interface{}{
+				"highAvailability": map[string]interface{}{
+					"enabled":                    true,
+					"synchronizeLogicalDecoding": true,
+				},
+			},
+		}),
+		withSpec("pgedge-n3", map[string]interface{}{
+			"instances": int64(2),
+			"replicationSlots": map[string]interface{}{
+				"highAvailability": map[string]interface{}{"enabled": false},
+			},
+		}),
 	)
 
-	counts, err := instanceCounts(context.Background(), client, "default", "pgedge")
+	specs, err := haSpecs(context.Background(), client, "default", "pgedge")
 	if err != nil {
-		t.Fatalf("instanceCounts: %v", err)
+		t.Fatalf("haSpecs: %v", err)
 	}
-	if counts["pgedge-n1"] != 1 || counts["pgedge-n2"] != 3 {
-		t.Errorf("unexpected counts: %v", counts)
+	want := map[string]HASpec{
+		// HA slots default to enabled when the spec doesn't say.
+		"pgedge-n1": {Instances: 1, HASlots: true},
+		"pgedge-n2": {Instances: 3, HASlots: true, SynchronizeLogicalDecoding: true},
+		"pgedge-n3": {Instances: 2, HASlots: false},
+	}
+	for name, w := range want {
+		if specs[name] != w {
+			t.Errorf("%s: got %+v, want %+v", name, specs[name], w)
+		}
 	}
 }

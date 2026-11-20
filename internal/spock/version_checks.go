@@ -4,6 +4,7 @@ package spock
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -56,23 +57,37 @@ func checkAddNodeVersions(nodes []config.Node, versions map[string]int) error {
 	return nil
 }
 
-// ValidateNativeSlotSync fails when a node with standbys needs PostgreSQL's
-// native slot sync to keep its Spock slots across a failover but doesn't
-// have it. That is the case for Spock 6.0 or later on PostgreSQL 18 or
-// later, where Spock no longer runs its own failover slot worker: without
-// sync_replication_slots, a promoted standby has no Spock slots and the
-// other nodes stop replicating from it. The chart turns it on through
-// pgEdge.nativeSlotSync; this catches the cases it can't, such as an image
-// tag it doesn't recognise with nativeSlotSync: auto, nativeSlotSync: false,
-// or CNPG's HA replication slots turned off.
+// ValidateNativeSlotSync fails when a node with standbys relies on
+// PostgreSQL's native slot sync to keep its Spock slots across a failover,
+// but native slot sync can't work on it.
+//
+// A node relies on it when it runs Spock 6.0 or later on PostgreSQL 18 or
+// later, where Spock no longer runs its own failover slot worker, or when
+// sync_replication_slots is on (e.g. PostgreSQL 17 with
+// pgEdge.nativeSlotSync: true), where Spock's worker yields to it. Native
+// slot sync then needs:
+//
+//   - sync_replication_slots on;
+//   - hot_standby_feedback on, which PostgreSQL requires on the standby;
+//   - CNPG's replicationSlots.highAvailability enabled, for the standby's
+//     physical slot;
+//   - replicationSlots.highAvailability.synchronizeLogicalDecoding, so CNPG
+//     puts dbname in the standby's primary_conninfo, which slot sync
+//     requires, and manages synchronized_standby_slots, which keeps peers
+//     from receiving changes the standby doesn't have yet.
+//
+// The chart sets all of them through pgEdge.nativeSlotSync; this catches the
+// cases it can't, such as an image tag it doesn't recognise with
+// nativeSlotSync: auto, nativeSlotSync: false, or settings overridden in a
+// node's clusterSpec.
 func ValidateNativeSlotSync(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) error {
-	counts, err := cluster.InstanceCounts(ctx, cfg.Namespace, cfg.AppName)
+	specs, err := cluster.HASpecs(ctx, cfg.Namespace, cfg.AppName)
 	if err != nil {
-		return fmt.Errorf("check instance counts: %w", err)
+		return fmt.Errorf("check CNPG cluster specs: %w", err)
 	}
 	for _, node := range cfg.Nodes {
-		instances := counts[fmt.Sprintf("%s-%s", cfg.AppName, node.Name)]
-		if instances <= 1 {
+		spec, ok := specs[fmt.Sprintf("%s-%s", cfg.AppName, node.Name)]
+		if !ok || spec.Instances <= 1 {
 			// A single instance, or a node not managed by this release.
 			continue
 		}
@@ -85,26 +100,59 @@ func ValidateNativeSlotSync(ctx context.Context, cfg *config.Config, conns map[s
 		if err != nil {
 			return fmt.Errorf("check spock version on %s: %w", node.Name, err)
 		}
-		if !needsNativeSlotSync(pgMajor, spockMajor) {
-			continue
+		var syncSlots, hotStandbyFeedback string
+		if err := conn.QueryRow(ctx, `
+			SELECT COALESCE(current_setting('sync_replication_slots', true), 'off'),
+			       current_setting('hot_standby_feedback')`,
+		).Scan(&syncSlots, &hotStandbyFeedback); err != nil {
+			return fmt.Errorf("check slot sync settings on %s: %w", node.Name, err)
 		}
-		var syncSlots string
-		if err := conn.QueryRow(ctx,
-			"SELECT COALESCE(current_setting('sync_replication_slots', true), 'off')",
-		).Scan(&syncSlots); err != nil {
-			return fmt.Errorf("check sync_replication_slots on %s: %w", node.Name, err)
-		}
-		if syncSlots != "on" {
-			return fmt.Errorf("node %s runs Spock %d on PostgreSQL %d with %d instances, but "+
-				"sync_replication_slots is %q, so its standbys get no copies of the Spock slots "+
-				"and a promoted standby would stop the other nodes replicating from it. Set "+
-				"pgEdge.nativeSlotSync: true (and keep CNPG's replicationSlots.highAvailability "+
-				"enabled), or set replicationSlots.highAvailability.synchronizeLogicalDecoding "+
-				"and sync_replication_slots in the node's clusterSpec; see docs/usage/spock6.md",
-				node.Name, spockMajor, pgMajor, instances, syncSlots)
+		if err := checkNativeSlotSync(node.Name, pgMajor, spockMajor, spec,
+			syncSlots, hotStandbyFeedback); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// checkNativeSlotSync applies ValidateNativeSlotSync's rules to one node
+// with more than one instance.
+func checkNativeSlotSync(node string, pgMajor, spockMajor int, spec cluster.HASpec, syncSlots, hotStandbyFeedback string) error {
+	required := needsNativeSlotSync(pgMajor, spockMajor)
+	if !required && syncSlots != "on" {
+		// Spock's own failover slot worker copies the slots.
+		return nil
+	}
+
+	var problems []string
+	if syncSlots != "on" {
+		problems = append(problems, fmt.Sprintf("sync_replication_slots is %q", syncSlots))
+	}
+	if hotStandbyFeedback != "on" {
+		problems = append(problems, fmt.Sprintf("hot_standby_feedback is %q", hotStandbyFeedback))
+	}
+	if !spec.HASlots {
+		problems = append(problems, "CNPG's replicationSlots.highAvailability is disabled")
+	}
+	if !spec.SynchronizeLogicalDecoding {
+		problems = append(problems, "replicationSlots.highAvailability.synchronizeLogicalDecoding is not enabled")
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+
+	why := "has sync_replication_slots on"
+	if required {
+		why = fmt.Sprintf("runs Spock %d on PostgreSQL %d", spockMajor, pgMajor)
+	}
+	return fmt.Errorf("node %s %s with %d instances, so its standbys only get copies of the "+
+		"Spock slots through PostgreSQL's native slot sync, but %s. Without working slot "+
+		"sync, a promoted standby would stop the other nodes replicating from it. Set "+
+		"pgEdge.nativeSlotSync: true and remove any overrides of these settings, or set "+
+		"replicationSlots.highAvailability.enabled and synchronizeLogicalDecoding, "+
+		"sync_replication_slots: \"on\" and hot_standby_feedback: \"on\" in the node's "+
+		"clusterSpec; see docs/usage/spock6.md",
+		node, why, spec.Instances, strings.Join(problems, ", "))
 }
 
 // needsNativeSlotSync reports whether standbys can only get copies of the

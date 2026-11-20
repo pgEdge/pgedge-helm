@@ -59,7 +59,14 @@ The chart leaves these settings alone in the following cases:
 - you set `synchronizeLogicalDecoding` or `sync_replication_slots` yourself, in the chart-wide or the node's `clusterSpec`.
 - CloudNativePG's high availability replication slots are disabled with `replicationSlots.highAvailability.enabled: false`.
 
-For a node with more than one instance that runs Spock 6.0 on PostgreSQL 18, the init-spock job checks that `sync_replication_slots` is on, and fails with an error if it isn't. Without it, a promoted standby has no Spock slots, and the other nodes stop replicating from the node. The check uses the versions the node actually runs, so it also catches images that `auto` doesn't recognize.
+For a node with more than one instance that relies on native slot synchronization, the init-spock job checks that it can work, and fails with an error if it can't. A node relies on it when it runs Spock 6.0 on PostgreSQL 18, or when `sync_replication_slots` is on. The job checks that:
+
+- `sync_replication_slots` is `on`.
+- `hot_standby_feedback` is `on`, which PostgreSQL requires for slot synchronization.
+- CloudNativePG's high availability replication slots are enabled.
+- `replicationSlots.highAvailability.synchronizeLogicalDecoding` is `true`, which CloudNativePG needs to give standbys a connection string that slot synchronization can use and to manage `synchronized_standby_slots`.
+
+Without working slot synchronization, a promoted standby has no usable Spock slots, and the other nodes stop replicating from the node. The check uses the versions the node actually runs, so it also catches images that `auto` doesn't recognize.
 
 On PostgreSQL 16 and 17, Spock 6.0 keeps using its own failover slot worker, as Spock 5 does, and `auto` does not change anything. To move an existing PostgreSQL 17 node with standbys to native slot synchronization with `pgEdge.nativeSlotSync: true`, follow the switching steps in the [Spock logical slot failover documentation](https://docs.pgedge.com/spock-v6/v6-0-0-beta/logical_slot_failover/); slot copies made by the Spock worker block native slot synchronization until you drop them.
 

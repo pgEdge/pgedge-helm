@@ -32,7 +32,7 @@ pgEdge:
 Other nodes replicate from a node through Spock replication slots on its primary. These slots are copied to each standby in one of two ways:
 
 - With Spock 5, and with Spock 6.0 on PostgreSQL 16 and 17, Spock's failover slot worker copies them, every second by default since Spock 5.0.11.
-- With Spock 6.0 on PostgreSQL 18, PostgreSQL's native slot synchronization copies them, and the chart turns it on through CloudNativePG. See [Using Spock 6.0](spock6.md#standby-instances-and-failover-slots).
+- With Spock 6.0 on PostgreSQL 18, PostgreSQL's native slot synchronization copies them, and the chart turns it on through CloudNativePG. With Spock 6.0 on PostgreSQL 17, native slot synchronization copies them instead of Spock's worker when you turn it on with `pgEdge.nativeSlotSync: true`, which sets `sync_replication_slots` to `on`. See [Using Spock 6.0](spock6.md#standby-instances-and-failover-slots).
 
 Since Spock 5.0.14, a new copy starts out as a temporary slot and only becomes permanent once the primary's slot has advanced past the standby's position. Native slot synchronization behaves the same way. Promotion drops temporary slots, so if a standby is promoted before its copies are permanent, the other nodes stop replicating from this node.
 
@@ -50,13 +50,17 @@ On PostgreSQL 16, leave out the `synced` column, which was added in PostgreSQL 1
 The standby is ready to promote only when, for every slot name returned on the primary, the standby returns a row with the same name where:
 
 - `temporary` is `f`;
-- `synced` is `t`, if native slot synchronization copies the slots (Spock 6.0 on PostgreSQL 18); a copy with `synced` set to `f` there is left over from Spock 5 and does not advance;
+- `synced` is `t`, if native slot synchronization copies the slots, that is when `sync_replication_slots` is `on` (always the case for Spock 6.0 on PostgreSQL 18); a copy with `synced` set to `f` there was made by Spock's failover slot worker, for example before an upgrade from Spock 5 or before you turned native slot synchronization on, and it does not advance and blocks native slot synchronization of that slot;
 - `wal_status` is not `lost`, meaning the WAL the slot needs has not been removed;
 - `conflicting` is not `t`, meaning the slot has not been invalidated by a recovery conflict.
 
 Compare the slot names on both sides, not just the rows on the standby: a slot that has no copy on the standby yet does not appear there at all. Do not promote the standby while any slot is missing or fails one of these checks.
 
 In Spock 5.0.14, a copy can stay temporary on an idle primary even after it has caught up. If that happens, run `SELECT pg_log_standby_snapshot();` on the primary (or any write transaction), then check again. A copy that is lost or conflicting is dropped and recreated from the primary by the failover slot worker or by native slot synchronization, after which it goes through the temporary stage again.
+
+Spock's failover slot worker recreates an invalidated copy only in Spock 5.0.14 and later, and only while `spock.failover_slots_recreate_invalidated` is `on`, which is the default. On older versions, or with that setting off, drop the invalidated copy on the standby with `SELECT pg_drop_replication_slot('<slot name>');`, and the worker copies the slot again.
+
+A copy can only recover if the slot on the primary is usable. If the primary's slot is itself lost or conflicting, neither the failover slot worker nor native slot synchronization replaces the copy, and the other nodes can't replicate from the primary through that slot either. Repair the primary's slot first: drop it on the primary with `pg_drop_replication_slot()`, then run `helm upgrade` with the same values. The init-spock job recreates the subscription that reads the slot, which recreates the slot, as described in [Automatic failover](#automatic-failover), with the same caveat about changes that are not replicated. The standby then copies the new slot.
 
 ### Automatic failover
 

@@ -5,6 +5,7 @@ package integration
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,12 @@ func TestSpockMajorUpgrade(t *testing.T) {
 			parts := strings.Split(strings.TrimSpace(out), "|")
 			if len(parts) != 2 || parts[0] != parts[1] {
 				t.Errorf("%s: spock extension %q does not match the binaries %q", pod, parts[0], parts[len(parts)-1])
+			}
+			// Make sure the images really were a major upgrade, so the
+			// test can't pass with two images of the same Spock major.
+			fromMajor, toMajor := spockMajorOf(before), spockMajorOf(parts[0])
+			if fromMajor < 0 || toMajor <= fromMajor {
+				t.Errorf("%s: expected a Spock major upgrade, got %s -> %s", pod, before, parts[0])
 			}
 			t.Logf("%s: spock %s -> %s", pod, before, parts[0])
 		}
@@ -188,4 +195,15 @@ func extensionVersion(t *testing.T, pod string) string {
 		t.Fatalf("read spock version on %s: %v", pod, err)
 	}
 	return strings.TrimSpace(out)
+}
+
+// spockMajorOf returns the major version of a Spock version string such as
+// "5.0.14" or "6.0.0-beta.2", or -1 if it can't be parsed.
+func spockMajorOf(version string) int {
+	major, _, _ := strings.Cut(strings.TrimSpace(version), ".")
+	n, err := strconv.Atoi(major)
+	if err != nil {
+		return -1
+	}
+	return n
 }

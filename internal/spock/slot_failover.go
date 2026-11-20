@@ -3,6 +3,7 @@ package spock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -125,8 +126,10 @@ func slotsWithoutFailover(ctx context.Context, conn *pgxpool.Pool) ([]slotState,
 }
 
 // enableFailoverForBusySlot pauses the subscription reading slotName so the
-// slot is free, marks it for failover, and resumes the subscription.
-func enableFailoverForBusySlot(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool, providerName, slotName string) error {
+// slot is free, marks it for failover, and resumes the subscription. A
+// failure to resume the subscription is returned, so the job fails and is
+// retried instead of reporting success with replication paused.
+func enableFailoverForBusySlot(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool, providerName, slotName string) (retErr error) {
 	subscriberName, subName, err := findSubscriptionForSlot(ctx, cfg, conns, providerName, slotName)
 	if err != nil {
 		return err
@@ -152,6 +155,9 @@ func enableFailoverForBusySlot(ctx context.Context, cfg *config.Config, conns ma
 		if err := setSubscriptionEnabled(enableCtx, subConn, subName, true); err != nil {
 			slog.Error("failed to re-enable subscription; enable it with spock.sub_enable()",
 				"subscriber", subscriberName, "sub", subName, "error", err)
+			retErr = errors.Join(retErr, fmt.Errorf(
+				"re-enable subscription %s on %s after pausing it to enable failover on slot %s: %w",
+				subName, subscriberName, slotName, err))
 			return
 		}
 		slog.Info("resumed subscription", "subscriber", subscriberName, "sub", subName)

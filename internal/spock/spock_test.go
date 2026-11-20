@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/pgEdge/pgedge-helm/internal/cluster"
 	"github.com/pgEdge/pgedge-helm/internal/config"
 	"github.com/pgEdge/pgedge-helm/internal/resource"
 )
@@ -944,5 +945,55 @@ func TestNeedsNativeSlotSync(t *testing.T) {
 		if got := needsNativeSlotSync(tc.pg, tc.spock); got != tc.want {
 			t.Errorf("needsNativeSlotSync(%d, %d) = %v, want %v", tc.pg, tc.spock, got, tc.want)
 		}
+	}
+}
+
+func TestCheckNativeSlotSync(t *testing.T) {
+	ready := cluster.HASpec{Instances: 3, HASlots: true, SynchronizeLogicalDecoding: true}
+	tests := []struct {
+		name       string
+		pg, spock  int
+		spec       cluster.HASpec
+		syncSlots  string
+		hsf        string
+		wantErr    bool
+		wantInText []string
+	}{
+		{name: "spock 5 on pg18 uses spock's worker", pg: 18, spock: 5,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "off", hsf: "on"},
+		{name: "spock 6 on pg17 uses spock's worker", pg: 17, spock: 6,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "off", hsf: "off"},
+		{name: "spock 6 on pg18 fully set up", pg: 18, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "on"},
+		{name: "spock 6 on pg18 without sync_replication_slots", pg: 18, spock: 6,
+			spec: ready, syncSlots: "off", hsf: "on", wantErr: true,
+			wantInText: []string{`sync_replication_slots is "off"`, "runs Spock 6 on PostgreSQL 18"}},
+		{name: "spock 6 on pg18 with hot_standby_feedback off", pg: 18, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "off", wantErr: true,
+			wantInText: []string{`hot_standby_feedback is "off"`}},
+		{name: "spock 6 on pg18 without synchronizeLogicalDecoding", pg: 18, spock: 6,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "on", hsf: "on", wantErr: true,
+			wantInText: []string{"synchronizeLogicalDecoding is not enabled"}},
+		{name: "spock 6 on pg18 with HA slots disabled", pg: 18, spock: 6,
+			spec: cluster.HASpec{Instances: 3}, syncSlots: "off", hsf: "on", wantErr: true,
+			wantInText: []string{"highAvailability is disabled", `sync_replication_slots is "off"`}},
+		{name: "native sync turned on for pg17 without hot_standby_feedback", pg: 17, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "off", wantErr: true,
+			wantInText: []string{"has sync_replication_slots on", `hot_standby_feedback is "off"`}},
+		{name: "native sync turned on for pg17 fully set up", pg: 17, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "on"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkNativeSlotSync("n1", tt.pg, tt.spock, tt.spec, tt.syncSlots, tt.hsf)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("got error %v, wantErr %v", err, tt.wantErr)
+			}
+			for _, want := range tt.wantInText {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not mention %q", err, want)
+				}
+			}
+		})
 	}
 }
