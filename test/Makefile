@@ -17,6 +17,9 @@ KIND_CONFIG ?= $(test_dir)/kind.yaml
 # same version, so tests run the same `kubectl cnpg` commands the docs give.
 CNPG_VERSION ?= 1.29.0
 CNPG_PLUGIN_DIR ?= $(shell go env GOPATH)/bin
+# Put CNPG_PLUGIN_DIR first on PATH so kubectl picks the pinned plugin, in the
+# checks below and in the tests, even when another kubectl-cnpg is installed.
+export PATH := $(CNPG_PLUGIN_DIR):$(PATH)
 
 # Export for Go tests
 export KUBECONTEXT
@@ -71,6 +74,8 @@ install-cnpg-plugin:
 .PHONY: ensure-cnpg-plugin
 ensure-cnpg-plugin:
 	@kubectl cnpg version 2>/dev/null | grep -q "Version:$(CNPG_VERSION) " || $(MAKE) install-cnpg-plugin
+	@kubectl cnpg version | grep -q "Version:$(CNPG_VERSION) " || \
+		{ echo "kubectl cnpg is not version $(CNPG_VERSION): $$(kubectl cnpg version)" >&2; exit 1; }
 
 # ---- Unit Tests ----
 
