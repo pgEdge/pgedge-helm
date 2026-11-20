@@ -190,31 +190,31 @@ func waitForStandbySlotSync(t *testing.T, k *kube.Kubectl, syncs []standbySlotSy
 	}
 }
 
-// switchover asks CNPG to promote target in the given cluster. It makes the
-// same status patch as `kubectl cnpg promote <cluster> <target>`, so the test
-// doesn't need the cnpg kubectl plugin.
+// switchover runs `kubectl cnpg promote <cluster> <target>`, the command
+// docs/usage/standby.md gives users for a planned switchover. The test
+// Makefile installs the plugin at the same version as the CNPG operator.
 func switchover(t *testing.T, k *kube.Kubectl, cluster, target string) {
 	t.Helper()
-	patch := fmt.Sprintf(
-		`{"status":{"targetPrimary":%q,"targetPrimaryTimestamp":%q,"phase":"Switchover in progress","phaseReason":"Switching over to %s"}}`,
-		target, time.Now().Format("2006-01-02T15:04:05.000000Z07:00"), target)
+	if _, err := exec.LookPath("kubectl-cnpg"); err != nil {
+		t.Fatalf("the kubectl cnpg plugin is not on PATH; run `make -C test install-cnpg-plugin` and add its install directory to PATH: %v", err)
+	}
 
-	args := []string{}
+	// kubectl only finds a plugin when its name comes before any flags, so
+	// pass --context and -n after the plugin arguments.
+	args := []string{"cnpg", "promote", cluster, target}
 	if k.Context != "" {
 		args = append(args, "--context", k.Context)
 	}
 	if k.Namespace != "" {
 		args = append(args, "-n", k.Namespace)
 	}
-	args = append(args, "patch", "clusters.postgresql.cnpg.io", cluster,
-		"--subresource=status", "--type=merge", "-p", patch)
 
 	out, err := exec.Command("kubectl", args...).CombinedOutput()
 	if err != nil {
-		t.Fatalf("switchover %s to %s: %v (%s)", cluster, target, err, string(out))
+		t.Fatalf("kubectl cnpg promote %s %s: %v (%s)", cluster, target, err, string(out))
 	}
 
-	// The patch isn't conditional, so make sure the request stuck.
+	// Make sure CNPG recorded the request.
 	got, err := clusterStatusField(k, cluster, "{.status.targetPrimary}")
 	if err != nil || got != target {
 		t.Fatalf("switchover %s to %s: status.targetPrimary is %q after patch (err: %v)", cluster, target, got, err)

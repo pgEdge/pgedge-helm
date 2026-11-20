@@ -19,8 +19,8 @@ import (
 //  1. an unplanned failover (force-delete the primary pod);
 //  2. a second unplanned failover, once the old primary has rejoined as a
 //     standby and its Spock slot copies have become permanent again;
-//  3. a planned switchover, the same status patch `kubectl cnpg promote`
-//     makes.
+//  3. a planned switchover with `kubectl cnpg promote`, as in
+//     docs/usage/standby.md.
 //
 // Repeated promotions are the risky case with Spock 5.0.14: after each one
 // the old primary comes back as a standby whose slot copies have to go
