@@ -115,7 +115,7 @@ test-reset: ensure-gotestsum kind-load-image
 .PHONY: test-failover
 test-failover: ensure-gotestsum kind-load-image
 	$(GOTESTSUM_CMD) -tags integration -v -timeout $(GO_TIMEOUT) \
-		-run "TestUnplannedFailover" ./test/integration/...
+		-run "TestFailoverAndSwitchover" ./test/integration/...
 
 # ---- Chart Testing (ct) ----
 

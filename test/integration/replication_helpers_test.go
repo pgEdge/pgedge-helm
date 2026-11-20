@@ -100,5 +100,11 @@ func verifyMeshReplication(t *testing.T, table string, pods []string, baseID int
 
 // podToNode extracts the node name from a pod name (e.g. "pgedge-n1-1" -> "n1").
 func podToNode(pod string) string {
-	return strings.TrimSuffix(strings.TrimPrefix(pod, "pgedge-"), "-1")
+	// CNPG names instance pods <cluster>-<instance number>, and clusters are
+	// named pgedge-<node>, so strip both to get the Spock node name.
+	node := strings.TrimPrefix(pod, "pgedge-")
+	if i := strings.LastIndex(node, "-"); i >= 0 {
+		node = node[:i]
+	}
+	return node
 }

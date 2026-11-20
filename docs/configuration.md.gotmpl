@@ -249,7 +249,7 @@ A YAML value of `null` here deletes the corresponding key before Helm ever rende
 
 Spock 5.0.14 adds `spock.failover_slots_database`, which names the database that Spock's failover slot worker connects to on each standby. With it set, the worker decodes each replication slot copy on the standby so that the copy has a consistent snapshot, and subscribers do not miss transactions that committed on the primary shortly before a failover. It must be the Spock database, and changing it requires a restart.
 
-This chart sets `spock.failover_slots_database` on every node to the chart-wide `pgEdge.clusterSpec.bootstrap.initdb.database` (`app` by default), which is the database the init-spock job configures Spock in. A node's own `clusterSpec.bootstrap` does not change it, so nodes bootstrapped from a backup with `initdb: null` get the same value. The chart does not set the parameter if you set it yourself, in the chart-wide or the node's `clusterSpec`. Spock versions older than 5.0.14 ignore it.
+This chart sets `spock.failover_slots_database` on every node to the chart-wide `pgEdge.clusterSpec.bootstrap.initdb.database` (`app` by default), which is the database the init-spock job configures Spock in. A node's own `clusterSpec.bootstrap` does not change it, so nodes bootstrapped from a backup with `initdb: null` get the same value. The chart does not set the parameter if you set it yourself, in the chart-wide or the node's `clusterSpec`. Spock versions older than 5.0.14 don't use it: PostgreSQL keeps it as an unused placeholder setting and starts without a warning.
 
 While the setting is in place, the worker keeps a connection open to that database on every node, including primaries. As a result:
 

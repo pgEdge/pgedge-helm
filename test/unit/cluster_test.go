@@ -242,6 +242,36 @@ func TestFailoverSlotsDatabaseExplicitOverride(t *testing.T) {
 	}
 }
 
+// An override on a single node's clusterSpec applies to that node only; the
+// chart's default still applies to the other nodes.
+func TestFailoverSlotsDatabasePerNodeOverride(t *testing.T) {
+	objects := renderTemplate(t, "failover-slots-database-per-node-override-values.yaml")
+
+	n1 := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if n1 == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+	params, found, _ := unstructured.NestedMap(n1.Object, "spec", "postgresql", "parameters")
+	if !found {
+		t.Fatal("expected postgresql.parameters to be set on pgedge-n1")
+	}
+	value, present := params["spock.failover_slots_database"]
+	if !present {
+		t.Fatal("expected spock.failover_slots_database to be present on pgedge-n1")
+	}
+	if value != "" {
+		t.Errorf("pgedge-n1: expected per-node override \"\" to be kept, got %v", value)
+	}
+
+	n2 := findByKindAndName(objects, "Cluster", "pgedge-n2")
+	if n2 == nil {
+		t.Fatal("pgedge-n2 Cluster not found")
+	}
+	if got := getNestedString(n2, "spec", "postgresql", "parameters", "spock.failover_slots_database"); got != "app" {
+		t.Errorf("pgedge-n2: expected spock.failover_slots_database=%q, got %q", "app", got)
+	}
+}
+
 func TestClusterDefaultBootstrapConfig(t *testing.T) {
 	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")
