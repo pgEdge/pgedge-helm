@@ -1,0 +1,14 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        postgresql:
+          parameters:
+            spock.failover_slots_database: ""
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    storage:
+      size: 1Gi

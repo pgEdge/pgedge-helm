@@ -1,0 +1,15 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        bootstrap:
+          initdb: null
+          recovery:
+            source: pgedge-n1
+  clusterSpec:
+    storage:
+      size: 1Gi

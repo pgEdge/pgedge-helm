@@ -180,6 +180,98 @@ func TestOutputPluginLibrariesPerNodeNullOverride(t *testing.T) {
 	}
 }
 
+// spock.failover_slots_database (Spock 5.0.14+) is derived from the
+// chart-wide initdb database, the database init-spock configures Spock in,
+// so the failover slot worker decodes slot copies in the Spock database.
+func TestFailoverSlotsDatabaseDefaultsToInitdbDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		values string
+		want   string
+	}{
+		{"single-node-minimal-values.yaml", "app"},
+		{"custom-database-values.yaml", "mydb"},
+	} {
+		t.Run(tc.values, func(t *testing.T) {
+			objects := renderTemplate(t, tc.values)
+			cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+			if cluster == nil {
+				t.Fatal("pgedge-n1 Cluster not found")
+			}
+			got := getNestedString(cluster, "spec", "postgresql", "parameters", "spock.failover_slots_database")
+			if got != tc.want {
+				t.Errorf("expected spock.failover_slots_database=%q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+// A node bootstrapped from a backup sets bootstrap.initdb to null. It must
+// still render, and still get the chart-wide Spock database that init-spock
+// configures on every node.
+func TestFailoverSlotsDatabaseRecoveryNode(t *testing.T) {
+	objects := renderTemplate(t, "recovery-node-values.yaml")
+	for _, name := range []string{"pgedge-n1", "pgedge-n2"} {
+		cluster := findByKindAndName(objects, "Cluster", name)
+		if cluster == nil {
+			t.Fatalf("%s Cluster not found", name)
+		}
+		got := getNestedString(cluster, "spec", "postgresql", "parameters", "spock.failover_slots_database")
+		if got != "app" {
+			t.Errorf("%s: expected spock.failover_slots_database=%q, got %q", name, "app", got)
+		}
+	}
+}
+
+func TestFailoverSlotsDatabaseExplicitOverride(t *testing.T) {
+	objects := renderTemplate(t, "failover-slots-database-override-values.yaml")
+	cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if cluster == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+
+	params, found, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+	if !found {
+		t.Fatal("expected postgresql.parameters to be set")
+	}
+	value, present := params["spock.failover_slots_database"]
+	if !present {
+		t.Fatal("expected spock.failover_slots_database to be present")
+	}
+	if value != "" {
+		t.Errorf("expected explicit spock.failover_slots_database=\"\" to be kept, got %v", value)
+	}
+}
+
+// An override on a single node's clusterSpec applies to that node only; the
+// chart's default still applies to the other nodes.
+func TestFailoverSlotsDatabasePerNodeOverride(t *testing.T) {
+	objects := renderTemplate(t, "failover-slots-database-per-node-override-values.yaml")
+
+	n1 := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if n1 == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+	params, found, _ := unstructured.NestedMap(n1.Object, "spec", "postgresql", "parameters")
+	if !found {
+		t.Fatal("expected postgresql.parameters to be set on pgedge-n1")
+	}
+	value, present := params["spock.failover_slots_database"]
+	if !present {
+		t.Fatal("expected spock.failover_slots_database to be present on pgedge-n1")
+	}
+	if value != "" {
+		t.Errorf("pgedge-n1: expected per-node override \"\" to be kept, got %v", value)
+	}
+
+	n2 := findByKindAndName(objects, "Cluster", "pgedge-n2")
+	if n2 == nil {
+		t.Fatal("pgedge-n2 Cluster not found")
+	}
+	if got := getNestedString(n2, "spec", "postgresql", "parameters", "spock.failover_slots_database"); got != "app" {
+		t.Errorf("pgedge-n2: expected spock.failover_slots_database=%q, got %q", "app", got)
+	}
+}
+
 func TestClusterDefaultBootstrapConfig(t *testing.T) {
 	objects := renderTemplate(t, "single-node-minimal-values.yaml")
 	clusters := filterByKind(objects, "Cluster")

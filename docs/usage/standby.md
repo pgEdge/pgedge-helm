@@ -27,6 +27,35 @@ pgEdge:
       size: 1Gi
 ```
 
+## Replication slot readiness
+
+Other nodes replicate from a node through Spock replication slots on its primary. Spock's failover slot worker copies these slots to each standby about once a minute. Since Spock 5.0.14, a new copy starts out as a temporary slot and only becomes permanent once the primary's slot has advanced past the standby's position. Promotion drops temporary slots, so if a standby is promoted before its copies are permanent, the other nodes stop replicating from this node.
+
+This mainly matters right after a node or standby is created, or after several promotions in quick succession. Before promoting a replica, run this query on the current primary and on the standby you want to promote:
+
+```sql
+SELECT slot_name, temporary, wal_status, conflicting
+FROM pg_replication_slots
+WHERE plugin = 'spock_output'
+ORDER BY slot_name;
+```
+
+The standby is ready to promote only when, for every slot name returned on the primary, the standby returns a row with the same name where:
+
+- `temporary` is `f`;
+- `wal_status` is not `lost`, meaning the WAL the slot needs has not been removed;
+- `conflicting` is not `t`, meaning the slot has not been invalidated by a recovery conflict.
+
+Compare the slot names on both sides, not just the rows on the standby: a slot that has no copy on the standby yet does not appear there at all. Do not promote the standby while any slot is missing or fails one of these checks.
+
+In Spock 5.0.14, a copy can stay temporary on an idle primary even after it has caught up. If that happens, run `SELECT pg_log_standby_snapshot();` on the primary (or any write transaction), then check again. A copy that is lost or conflicting is dropped and recreated from the primary by Spock's failover slot worker, after which it goes through the temporary stage again.
+
+### Automatic failover
+
+CloudNativePG's automatic failover doesn't perform this check. If the primary fails before the standby's copies are permanent, CloudNativePG still promotes the standby, and the other nodes stop replicating from this node. Their subscriptions to it report errors such as `replication slot "spk_app_n1_sub_n1_n2" does not exist`.
+
+To recover, run `helm upgrade` with the same values. The init-spock job finds each subscription whose slot is missing on the new primary and recreates it, which also recreates the slot. The recreated subscription starts from the new slot's position and does not copy existing data, so changes made on this node between the failover and the recovery are not replicated to the other nodes. Check for and repair any differences between the nodes afterwards.
+
 ## Promoting a replica
 
 If you have configured a node with more than one instance, you can perform a promotion using the `kubectl cnpg` plugin.

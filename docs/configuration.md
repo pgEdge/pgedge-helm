@@ -245,6 +245,27 @@ A YAML value of `null` here deletes the corresponding key before Helm ever rende
 
     This `null` override only works at the chart-wide `pgEdge.clusterSpec` level. Setting it to `null` on a single node's `clusterSpec` does not omit the parameter: that override is merged onto the chart-wide default with Sprig's `mergeOverwrite` rather than through Helm's own values merging, and Kubernetes stores a `null` value for a `map[string]string` entry as an empty string rather than dropping the key. An empty value is still rejected exactly like any other value on a PostgreSQL version that predates this GUC. There is currently no values-only way to exempt a single node from this default while keeping it for the rest of the cluster — pin every node's image consistently instead.
 
+### spock.failover_slots_database
+
+Spock 5.0.14 adds `spock.failover_slots_database`, which names the database that Spock's failover slot worker connects to on each standby. With it set, the worker decodes each replication slot copy on the standby so that the copy has a consistent snapshot, and subscribers do not miss transactions that committed on the primary shortly before a failover. It must be the Spock database, and changing it requires a restart.
+
+This chart sets `spock.failover_slots_database` on every node to the chart-wide `pgEdge.clusterSpec.bootstrap.initdb.database` (`app` by default), which is the database the init-spock job configures Spock in. A node's own `clusterSpec.bootstrap` does not change it, so nodes bootstrapped from a backup with `initdb: null` get the same value. The chart does not set the parameter if you set it yourself, in the chart-wide or the node's `clusterSpec`. Spock versions older than 5.0.14 don't use it: PostgreSQL keeps it as an unused placeholder setting and starts without a warning.
+
+While the setting is in place, the worker keeps a connection open to that database on every node, including primaries. As a result:
+
+- `DROP DATABASE` on it fails. `WITH (FORCE)` closes the worker's connection, but PostgreSQL still refuses to drop a database with active logical replication slots, which the Spock database has as long as other nodes replicate from it. To stop using a node, remove it from the cluster instead (see [Removing Nodes](usage/removing_nodes.md)).
+- `ALTER DATABASE ... RENAME` on it fails, and has no `FORCE` option. Turn the setting off first (see below), wait for the rolling restart to finish, and run the rename while connected to another database. To turn the setting back on, set it to the new database name.
+
+To turn the setting off, set it to an empty string:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    postgresql:
+      parameters:
+        spock.failover_slots_database: ""
+```
+
 ## Values reference
 
 You can customize this Helm chart by specifying configuration parameters in your `values.yaml` file.
