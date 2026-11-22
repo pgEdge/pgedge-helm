@@ -1010,3 +1010,13 @@ func TestLagTrackerQueryWorksOnSpock5And6(t *testing.T) {
 		t.Error("lagTrackerQuery must not select commit_lsn directly; Spock 5.0.x has no such column")
 	}
 }
+
+func TestPendingInitialSyncQuery(t *testing.T) {
+	// Same READY check as Spock's Zodan add-node: sync entries not in
+	// 'y' (sync done) or 'r' (ready) mean the initial copy is still running.
+	for _, want := range []string{"spock.local_sync_status", "sync_status NOT IN ('y', 'r')", "s.sub_name = $1"} {
+		if !strings.Contains(pendingInitialSyncQuery, want) {
+			t.Errorf("pendingInitialSyncQuery should contain %q", want)
+		}
+	}
+}
