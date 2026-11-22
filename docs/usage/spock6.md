@@ -115,15 +115,35 @@ Use the following steps to upgrade:
 
 6. Check that the init-spock job completed, with `kubectl get job pgedge-init-spock`.
 
-7. On PostgreSQL 18, if a node has standby instances, drop the slot copies that Spock 5's failover slot worker made on each standby. Native slot synchronization doesn't replace a slot with the same name, and keeps failing on the standby until those copies are gone. Run the following statement on every standby pod, for example with `kubectl exec <pod> -c postgres -- psql -U admin -d app -c "..."`:
+7. On PostgreSQL 18, if a node has standby instances, remove the slot copies that Spock 5's failover slot worker made on each standby. That worker copies every logical slot that `spock.synchronize_slot_names` matches, which is all of them by default, not only Spock's. Native slot synchronization doesn't replace a slot with the same name, and keeps failing on the standby until those copies are gone. Run the queries below with, for example, `kubectl exec <pod> -c postgres -- psql -U admin -d app -c "..."`, and follow these steps:
 
-    ```sql
-    SELECT pg_drop_replication_slot(slot_name)
-    FROM pg_replication_slots
-    WHERE plugin = 'spock_output' AND NOT synced AND NOT active;
-    ```
+    1. On the primary, list the logical slots that the standby should carry:
 
-    Native slot synchronization then creates new copies. Don't promote a standby until its copies show `synced = t` and `temporary = f`, as described in [Replication slot readiness](standby.md#replication-slot-readiness).
+        ```sql
+        SELECT slot_name, plugin, failover
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical' AND NOT temporary;
+        ```
+
+        Native slot synchronization only copies slots with `failover` set to `t`. The init-spock job sets it on Spock's slots. For any other logical slot that must survive a failover, set it yourself; for a PostgreSQL subscriber, run `ALTER SUBSCRIPTION ... SET (failover = true)` while the subscription is disabled.
+
+    2. On each standby, list the slots that native slot synchronization didn't create:
+
+        ```sql
+        SELECT slot_name, plugin, active, active_pid
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical' AND NOT synced AND NOT temporary;
+        ```
+
+        A slot from this list is a copy only if a slot with the same name exists on the primary. A slot that exists only on the standby, such as one created there for decoding on the standby, is not a copy: leave it.
+
+    3. Drop each copy by name on the standby. A copy that shows `active = t` can't be dropped until the client in `active_pid` stops using it.
+
+        ```sql
+        SELECT pg_drop_replication_slot('<slot_name>');
+        ```
+
+    Native slot synchronization then creates new copies. Don't promote a standby until every slot with `failover = t` on the primary appears on it with `synced = t` and `temporary = f`, as described in [Replication slot readiness](standby.md#replication-slot-readiness).
 
 During the rollout, Spock's manager worker updates the Spock extension on each primary with `ALTER EXTENSION spock UPDATE` as soon as the primary starts on the new image. The init-spock job waits until the extension on every node matches the Spock binaries before it changes anything, and runs the update itself if it hasn't happened within a minute. The job fails with an error if a node's extension is newer than its binaries, which happens if you roll the image back after the upgrade.
 

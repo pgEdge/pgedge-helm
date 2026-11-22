@@ -132,15 +132,30 @@ func TestSpockMajorUpgrade(t *testing.T) {
 
 		// Where native slot sync takes over (PostgreSQL 18 + Spock 6.0), the
 		// copies Spock 5's worker made are not synced copies and native slot
-		// sync won't replace them. Drop them as the upgrade guide says.
+		// sync won't replace them. Drop them as the upgrade guide says: only
+		// unsynced slots on the standby whose name exists on the primary.
 		native := nativeSlotSyncOn(t, primaries["pgedge-n1"])
 		if native {
-			for _, standby := range standbys {
-				if _, err := testKube.ExecSQL(standby, `
-					SELECT pg_drop_replication_slot(slot_name)
+			for _, pair := range syncs {
+				names, err := testKube.ExecSQL(pair.primary, `
+					SELECT coalesce(string_agg(quote_literal(slot_name), ','), '')
 					FROM pg_replication_slots
-					WHERE plugin = 'spock_output' AND NOT synced AND NOT active;`); err != nil {
-					t.Fatalf("drop Spock 5 slot copies on %s: %v", standby, err)
+					WHERE slot_type = 'logical' AND NOT temporary;`)
+				if err != nil {
+					t.Fatalf("list logical slots on %s: %v", pair.primary, err)
+				}
+				names = strings.TrimSpace(names)
+				if names == "" {
+					continue
+				}
+				for _, standby := range pair.standbys {
+					if _, err := testKube.ExecSQL(standby, fmt.Sprintf(`
+						SELECT pg_drop_replication_slot(slot_name)
+						FROM pg_replication_slots
+						WHERE slot_type = 'logical' AND NOT synced AND NOT temporary
+						  AND NOT active AND slot_name IN (%s);`, names)); err != nil {
+						t.Fatalf("drop Spock 5 slot copies on %s: %v", standby, err)
+					}
 				}
 			}
 		}
