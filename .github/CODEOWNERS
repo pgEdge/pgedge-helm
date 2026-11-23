@@ -2,27 +2,28 @@
 # pgedge-helm is Tier 3. The last matching line wins.
 
 # Tier 3: every change needs a code owner's approval.
-*  @mmols
+*  @pgEdge/platform
 
-# Workflows, release, packaging and signing: a code owner or build-packaging.
-/.github/workflows/  @mmols @pgEdge/build-packaging
-/.github/actions/  @mmols @pgEdge/build-packaging
-action.yml  @mmols @pgEdge/build-packaging
-action.yaml  @mmols @pgEdge/build-packaging
-.goreleaser*.yml  @mmols @pgEdge/build-packaging
-.goreleaser*.yaml  @mmols @pgEdge/build-packaging
-*.spec  @mmols @pgEdge/build-packaging
-debian/  @mmols @pgEdge/build-packaging
-rpm/  @mmols @pgEdge/build-packaging
-packaging/  @mmols @pgEdge/build-packaging
-release*.sh  @mmols @pgEdge/build-packaging
-sign*.sh  @mmols @pgEdge/build-packaging
-sign*.py  @mmols @pgEdge/build-packaging
-Dockerfile*  @mmols @pgEdge/build-packaging
+# Workflows, release, packaging and signing: platform-admins or
+# build-packaging.
+/.github/workflows/  @pgEdge/platform-admins @pgEdge/build-packaging
+/.github/actions/  @pgEdge/platform-admins @pgEdge/build-packaging
+action.yml  @pgEdge/platform-admins @pgEdge/build-packaging
+action.yaml  @pgEdge/platform-admins @pgEdge/build-packaging
+.goreleaser*.yml  @pgEdge/platform-admins @pgEdge/build-packaging
+.goreleaser*.yaml  @pgEdge/platform-admins @pgEdge/build-packaging
+*.spec  @pgEdge/platform-admins @pgEdge/build-packaging
+debian/  @pgEdge/platform-admins @pgEdge/build-packaging
+rpm/  @pgEdge/platform-admins @pgEdge/build-packaging
+packaging/  @pgEdge/platform-admins @pgEdge/build-packaging
+release*.sh  @pgEdge/platform-admins @pgEdge/build-packaging
+sign*.sh  @pgEdge/platform-admins @pgEdge/build-packaging
+sign*.py  @pgEdge/platform-admins @pgEdge/build-packaging
+Dockerfile*  @pgEdge/platform-admins @pgEdge/build-packaging
 
-# Ownership and AI review configuration: code owners only.
-/CODEOWNERS  @mmols
-/.github/CODEOWNERS  @mmols
-/docs/CODEOWNERS  @mmols
-/REVIEW.md  @mmols
-/.coderabbit.yaml  @mmols
+# Ownership and AI review configuration: platform-admins only.
+/CODEOWNERS  @pgEdge/platform-admins
+/.github/CODEOWNERS  @pgEdge/platform-admins
+/docs/CODEOWNERS  @pgEdge/platform-admins
+/REVIEW.md  @pgEdge/platform-admins
+/.coderabbit.yaml  @pgEdge/platform-admins
