@@ -75,13 +75,75 @@ func waitForAll(ctx context.Context, client dynamic.Interface, namespace, appNam
 
 // WaitForAll creates an in-cluster K8s client and waits for all CNPG clusters.
 func WaitForAll(ctx context.Context, namespace, appName string) error {
+	client, err := newClient()
+	if err != nil {
+		return err
+	}
+	return waitForAll(ctx, client, namespace, appName)
+}
+
+// HASpec is the part of a CNPG Cluster spec that decides whether its
+// standbys can keep copies of logical replication slots.
+type HASpec struct {
+	// Instances is spec.instances.
+	Instances int64
+	// HASlots is spec.replicationSlots.highAvailability.enabled, which CNPG
+	// defaults to true.
+	HASlots bool
+	// SynchronizeLogicalDecoding is
+	// spec.replicationSlots.highAvailability.synchronizeLogicalDecoding.
+	// CNPG needs it to add dbname to the standbys' primary_conninfo, which
+	// PostgreSQL's native slot sync requires, and to manage
+	// synchronized_standby_slots.
+	SynchronizeLogicalDecoding bool
+}
+
+// haSpecs returns the HASpec of each CNPG cluster with the app label, keyed
+// by cluster name.
+func haSpecs(ctx context.Context, client dynamic.Interface, namespace, appName string) (map[string]HASpec, error) {
+	list, err := client.Resource(cnpgGVR).Namespace(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("pgedge.com/app-name=%s", appName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list CNPG clusters: %w", err)
+	}
+	specs := make(map[string]HASpec, len(list.Items))
+	for _, item := range list.Items {
+		instances, _, _ := unstructured.NestedInt64(item.Object, "spec", "instances")
+		haSlots, found, _ := unstructured.NestedBool(item.Object,
+			"spec", "replicationSlots", "highAvailability", "enabled")
+		if !found {
+			haSlots = true
+		}
+		syncLD, _, _ := unstructured.NestedBool(item.Object,
+			"spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding")
+		specs[item.GetName()] = HASpec{
+			Instances:                  instances,
+			HASlots:                    haSlots,
+			SynchronizeLogicalDecoding: syncLD,
+		}
+	}
+	return specs, nil
+}
+
+// HASpecs creates an in-cluster K8s client and returns the HASpec of each
+// CNPG cluster with the app label, keyed by cluster name.
+func HASpecs(ctx context.Context, namespace, appName string) (map[string]HASpec, error) {
+	client, err := newClient()
+	if err != nil {
+		return nil, err
+	}
+	return haSpecs(ctx, client, namespace, appName)
+}
+
+func newClient() (dynamic.Interface, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("k8s in-cluster config: %w", err)
+		return nil, fmt.Errorf("k8s in-cluster config: %w", err)
 	}
 	client, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		return fmt.Errorf("k8s dynamic client: %w", err)
+		return nil, fmt.Errorf("k8s dynamic client: %w", err)
 	}
-	return waitForAll(ctx, client, namespace, appName)
+	return client, nil
 }

@@ -16,6 +16,17 @@ pgEdge:
   initSpock: true
   # -- The name of the admin role used for database management and init-spock connections.
   adminUser: admin
+  # -- Whether to turn on PostgreSQL's native logical slot synchronization
+  # (through CloudNativePG's `replicationSlots.highAvailability.synchronizeLogicalDecoding`)
+  # so standbys keep copies of the Spock replication slots. Spock 6.0 needs it on
+  # PostgreSQL 18, where it no longer runs its own failover slot worker.
+  # `auto` turns it on for nodes whose image tag names PostgreSQL 18+ and Spock 6+
+  # (e.g. `18-spock6-standard`); `true` turns it on for every node, e.g. for images
+  # given by digest or to use it on PostgreSQL 17; `false` never turns it on.
+  # Nodes with a single instance are always left alone, since they have no standbys.
+  # Settings you put in a node's `clusterSpec` always win. If a node needs it but
+  # doesn't have it, the init-spock job fails. See docs/usage/spock6.md.
+  nativeSlotSync: auto
   # -- Docker image for the init-spock job. If not set, defaults to ghcr.io/pgedge/pgedge-helm-utils:v<chart-version>.
   # Override this for local development or to use a custom image.
   initSpockImageName: ""
@@ -48,6 +59,9 @@ pgEdge:
   clusterSpec:
     instances: 1
     imagePullPolicy: Always
+    # Spock 5 stays the default until Spock 6.0 is generally available. To use
+    # Spock 6.0 (beta), set an image such as
+    # ghcr.io/pgedge/pgedge-postgres:18-spock6-standard; see docs/usage/spock6.md.
     imageName: ghcr.io/pgedge/pgedge-postgres:18-spock5-standard
     certificates:
       clientCASecret: client-ca-key-pair

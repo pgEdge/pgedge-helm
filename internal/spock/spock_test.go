@@ -2,10 +2,12 @@
 package spock
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/pgEdge/pgedge-helm/internal/cluster"
 	"github.com/pgEdge/pgedge-helm/internal/config"
 	"github.com/pgEdge/pgedge-helm/internal/resource"
 )
@@ -781,5 +783,240 @@ func TestComputeDesiredPeerSubscriptionWaitsOnOriginAdvance(t *testing.T) {
 	}
 	if foundSlotAdvanceDirect {
 		t.Error("sub_n2_n3 should NOT directly depend on replication_slot_advance_from_cts (gated via OriginAdvance instead)")
+	}
+}
+
+// --- Spock 5.0.x / 6.0 compatibility ---
+
+// spock.progress has a remote_lsn column on 5.0.x but is a view without it
+// on 6.0, so the peer catch-up check must read origin progress instead.
+func TestPeerCatchupQueryWorksOnSpock5And6(t *testing.T) {
+	if strings.Contains(peerCatchupQuery, "spock.progress") {
+		t.Error("peerCatchupQuery must not read spock.progress, whose columns differ between Spock 5.0.x and 6.0")
+	}
+	for _, want := range []string{
+		"pg_replication_origin_status",
+		"ros.external_id = s.sub_slot_name",
+		"ros.remote_lsn >= $1::pg_lsn",
+		"n.node_name = $2",
+	} {
+		if !strings.Contains(peerCatchupQuery, want) {
+			t.Errorf("peerCatchupQuery missing %q", want)
+		}
+	}
+}
+
+func TestCreateLogicalSlotSQL(t *testing.T) {
+	for _, tc := range []struct {
+		version      int
+		wantFailover bool
+	}{
+		{150010, false},
+		{160016, false},
+		{170000, true},
+		{170012, true},
+		{180007, true},
+	} {
+		sql := createLogicalSlotSQL(tc.version)
+		if !strings.Contains(sql, "pg_create_logical_replication_slot($1, 'spock_output'") {
+			t.Errorf("%d: unexpected statement %q", tc.version, sql)
+		}
+		if got := strings.Contains(sql, "failover := true"); got != tc.wantFailover {
+			t.Errorf("%d: failover flag = %v, want %v (%q)", tc.version, got, tc.wantFailover, sql)
+		}
+		if slotFailoverSupported(tc.version) != tc.wantFailover {
+			t.Errorf("%d: slotFailoverSupported = %v, want %v", tc.version, !tc.wantFailover, tc.wantFailover)
+		}
+	}
+}
+
+func TestDecideExtensionAction(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		installed, available string
+		hasPath              bool
+		want                 extensionAction
+	}{
+		{"current 5", "5.0.14", "5.0.14", false, extensionCurrent},
+		{"current 6", "6.0.0", "6.0.0", false, extensionCurrent},
+		{"5 to 6", "5.0.14", "6.0.0", true, extensionNeedsUpdate},
+		{"5 minor", "5.0.12", "5.0.14", true, extensionNeedsUpdate},
+		{"rollback 6 to 5", "6.0.0", "5.0.14", false, extensionNoPath},
+		{"no path from old 5", "5.0.10", "6.0.0", false, extensionNoPath},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := decideExtensionAction(tc.installed, tc.available, tc.hasPath); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStandbySlotNamesQueryToleratesMissingSetting(t *testing.T) {
+	// The setting is read with missing_ok so the query also runs on a Spock
+	// build that doesn't define it.
+	if !strings.Contains(standbySlotNamesQuery, "current_setting('spock.pg_standby_slot_names', true)") {
+		t.Errorf("standbySlotNamesQuery must read spock.pg_standby_slot_names with missing_ok: %s", standbySlotNamesQuery)
+	}
+}
+
+// The failover flag only exists on PostgreSQL 17+, and only Spock 6.0
+// provides spock.slot_enable_failover() to set it on an existing slot.
+func TestSlotFailoverCapableQuery(t *testing.T) {
+	for _, want := range []string{
+		"server_version_num')::int >= 170000",
+		"to_regprocedure('spock.slot_enable_failover()') IS NOT NULL",
+	} {
+		if !strings.Contains(slotFailoverCapableQuery, want) {
+			t.Errorf("slotFailoverCapableQuery missing %q", want)
+		}
+	}
+}
+
+// Copies synced from a primary, temporary slots and invalidated slots can't
+// take the failover flag, so they must not be picked up.
+func TestSlotsWithoutFailoverQuery(t *testing.T) {
+	for _, want := range []string{
+		"plugin = 'spock_output'",
+		"NOT temporary",
+		"NOT failover",
+		"NOT synced",
+		"invalidation_reason IS NULL",
+	} {
+		if !strings.Contains(slotsWithoutFailoverQuery, want) {
+			t.Errorf("slotsWithoutFailoverQuery missing %q", want)
+		}
+	}
+}
+
+func TestParseSpockMajor(t *testing.T) {
+	for in, want := range map[string]int{"5.0.14": 5, "6.0.0": 6, "6.0.0-beta1": 6, "6": 6, "10.1.0": 10} {
+		got, err := parseSpockMajor(in)
+		if err != nil || got != want {
+			t.Errorf("parseSpockMajor(%q) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "beta", "x.0.0"} {
+		if _, err := parseSpockMajor(in); err == nil {
+			t.Errorf("parseSpockMajor(%q): expected an error", in)
+		}
+	}
+}
+
+func TestCheckAddNodeVersions(t *testing.T) {
+	nodes := []config.Node{
+		{Name: "n1"},
+		{Name: "n2"},
+		{Name: "n3", Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"}},
+	}
+	for _, tc := range []struct {
+		name     string
+		versions map[string]int
+		wantErr  bool
+	}{
+		{"same 5", map[string]int{"n1": 5, "n2": 5, "n3": 5}, false},
+		{"same 6", map[string]int{"n1": 6, "n2": 6, "n3": 6}, false},
+		{"new node older", map[string]int{"n1": 6, "n2": 6, "n3": 5}, true},
+		{"new node newer", map[string]int{"n1": 5, "n2": 5, "n3": 6}, true},
+		{"one peer differs", map[string]int{"n1": 6, "n2": 5, "n3": 6}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkAddNodeVersions(nodes, tc.versions)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("err = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+
+	// Nodes restored from a backup (bootstrap.mode: cnpg) aren't checked.
+	restored := []config.Node{{Name: "n1"}, {Name: "n2", Bootstrap: config.NodeBootstrap{Mode: "cnpg"}}}
+	if err := checkAddNodeVersions(restored, map[string]int{"n1": 6, "n2": 5}); err != nil {
+		t.Errorf("cnpg-bootstrapped node should not be checked: %v", err)
+	}
+}
+
+func TestNeedsNativeSlotSync(t *testing.T) {
+	for _, tc := range []struct {
+		pg, spock int
+		want      bool
+	}{
+		{16, 6, false}, {17, 6, false}, {18, 5, false}, {18, 6, true}, {19, 7, true},
+	} {
+		if got := needsNativeSlotSync(tc.pg, tc.spock); got != tc.want {
+			t.Errorf("needsNativeSlotSync(%d, %d) = %v, want %v", tc.pg, tc.spock, got, tc.want)
+		}
+	}
+}
+
+func TestCheckNativeSlotSync(t *testing.T) {
+	ready := cluster.HASpec{Instances: 3, HASlots: true, SynchronizeLogicalDecoding: true}
+	tests := []struct {
+		name       string
+		pg, spock  int
+		spec       cluster.HASpec
+		syncSlots  string
+		hsf        string
+		wantErr    bool
+		wantInText []string
+	}{
+		{name: "spock 5 on pg18 uses spock's worker", pg: 18, spock: 5,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "off", hsf: "on"},
+		{name: "spock 6 on pg17 uses spock's worker", pg: 17, spock: 6,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "off", hsf: "off"},
+		{name: "spock 6 on pg18 fully set up", pg: 18, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "on"},
+		{name: "spock 6 on pg18 without sync_replication_slots", pg: 18, spock: 6,
+			spec: ready, syncSlots: "off", hsf: "on", wantErr: true,
+			wantInText: []string{`sync_replication_slots is "off"`, "runs Spock 6 on PostgreSQL 18"}},
+		{name: "spock 6 on pg18 with hot_standby_feedback off", pg: 18, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "off", wantErr: true,
+			wantInText: []string{`hot_standby_feedback is "off"`}},
+		{name: "spock 6 on pg18 without synchronizeLogicalDecoding", pg: 18, spock: 6,
+			spec: cluster.HASpec{Instances: 3, HASlots: true}, syncSlots: "on", hsf: "on", wantErr: true,
+			wantInText: []string{"synchronizeLogicalDecoding is not enabled"}},
+		{name: "spock 6 on pg18 with HA slots disabled", pg: 18, spock: 6,
+			spec: cluster.HASpec{Instances: 3}, syncSlots: "off", hsf: "on", wantErr: true,
+			wantInText: []string{"highAvailability is disabled", `sync_replication_slots is "off"`}},
+		{name: "native sync turned on for pg17 without hot_standby_feedback", pg: 17, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "off", wantErr: true,
+			wantInText: []string{"has sync_replication_slots on", `hot_standby_feedback is "off"`}},
+		{name: "native sync turned on for pg17 fully set up", pg: 17, spock: 6,
+			spec: ready, syncSlots: "on", hsf: "on"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkNativeSlotSync("n1", tt.pg, tt.spock, tt.spec, tt.syncSlots, tt.hsf)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("got error %v, wantErr %v", err, tt.wantErr)
+			}
+			for _, want := range tt.wantInText {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not mention %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLagTrackerQueryWorksOnSpock5And6(t *testing.T) {
+	// commit_lsn exists only on Spock 6.0; reading it through to_jsonb keeps
+	// the query valid on Spock 5.0.x, where it comes back NULL.
+	for _, want := range []string{"lt.commit_timestamp", "to_jsonb(lt)->>'commit_lsn'", "spock.lag_tracker lt"} {
+		if !strings.Contains(lagTrackerQuery, want) {
+			t.Errorf("lagTrackerQuery should contain %q", want)
+		}
+	}
+	if strings.Contains(lagTrackerQuery, "SELECT commit_lsn") || strings.Contains(lagTrackerQuery, "lt.commit_lsn") {
+		t.Error("lagTrackerQuery must not select commit_lsn directly; Spock 5.0.x has no such column")
+	}
+}
+
+func TestPendingInitialSyncQuery(t *testing.T) {
+	// Same READY check as Spock's Zodan add-node: sync entries not in
+	// 'y' (sync done) or 'r' (ready) mean the initial copy is still running.
+	for _, want := range []string{"spock.local_sync_status", "sync_status NOT IN ('y', 'r')", "s.sub_name = $1"} {
+		if !strings.Contains(pendingInitialSyncQuery, want) {
+			t.Errorf("pendingInitialSyncQuery should contain %q", want)
+		}
 	}
 }

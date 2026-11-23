@@ -1,0 +1,31 @@
+pgEdge:
+  appName: pgedge
+  nativeSlotSync: true
+  nodes:
+    # Image by digest: auto can't tell the versions, true turns it on.
+    - name: n1
+      hostname: pgedge-n1-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    # PostgreSQL 17 + Spock 6: auto leaves it off, true turns it on.
+    - name: n2
+      hostname: pgedge-n2-rw
+      clusterSpec:
+        imageName: ghcr.io/pgedge/pgedge-postgres:17-spock6-standard
+    # CNPG HA replication slots off: still left alone.
+    - name: n3
+      hostname: pgedge-n3-rw
+      clusterSpec:
+        replicationSlots:
+          highAvailability:
+            enabled: false
+    # A single instance: still left alone.
+    - name: n4
+      hostname: pgedge-n4-rw
+      clusterSpec:
+        instances: 1
+  clusterSpec:
+    imageName: ghcr.io/pgedge/pgedge-postgres:18-spock6-standard
+    instances: 2
+    storage:
+      size: 1Gi

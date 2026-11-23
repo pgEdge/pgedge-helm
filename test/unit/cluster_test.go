@@ -453,3 +453,167 @@ func TestClusterDefaultImageName(t *testing.T) {
 		t.Errorf("expected imageName=%q, got %q", expected, imageName)
 	}
 }
+
+// Spock 6.0 on PostgreSQL 18 has no failover slot worker of its own, so the
+// chart turns on CNPG's logical decoding slot sync for those images only.
+func TestNativeSlotSyncForSpock6OnPG18(t *testing.T) {
+	objects := renderTemplate(t, "spock6-native-slot-sync-values.yaml")
+	for _, tc := range []struct {
+		cluster string
+		want    bool
+	}{
+		{"pgedge-n1", true},
+		{"pgedge-n2", true},
+		{"pgedge-n3", false},
+		{"pgedge-n4", false},
+		{"pgedge-n5", false},
+		{"pgedge-n6", false},
+		{"pgedge-n7", false},
+	} {
+		t.Run(tc.cluster, func(t *testing.T) {
+			cluster := findByKindAndName(objects, "Cluster", tc.cluster)
+			if cluster == nil {
+				t.Fatalf("%s Cluster not found", tc.cluster)
+			}
+			sync, _, _ := unstructured.NestedBool(cluster.Object,
+				"spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding")
+			if sync != tc.want {
+				t.Errorf("synchronizeLogicalDecoding = %v, want %v", sync, tc.want)
+			}
+			params, _, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+			value, present := params["sync_replication_slots"]
+			if tc.want {
+				if value != "on" {
+					t.Errorf("sync_replication_slots = %v, want \"on\"", value)
+				}
+				if params["hot_standby_feedback"] != "on" {
+					t.Errorf("hot_standby_feedback = %v, want \"on\"", params["hot_standby_feedback"])
+				}
+			} else if present {
+				t.Errorf("sync_replication_slots should not be set, got %v", value)
+			}
+		})
+	}
+
+	// Turning it on for one node must not leak into the others.
+	n5 := findByKindAndName(objects, "Cluster", "pgedge-n5")
+	if enabled, found, _ := unstructured.NestedBool(n5.Object,
+		"spec", "replicationSlots", "highAvailability", "enabled"); !found || enabled {
+		t.Errorf("pgedge-n5: expected highAvailability.enabled=false to be kept")
+	}
+	n3 := findByKindAndName(objects, "Cluster", "pgedge-n3")
+	if _, found, _ := unstructured.NestedMap(n3.Object, "spec", "replicationSlots"); found {
+		t.Errorf("pgedge-n3: expected no replicationSlots section")
+	}
+}
+
+func TestNativeSlotSyncRespectsUserSettings(t *testing.T) {
+	objects := renderTemplate(t, "spock6-native-slot-sync-override-values.yaml")
+
+	n1 := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if sync, found, _ := unstructured.NestedBool(n1.Object,
+		"spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding"); !found || sync {
+		t.Errorf("pgedge-n1: expected explicit synchronizeLogicalDecoding=false to be kept")
+	}
+	if params, _, _ := unstructured.NestedMap(n1.Object, "spec", "postgresql", "parameters"); params["sync_replication_slots"] != nil {
+		t.Errorf("pgedge-n1: sync_replication_slots should not be set, got %v", params["sync_replication_slots"])
+	}
+
+	n2 := findByKindAndName(objects, "Cluster", "pgedge-n2")
+	if got := getNestedString(n2, "spec", "postgresql", "parameters", "sync_replication_slots"); got != "off" {
+		t.Errorf("pgedge-n2: expected explicit sync_replication_slots=off to be kept, got %q", got)
+	}
+	if _, found, _ := unstructured.NestedBool(n2.Object,
+		"spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding"); found {
+		t.Errorf("pgedge-n2: synchronizeLogicalDecoding should not be set")
+	}
+}
+
+// The default image stays on Spock 5 until Spock 6.0 is GA.
+func TestDefaultImageHasNoNativeSlotSync(t *testing.T) {
+	objects := renderTemplate(t, "single-node-minimal-values.yaml")
+	cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if cluster == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+	if _, found, _ := unstructured.NestedMap(cluster.Object, "spec", "replicationSlots"); found {
+		t.Error("expected no replicationSlots section for the default Spock 5 image")
+	}
+	params, _, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+	if _, present := params["sync_replication_slots"]; present {
+		t.Error("expected sync_replication_slots to be absent for the default Spock 5 image")
+	}
+}
+
+// Spock 6.0 settings, including the ones that now take units, pass schema
+// validation and render as given. The chart never sets
+// spock.pg_standby_slot_names, which stalls replication on PostgreSQL 18 with
+// Spock 6.0 when it names a missing slot.
+func TestSpock6SettingsRender(t *testing.T) {
+	objects := renderTemplate(t, "spock6-guc-units-values.yaml")
+	cluster := findByKindAndName(objects, "Cluster", "pgedge-n1")
+	if cluster == nil {
+		t.Fatal("pgedge-n1 Cluster not found")
+	}
+	for key, want := range map[string]string{
+		"spock.restart_delay_default":      "5s",
+		"spock.restart_delay_on_exception": "1min",
+		"spock.output_delay":               "0",
+		"spock.sync_timeout":               "2h",
+		"spock.event_history_size":         "4096",
+		"spock.non_conflicting_inserts":    "off",
+		"output_plugin_libraries":          "pgoutput, test_decoding, spock_output",
+	} {
+		if got := getNestedString(cluster, "spec", "postgresql", "parameters", key); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	}
+	params, _, _ := unstructured.NestedMap(cluster.Object, "spec", "postgresql", "parameters")
+	if _, present := params["spock.pg_standby_slot_names"]; present {
+		t.Error("the chart must not set spock.pg_standby_slot_names")
+	}
+}
+
+// nativeSlotSyncOn reports whether a rendered Cluster has native slot sync on.
+func nativeSlotSyncOn(t *testing.T, objects []unstructured.Unstructured, name string) bool {
+	t.Helper()
+	cluster := findByKindAndName(objects, "Cluster", name)
+	if cluster == nil {
+		t.Fatalf("%s Cluster not found", name)
+	}
+	sync, _, _ := unstructured.NestedBool(cluster.Object,
+		"spec", "replicationSlots", "highAvailability", "synchronizeLogicalDecoding")
+	param := getNestedString(cluster, "spec", "postgresql", "parameters", "sync_replication_slots")
+	if sync != (param == "on") {
+		t.Errorf("%s: synchronizeLogicalDecoding=%v but sync_replication_slots=%q", name, sync, param)
+	}
+	return sync
+}
+
+func TestNativeSlotSyncTrueForcesOn(t *testing.T) {
+	objects := renderTemplate(t, "native-slot-sync-true-values.yaml")
+	for name, want := range map[string]bool{
+		"pgedge-n1": true,  // digest image
+		"pgedge-n2": true,  // PostgreSQL 17
+		"pgedge-n3": false, // HA replication slots disabled
+		"pgedge-n4": false, // single instance
+	} {
+		if got := nativeSlotSyncOn(t, objects, name); got != want {
+			t.Errorf("%s: native slot sync = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func TestNativeSlotSyncFalseKeepsOff(t *testing.T) {
+	objects := renderTemplate(t, "native-slot-sync-false-values.yaml")
+	if nativeSlotSyncOn(t, objects, "pgedge-n1") {
+		t.Error("nativeSlotSync: false must leave native slot sync off even for a Spock 6 / PostgreSQL 18 image")
+	}
+}
+
+func TestNativeSlotSyncRejectsInvalidValue(t *testing.T) {
+	out := renderTemplateExpectError(t, "native-slot-sync-invalid-values.yaml")
+	if !strings.Contains(out, "nativeSlotSync") {
+		t.Errorf("expected a schema error naming nativeSlotSync, got: %s", out)
+	}
+}

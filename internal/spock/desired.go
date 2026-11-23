@@ -135,9 +135,10 @@ func addPopulateResources(
 		resources[peerWaitEvt.Identifier()] = peerWaitEvt
 		peerWaitForSync = append(peerWaitForSync, peerWaitEvt.Identifier())
 
-		// Belt-and-suspenders: also wait on apply progress via
-		// spock.progress.remote_lsn, which tracks actual commit application
-		// rather than WAL receipt. Gates the source→new COPY.
+		// Belt-and-suspenders: also wait on apply progress via the
+		// subscription's replication origin (pg_replication_origin_status),
+		// which tracks actual commit application rather than WAL receipt
+		// and works on Spock 5.0.x and 6.0. Gates the source→new COPY.
 		peerCatchup := NewPeerCatchup(peer.Name, sourceNode, peerSyncEvt, conns[sourceNode])
 		resources[peerCatchup.Identifier()] = peerCatchup
 		peerWaitForSync = append(peerWaitForSync, peerCatchup.Identifier())
