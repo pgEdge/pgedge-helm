@@ -125,7 +125,13 @@ Use the following steps to upgrade:
         WHERE slot_type = 'logical' AND NOT temporary;
         ```
 
-        Native slot synchronization only copies slots with `failover` set to `t`. The init-spock job sets it on Spock's slots. For any other logical slot that must survive a failover, set it yourself; for a PostgreSQL subscriber, run `ALTER SUBSCRIPTION ... SET (failover = true)` while the subscription is disabled.
+        Native slot synchronization only copies slots with `failover` set to `t`. The init-spock job sets it on Spock's slots. For any other logical slot that must survive a failover, set it yourself; for a PostgreSQL subscriber, run the following statements on the subscriber, which pause the subscription while the flag changes and then resume it:
+
+        ```sql
+        ALTER SUBSCRIPTION <name> DISABLE;
+        ALTER SUBSCRIPTION <name> SET (failover = true);
+        ALTER SUBSCRIPTION <name> ENABLE;
+        ```
 
     2. On each standby, list the slots that native slot synchronization didn't create:
 
