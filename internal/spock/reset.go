@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,12 +55,15 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	// databases on this server has its own. Ours are named after the slots of
 	// this database's subscriptions on this node: the ones in the catalog
 	// being dropped, and the ones the reconcile creates again afterwards.
-	origins := []string{}
-	for _, peer := range cfg.Nodes {
-		if peer.Name != node.Name {
-			origins = append(origins, spockSlotName(cfg.DBName, peer.Name, node.Name))
-		}
+	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname <> current_database()")
+	if err != nil {
+		return fmt.Errorf("list databases on %s: %w", node.Name, err)
 	}
+	otherDBs, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return fmt.Errorf("list databases on %s: %w", node.Name, err)
+	}
+	origins := configuredOrigins(cfg, node, otherDBs)
 
 	// Backup repsets into memory before nuking — the spock schema is
 	// destroyed by DROP EXTENSION CASCADE, so SQL-table backups won't survive.
@@ -131,4 +135,25 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	}
 
 	return nil
+}
+
+// configuredOrigins returns the origin names the reconcile creates on node.
+// A name that another database on the server would also produce (for
+// example sales-db and sales_db) can't be shown to be ours, so it is left out.
+func configuredOrigins(cfg *config.Config, node config.Node, otherDBs []string) []string {
+	var origins []string
+	for _, peer := range cfg.Nodes {
+		if peer.Name == node.Name {
+			continue
+		}
+		name := spockSlotName(cfg.DBName, peer.Name, node.Name)
+		if slices.ContainsFunc(otherDBs, func(db string) bool {
+			return spockSlotName(db, peer.Name, node.Name) == name
+		}) {
+			slog.Warn("replication origin name is shared with another database, leaving it", "node", node.Name, "origin", name)
+			continue
+		}
+		origins = append(origins, name)
+	}
+	return origins
 }

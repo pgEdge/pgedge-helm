@@ -2,6 +2,7 @@
 package spock
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -783,5 +784,20 @@ func TestComputeDesiredPeerSubscriptionWaitsOnOriginAdvance(t *testing.T) {
 	}
 	if foundSlotAdvanceDirect {
 		t.Error("sub_n2_n3 should NOT directly depend on replication_slot_advance_from_cts (gated via OriginAdvance instead)")
+	}
+}
+
+func TestConfiguredOriginsSkipsNamesSharedWithOtherDatabases(t *testing.T) {
+	cfg := &config.Config{DBName: "sales-db", Nodes: []config.Node{{Name: "n1"}, {Name: "n2"}, {Name: "n3"}}}
+	n2 := cfg.Nodes[1]
+
+	got := configuredOrigins(cfg, n2, []string{"postgres", "analytics"})
+	want := []string{"spk_sales_db_n1_sub_n1_n2", "spk_sales_db_n3_sub_n3_n2"}
+	if !slices.Equal(got, want) {
+		t.Errorf("no other database shares the names: got %v, want %v", got, want)
+	}
+
+	if got := configuredOrigins(cfg, n2, []string{"postgres", "sales_db"}); len(got) != 0 {
+		t.Errorf("sales_db produces the same names, expected none, got %v", got)
 	}
 }
