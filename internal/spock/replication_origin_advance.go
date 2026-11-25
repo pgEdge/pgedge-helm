@@ -43,9 +43,8 @@ func NewReplicationOriginAdvance(providerName, subscriberName, dbName string, sl
 	}
 }
 
-// originName returns the replication origin name. By Spock convention the
-// origin matches the slot name (spk_<db>_<provider>_sub_<provider>_<subscriber>),
-// so we reuse spockSlotName.
+// originName returns the replication origin name. Spock gives the origin the
+// same name as the slot, so we reuse spockSlotName.
 func (r *ReplicationOriginAdvance) originName() string {
 	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
 }

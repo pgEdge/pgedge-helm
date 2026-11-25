@@ -91,6 +91,11 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Reconcile Spock resources
+	// Step 4: Make sure our slot names match what Spock generates
+	if err := spock.VerifySlotNames(ctx, cfg, conns); err != nil {
+		return err
+	}
+
+	// Step 5: Reconcile Spock resources
 	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
 }

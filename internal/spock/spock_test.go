@@ -173,8 +173,8 @@ func TestReplicationSlotIdentifier(t *testing.T) {
 func TestReplicationSlotIdentifierDashesReplaced(t *testing.T) {
 	s := NewReplicationSlot("us-east-1", "us-west-2", "my-db", nil)
 	id := s.Identifier()
-	if id.ID != "spk_my_db_us_east_1_sub_us_east_1_us_west_2" {
-		t.Errorf("id: got %q, want spk_my_db_us_east_1_sub_us_east_1_us_west_2", id.ID)
+	if id.ID != "spk_my_db_us_east_1_sub_us_ecd0c83f" {
+		t.Errorf("id: got %q, want spk_my_db_us_east_1_sub_us_ecd0c83f", id.ID)
 	}
 }
 
