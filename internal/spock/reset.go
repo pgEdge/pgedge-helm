@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,19 +50,9 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 		return fmt.Errorf("check spock extension on %s: %w", node.Name, err)
 	}
 
-	// Replication origins have no database column, and Spock in other
-	// databases on this server has its own. Ours are named after the slots of
-	// this database's subscriptions on this node: the ones in the catalog
-	// being dropped, and the ones the reconcile creates again afterwards.
-	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname <> current_database()")
-	if err != nil {
-		return fmt.Errorf("list databases on %s: %w", node.Name, err)
-	}
-	otherDBs, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return fmt.Errorf("list databases on %s: %w", node.Name, err)
-	}
-	origins := configuredOrigins(cfg, node, otherDBs)
+	// Slot names of this database's subscriptions on this node, whose
+	// replication origins are dropped below.
+	var subSlots []string
 
 	// Backup repsets into memory before nuking — the spock schema is
 	// destroyed by DROP EXTENSION CASCADE, so SQL-table backups won't survive.
@@ -77,11 +66,10 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 		if err != nil {
 			return fmt.Errorf("list subscriptions on %s: %w", node.Name, err)
 		}
-		subSlots, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		subSlots, err = pgx.CollectRows(rows, pgx.RowTo[string])
 		if err != nil {
 			return fmt.Errorf("list subscriptions on %s: %w", node.Name, err)
 		}
-		origins = append(origins, subSlots...)
 	}
 
 	_, err = conn.Exec(ctx, "DROP EXTENSION IF EXISTS spock CASCADE")
@@ -109,17 +97,32 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 		slog.Warn("drop replication slots failed (continuing)", "node", node.Name, "error", err)
 	}
 
-	_, err = conn.Exec(ctx, `
-		SELECT pg_replication_origin_drop(roname)
-		  FROM pg_replication_origin
-		 WHERE roname = ANY($1)`, origins)
-	if err != nil {
-		slog.Warn("drop replication origins failed (continuing)", "node", node.Name, "error", err)
-	}
-
 	_, err = conn.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS spock")
 	if err != nil {
 		return fmt.Errorf("create spock extension on %s: %w", node.Name, err)
+	}
+
+	// Replication origins have no database column, and Spock in other
+	// databases on this server has its own. Ours are named after the slots of
+	// this database's subscriptions on this node: the ones in the catalog that
+	// was just dropped, and the ones the reconcile creates again, whose names
+	// Spock generates.
+	var peers, subNames []string
+	for _, peer := range cfg.Nodes {
+		if peer.Name != node.Name {
+			peers = append(peers, peer.Name)
+			subNames = append(subNames, spockSubName(peer.Name, node.Name))
+		}
+	}
+	_, err = conn.Exec(ctx, `
+		SELECT pg_replication_origin_drop(roname)
+		  FROM pg_replication_origin
+		 WHERE roname = ANY($1)
+		    OR roname IN (SELECT spock.spock_gen_slot_name(current_database()::name, p::name, s::name)::text
+		                    FROM unnest($2::text[], $3::text[]) AS t(p, s))`,
+		subSlots, peers, subNames)
+	if err != nil {
+		slog.Warn("drop replication origins failed (continuing)", "node", node.Name, "error", err)
 	}
 
 	dsn := fmt.Sprintf("host=%s dbname=%s user=%s %s port=5432",
@@ -135,25 +138,4 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	}
 
 	return nil
-}
-
-// configuredOrigins returns the origin names the reconcile creates on node.
-// A name that another database on the server would also produce (for
-// example sales-db and sales_db) can't be shown to be ours, so it is left out.
-func configuredOrigins(cfg *config.Config, node config.Node, otherDBs []string) []string {
-	var origins []string
-	for _, peer := range cfg.Nodes {
-		if peer.Name == node.Name {
-			continue
-		}
-		name := spockSlotName(cfg.DBName, peer.Name, node.Name)
-		if slices.ContainsFunc(otherDBs, func(db string) bool {
-			return spockSlotName(db, peer.Name, node.Name) == name
-		}) {
-			slog.Warn("replication origin name is shared with another database, leaving it", "node", node.Name, "origin", name)
-			continue
-		}
-		origins = append(origins, name)
-	}
-	return origins
 }
