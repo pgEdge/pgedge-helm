@@ -52,6 +52,13 @@ func TestGenSlotNameMatchesSpock(t *testing.T) {
 		{"app", "pgedge-us-east-1a", "sub_pgedge_us_east_1a_pgedge_prod_europe_west4", "spk_app_pgedge_u9015794_sub_pgedb914757"},
 		{"app", "pgedge-eu-west-2-b", "sub_pgedge_eu_west_2_b_pgedge_prod_europe_west4", "spk_app_pgedge_e0b2b3f9_sub_pged146372a"},
 		{"app", "pgedge-eu-central-1", "sub_pgedge_eu_central_1_pgedge_prod_europe_west4", "spk_app_pgedge_ee981be6_sub_pged456ceb6"},
+		// Parts over 63 bytes, which PostgreSQL clips without splitting a
+		// multibyte character before Spock hashes them.
+		{"app", "pgedge-production-us-east-1-primary", "sub_pgedge_production_us_east_1_primary_pgedge_production_eu_west_2_primary", "spk_app_pgedge_p1c40ec9_sub_pged61bdb91"},
+		{"app", "pgedge-production-us-east-1-primary-database-cluster-node-number-01", "sub_n1_n2", "spk_app_pgedge_p12efff3_sub_n1_n2"},
+		{"app", "montréal-centre-de-données-prod", "sub_montréal_centre_de_données_prod_münchen_rechenzentrum_süd_1", "spk_app_montr__a01f2fe5_sub_mont71141fa"},
+		{"app", "東京データセンター-1", "sub_東京データセンター_1_東京本番データベース_1", "spk_app_________3545da1_sub_____809b575"},
+		{"app", "大阪データセンター-2", "sub_大阪データセンター_2_大阪本番データベース_2", "spk_app_________03b9e26_sub_____42aab18"},
 	}
 	for _, c := range cases {
 		if got := genSlotName(c.db, c.provider, c.sub); got != c.want {

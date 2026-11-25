@@ -4,9 +4,11 @@ package spock
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/bits"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -22,16 +24,30 @@ func spockSlotName(dbName, providerName, subscriberName string) string {
 
 // genSlotName mirrors Spock's gen_slot_name(): "spk_<db>_<provider>_<sub>",
 // where each part longer than 16 bytes is shortened, then every byte outside
-// [a-z0-9_] becomes an underscore. The result is at most 51 bytes, so the
-// 63-byte name limit never truncates it.
+// [a-z0-9_] becomes an underscore. Spock receives each part as a PostgreSQL
+// name, so it is first clipped to 63 bytes. The result is at most 51 bytes,
+// so the 63-byte name limit never truncates it.
 func genSlotName(dbName, providerNode, subName string) string {
-	name := []byte("spk_" + shortenHash(dbName) + "_" + shortenHash(providerNode) + "_" + shortenHash(subName))
+	name := []byte("spk_" + shortenHash(clipName(dbName)) + "_" + shortenHash(clipName(providerNode)) + "_" + shortenHash(clipName(subName)))
 	for i, ch := range name {
 		if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '_' {
 			name[i] = '_'
 		}
 	}
 	return string(name)
+}
+
+// clipName clips s the way PostgreSQL stores a name: to at most 63 bytes,
+// without splitting a multibyte character.
+func clipName(s string) string {
+	if len(s) <= 63 {
+		return s
+	}
+	n := 63
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }
 
 // shortenHash mirrors Spock's shorten_hash(str, 16): strings longer than 16
@@ -105,30 +121,56 @@ func hashFinal(a, b, c uint32) uint32 {
 	return c
 }
 
-// VerifySlotNames asks each provider's Spock for the slot name of every
-// subscription and fails if spockSlotName disagrees. A wrong name makes the
-// reconciler drop live slots and recreate healthy subscriptions, so stop
-// before touching anything.
-func VerifySlotNames(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) error {
+// VerifySlotNames compares spockSlotName with Spock's spock_gen_slot_name()
+// for every subscription and fails if they disagree. A wrong name makes the
+// reconciler drop live slots and recreate healthy subscriptions, so this must
+// run before anything is changed. The function depends only on its arguments,
+// so any node that has it answers for every pair. It returns false only when
+// no node has the Spock extension yet, so there is no Spock state to protect.
+func VerifySlotNames(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) (bool, error) {
+	var conn *pgxpool.Pool
+	spockInstalled := false
+	for _, node := range cfg.Nodes {
+		var hasFunc, hasSpock bool
+		err := conns[node.Name].QueryRow(ctx, `
+			SELECT to_regprocedure('spock.spock_gen_slot_name(name,name,name)') IS NOT NULL,
+			       EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'spock')`,
+		).Scan(&hasFunc, &hasSpock)
+		if err != nil {
+			return false, fmt.Errorf("look for spock_gen_slot_name on %s: %w", node.Name, err)
+		}
+		spockInstalled = spockInstalled || hasSpock
+		if hasFunc {
+			conn = conns[node.Name]
+			break
+		}
+	}
+	if conn == nil {
+		if spockInstalled {
+			return false, errors.New("spock.spock_gen_slot_name not found on any node")
+		}
+		return false, nil
+	}
+
 	for _, src := range cfg.Nodes {
 		for _, dst := range cfg.Nodes {
 			if src.Name == dst.Name {
 				continue
 			}
 			var spockName string
-			err := conns[src.Name].QueryRow(ctx,
+			err := conn.QueryRow(ctx,
 				"SELECT spock.spock_gen_slot_name($1, $2, $3)::text",
 				cfg.DBName, src.Name, spockSubName(src.Name, dst.Name),
 			).Scan(&spockName)
 			if err != nil {
-				return fmt.Errorf("get spock slot name for %s→%s: %w", src.Name, dst.Name, err)
+				return false, fmt.Errorf("get spock slot name for %s→%s: %w", src.Name, dst.Name, err)
 			}
 			if ours := spockSlotName(cfg.DBName, src.Name, dst.Name); ours != spockName {
-				return fmt.Errorf("slot name mismatch for %s→%s: computed %q, spock uses %q", src.Name, dst.Name, ours, spockName)
+				return false, fmt.Errorf("slot name mismatch for %s→%s: computed %q, spock uses %q", src.Name, dst.Name, ours, spockName)
 			}
 		}
 	}
-	return nil
+	return true, nil
 }
 
 // spockSubName returns the canonical Spock subscription name for a
