@@ -16,26 +16,22 @@ import (
 type ReplicationSlot struct {
 	providerName   string
 	subscriberName string
-	dbName         string
-	nameOverride   string // set for orphan slots discovered by raw name
+	name           string
 	conn           *pgxpool.Pool
 	status         resource.Status
 }
 
-func NewReplicationSlot(providerName, subscriberName, dbName string, conn *pgxpool.Pool) *ReplicationSlot {
+func NewReplicationSlot(providerName, subscriberName, slotName string, conn *pgxpool.Pool) *ReplicationSlot {
 	return &ReplicationSlot{
 		providerName:   providerName,
 		subscriberName: subscriberName,
-		dbName:         dbName,
+		name:           slotName,
 		conn:           conn,
 	}
 }
 
 func (r *ReplicationSlot) slotName() string {
-	if r.nameOverride != "" {
-		return r.nameOverride
-	}
-	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
+	return r.name
 }
 
 func (r *ReplicationSlot) Identifier() resource.Identifier {

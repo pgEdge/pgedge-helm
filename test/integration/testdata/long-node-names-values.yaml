@@ -1,0 +1,12 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: node-a
+      ordinal: 1
+      hostname: pgedge-node-a-rw
+    - name: node-b
+      ordinal: 2
+      hostname: pgedge-node-b-rw
+  clusterSpec:
+    storage:
+      size: 1Gi

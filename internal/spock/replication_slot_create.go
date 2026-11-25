@@ -17,22 +17,22 @@ import (
 type ReplicationSlotCreate struct {
 	providerName   string
 	subscriberName string
-	dbName         string
+	name           string
 	conn           *pgxpool.Pool
 	status         resource.Status
 }
 
-func NewReplicationSlotCreate(providerName, subscriberName, dbName string, conn *pgxpool.Pool) *ReplicationSlotCreate {
+func NewReplicationSlotCreate(providerName, subscriberName, slotName string, conn *pgxpool.Pool) *ReplicationSlotCreate {
 	return &ReplicationSlotCreate{
 		providerName:   providerName,
 		subscriberName: subscriberName,
-		dbName:         dbName,
+		name:           slotName,
 		conn:           conn,
 	}
 }
 
 func (r *ReplicationSlotCreate) slotName() string {
-	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
+	return r.name
 }
 
 func (r *ReplicationSlotCreate) Identifier() resource.Identifier {

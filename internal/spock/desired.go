@@ -26,8 +26,9 @@ const (
 	ResourceTypePeerCatchup                   = "spock.peer_catchup"
 )
 
-// ComputeDesired builds the full resource graph from node config.
-func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[resource.Identifier]resource.Resource {
+// ComputeDesired builds the full resource graph from node config. names must
+// hold the slot name of every pair of configured nodes.
+func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool, names SlotNames) map[resource.Identifier]resource.Resource {
 	resources := make(map[resource.Identifier]resource.Resource)
 
 	// Users + Nodes
@@ -50,7 +51,7 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 	// Emit populate resources and collect per-node peer deps
 	peerDeps := map[string][]resource.Identifier{}
 	for _, newNode := range newNodes {
-		deps := addPopulateResources(resources, cfg, newNode, conns)
+		deps := addPopulateResources(resources, cfg, newNode, conns, names)
 		peerDeps[newNode.Name] = deps
 	}
 
@@ -61,12 +62,13 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 				continue
 			}
 
-			slot := NewReplicationSlot(src.Name, dst.Name, cfg.DBName, conns[src.Name])
+			slotName := names.slot(src.Name, dst.Name)
+			slot := NewReplicationSlot(src.Name, dst.Name, slotName, conns[src.Name])
 			resources[slot.Identifier()] = slot
 
 			// Source→new subscription: created with sync=true, extra deps on peer waits
 			if newNode, isNewDst := newNodes[dst.Name]; isNewDst && src.Name == newNode.Bootstrap.SourceNode {
-				s := NewSubscription(src, dst, cfg.DBName, cfg.PgEdgeUser, true, conns[dst.Name], peerDeps[dst.Name]...)
+				s := NewSubscription(src, dst, cfg.DBName, cfg.PgEdgeUser, slotName, true, conns[dst.Name], peerDeps[dst.Name]...)
 				resources[s.Identifier()] = s
 				continue
 			}
@@ -92,7 +94,7 @@ func ComputeDesired(cfg *config.Config, conns map[string]*pgxpool.Pool) map[reso
 				})
 			}
 
-			s := NewSubscription(src, dst, cfg.DBName, cfg.PgEdgeUser, false, conns[dst.Name], extraDeps...)
+			s := NewSubscription(src, dst, cfg.DBName, cfg.PgEdgeUser, slotName, false, conns[dst.Name], extraDeps...)
 			resources[s.Identifier()] = s
 		}
 	}
@@ -108,6 +110,7 @@ func addPopulateResources(
 	cfg *config.Config,
 	newNode config.Node,
 	conns map[string]*pgxpool.Pool,
+	names SlotNames,
 ) []resource.Identifier {
 	sourceNode := newNode.Bootstrap.SourceNode
 	var peerWaitForSync []resource.Identifier
@@ -117,13 +120,14 @@ func addPopulateResources(
 			continue
 		}
 
-		slotCreate := NewReplicationSlotCreate(peer.Name, newNode.Name, cfg.DBName, conns[peer.Name])
+		slotName := names.slot(peer.Name, newNode.Name)
+		slotCreate := NewReplicationSlotCreate(peer.Name, newNode.Name, slotName, conns[peer.Name])
 		resources[slotCreate.Identifier()] = slotCreate
 
 		// Create disabled subscription from peer→new early in populate.
 		// This registers the subscription in Spock metadata so the lag tracker
 		// can populate. The end-state Subscription enables it after slot advance.
-		disabledSub := NewDisabledSubscription(peer, newNode, cfg.DBName, cfg.PgEdgeUser, conns[newNode.Name])
+		disabledSub := NewDisabledSubscription(peer, newNode, cfg.DBName, cfg.PgEdgeUser, slotName, conns[newNode.Name])
 		resources[disabledSub.Identifier()] = disabledSub
 
 		peerSyncEvt := NewSyncEvent(peer.Name, sourceNode, conns[peer.Name],
@@ -147,14 +151,14 @@ func addPopulateResources(
 		)
 		resources[lagTracker.Identifier()] = lagTracker
 
-		slotAdvance := NewReplicationSlotAdvanceFromCTS(peer.Name, newNode.Name, cfg.DBName, lagTracker, conns[peer.Name])
+		slotAdvance := NewReplicationSlotAdvanceFromCTS(peer.Name, newNode.Name, slotName, lagTracker, conns[peer.Name])
 		resources[slotAdvance.Identifier()] = slotAdvance
 
 		// Subscriber-side origin advance. Separate from slot advance because
 		// the slot lives on the provider and the origin on the subscriber —
 		// different connections. Both must agree to prevent the apply worker
 		// from replaying historical WAL from 0/0.
-		originAdvance := NewReplicationOriginAdvance(peer.Name, newNode.Name, cfg.DBName, slotAdvance, conns[newNode.Name])
+		originAdvance := NewReplicationOriginAdvance(peer.Name, newNode.Name, slotName, slotAdvance, conns[newNode.Name])
 		resources[originAdvance.Identifier()] = originAdvance
 	}
 

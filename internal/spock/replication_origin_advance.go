@@ -27,26 +27,26 @@ import (
 type ReplicationOriginAdvance struct {
 	providerName   string
 	subscriberName string
-	dbName         string
+	name           string
 	slotAdvance    *ReplicationSlotAdvanceFromCTS
 	conn           *pgxpool.Pool // subscriber's connection
 	status         resource.Status
 }
 
-func NewReplicationOriginAdvance(providerName, subscriberName, dbName string, slotAdvance *ReplicationSlotAdvanceFromCTS, conn *pgxpool.Pool) *ReplicationOriginAdvance {
+func NewReplicationOriginAdvance(providerName, subscriberName, originName string, slotAdvance *ReplicationSlotAdvanceFromCTS, conn *pgxpool.Pool) *ReplicationOriginAdvance {
 	return &ReplicationOriginAdvance{
 		providerName:   providerName,
 		subscriberName: subscriberName,
-		dbName:         dbName,
+		name:           originName,
 		slotAdvance:    slotAdvance,
 		conn:           conn,
 	}
 }
 
 // originName returns the replication origin name. Spock gives the origin the
-// same name as the slot, so we reuse spockSlotName.
+// same name as the provider-side slot.
 func (r *ReplicationOriginAdvance) originName() string {
-	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
+	return r.name
 }
 
 func (r *ReplicationOriginAdvance) Identifier() resource.Identifier {

@@ -3,174 +3,120 @@ package spock
 
 import (
 	"context"
-	"encoding/binary"
-	"errors"
 	"fmt"
-	"math/bits"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/pgEdge/pgedge-helm/internal/config"
 )
 
-// spockSlotName returns the replication slot name Spock generates for the
-// provider→subscriber subscription. Spock uses the same name for the
-// subscriber's replication origin.
-func spockSlotName(dbName, providerName, subscriberName string) string {
-	return genSlotName(dbName, providerName, spockSubName(providerName, subscriberName))
+// slotPair identifies a provider→subscriber subscription.
+type slotPair struct {
+	provider   string
+	subscriber string
 }
 
-// genSlotName mirrors Spock's gen_slot_name(): "spk_<db>_<provider>_<sub>",
-// where each part longer than 16 bytes is shortened, then every byte outside
-// [a-z0-9_] becomes an underscore. Spock receives each part as a PostgreSQL
-// name, so it is first clipped to 63 bytes. The result is at most 51 bytes,
-// so the 63-byte name limit never truncates it.
-func genSlotName(dbName, providerNode, subName string) string {
-	name := []byte("spk_" + shortenHash(clipName(dbName)) + "_" + shortenHash(clipName(providerNode)) + "_" + shortenHash(clipName(subName)))
-	for i, ch := range name {
-		if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '_' {
-			name[i] = '_'
-		}
+// SlotNames holds the replication slot name Spock generates for each
+// provider→subscriber subscription in the config. Spock gives the subscriber's
+// replication origin the same name.
+//
+// Spock shortens and rewrites long names (see gen_slot_name() in Spock), so
+// the names come from Spock itself rather than being rebuilt here.
+type SlotNames map[slotPair]string
+
+// slot returns the slot name for a provider→subscriber pair. Every pair of
+// configured nodes is loaded up front, so a missing pair is a programming
+// error.
+func (n SlotNames) slot(provider, subscriber string) string {
+	name, ok := n[slotPair{provider, subscriber}]
+	if !ok {
+		panic(fmt.Sprintf("no spock slot name loaded for %s→%s", provider, subscriber))
 	}
-	return string(name)
+	return name
 }
 
-// clipName clips s the way PostgreSQL stores a name: to at most 63 bytes,
-// without splitting a multibyte character.
-func clipName(s string) string {
-	if len(s) <= 63 {
-		return s
-	}
-	n := 63
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n--
-	}
-	return s[:n]
-}
-
-// shortenHash mirrors Spock's shorten_hash(str, 16): strings longer than 16
-// bytes become their first 8 bytes plus the first 7 hex digits of hash_any().
-func shortenHash(s string) string {
-	if len(s) <= 16 {
-		return s
-	}
-	return s[:8] + fmt.Sprintf("%08x", hashAny([]byte(s)))[:7]
-}
-
-// hashAny is PostgreSQL's hash_any() (Bob Jenkins' lookup3, as in
-// src/common/hashfn.c) for little-endian platforms, which is what the
-// pgEdge images run on.
-func hashAny(k []byte) uint32 {
-	a := 0x9e3779b9 + uint32(len(k)) + 3923095 // #nosec G115 -- same wraparound as C's uint32 length; inputs are short names
-	b, c := a, a
-	for len(k) >= 12 {
-		a += binary.LittleEndian.Uint32(k[0:])
-		b += binary.LittleEndian.Uint32(k[4:])
-		c += binary.LittleEndian.Uint32(k[8:])
-		a, b, c = hashMix(a, b, c)
-		k = k[12:]
-	}
-	// Remaining 0-11 bytes; the lowest byte of c is reserved for the length.
-	var tail [12]byte
-	copy(tail[:], k)
-	a += binary.LittleEndian.Uint32(tail[0:])
-	b += binary.LittleEndian.Uint32(tail[4:])
-	c += binary.LittleEndian.Uint32(tail[8:]) << 8
-	return hashFinal(a, b, c)
-}
-
-func hashMix(a, b, c uint32) (uint32, uint32, uint32) {
-	a -= c
-	a ^= bits.RotateLeft32(c, 4)
-	c += b
-	b -= a
-	b ^= bits.RotateLeft32(a, 6)
-	a += c
-	c -= b
-	c ^= bits.RotateLeft32(b, 8)
-	b += a
-	a -= c
-	a ^= bits.RotateLeft32(c, 16)
-	c += b
-	b -= a
-	b ^= bits.RotateLeft32(a, 19)
-	a += c
-	c -= b
-	c ^= bits.RotateLeft32(b, 4)
-	b += a
-	return a, b, c
-}
-
-func hashFinal(a, b, c uint32) uint32 {
-	c ^= b
-	c -= bits.RotateLeft32(b, 14)
-	a ^= c
-	a -= bits.RotateLeft32(c, 11)
-	b ^= a
-	b -= bits.RotateLeft32(a, 25)
-	c ^= b
-	c -= bits.RotateLeft32(b, 16)
-	a ^= c
-	a -= bits.RotateLeft32(c, 4)
-	b ^= a
-	b -= bits.RotateLeft32(a, 14)
-	c ^= b
-	c -= bits.RotateLeft32(b, 24)
-	return c
-}
-
-// VerifySlotNames compares spockSlotName with Spock's spock_gen_slot_name()
-// for every subscription and fails if they disagree. A wrong name makes the
-// reconciler drop live slots and recreate healthy subscriptions, so this must
-// run before anything is changed. The function depends only on its arguments,
-// so any node that has it answers for every pair. It returns false only when
-// no node has the Spock extension yet, so there is no Spock state to protect.
-func VerifySlotNames(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) (bool, error) {
-	var conn *pgxpool.Pool
-	spockInstalled := false
-	for _, node := range cfg.Nodes {
-		var hasFunc, hasSpock bool
-		err := conns[node.Name].QueryRow(ctx, `
-			SELECT to_regprocedure('spock.spock_gen_slot_name(name,name,name)') IS NOT NULL,
-			       EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'spock')`,
-		).Scan(&hasFunc, &hasSpock)
-		if err != nil {
-			return false, fmt.Errorf("look for spock_gen_slot_name on %s: %w", node.Name, err)
-		}
-		spockInstalled = spockInstalled || hasSpock
-		if hasFunc {
-			conn = conns[node.Name]
-			break
-		}
-	}
-	if conn == nil {
-		if spockInstalled {
-			return false, errors.New("spock.spock_gen_slot_name not found on any node")
-		}
-		return false, nil
-	}
-
+// LoadSlotNames asks Spock for the slot name of every provider→subscriber pair
+// in the config. spock.spock_gen_slot_name() depends only on its arguments, so
+// any node that has the Spock extension answers for every pair.
+func LoadSlotNames(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) (SlotNames, error) {
+	var providers, subscribers, subNames []string
 	for _, src := range cfg.Nodes {
 		for _, dst := range cfg.Nodes {
 			if src.Name == dst.Name {
 				continue
 			}
-			var spockName string
-			err := conn.QueryRow(ctx,
-				"SELECT spock.spock_gen_slot_name($1, $2, $3)::text",
-				cfg.DBName, src.Name, spockSubName(src.Name, dst.Name),
-			).Scan(&spockName)
-			if err != nil {
-				return false, fmt.Errorf("get spock slot name for %s→%s: %w", src.Name, dst.Name, err)
-			}
-			if ours := spockSlotName(cfg.DBName, src.Name, dst.Name); ours != spockName {
-				return false, fmt.Errorf("slot name mismatch for %s→%s: computed %q, spock uses %q", src.Name, dst.Name, ours, spockName)
-			}
+			providers = append(providers, src.Name)
+			subscribers = append(subscribers, dst.Name)
+			subNames = append(subNames, spockSubName(src.Name, dst.Name))
 		}
 	}
-	return true, nil
+
+	names := make(SlotNames, len(providers))
+	if len(providers) == 0 {
+		return names, nil
+	}
+
+	conn, err := slotNameConn(ctx, cfg, conns)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := conn.Query(ctx, `
+		SELECT p, s, spock.spock_gen_slot_name($1::name, p::name, sub::name)::text
+		  FROM unnest($2::text[], $3::text[], $4::text[]) AS t(p, s, sub)`,
+		cfg.DBName, providers, subscribers, subNames)
+	if err != nil {
+		return nil, fmt.Errorf("get spock slot names: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var provider, subscriber, name string
+		if err := rows.Scan(&provider, &subscriber, &name); err != nil {
+			return nil, fmt.Errorf("read spock slot name: %w", err)
+		}
+		names[slotPair{provider, subscriber}] = name
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("get spock slot names: %w", err)
+	}
+	if len(names) != len(providers) {
+		return nil, fmt.Errorf("got %d spock slot names, want %d", len(names), len(providers))
+	}
+	return names, nil
+}
+
+// slotNameConn returns the connection of the first node that has
+// spock.spock_gen_slot_name().
+func slotNameConn(ctx context.Context, cfg *config.Config, conns map[string]*pgxpool.Pool) (*pgxpool.Pool, error) {
+	for _, node := range cfg.Nodes {
+		var hasFunc bool
+		err := conns[node.Name].QueryRow(ctx,
+			"SELECT to_regprocedure('spock.spock_gen_slot_name(name,name,name)') IS NOT NULL",
+		).Scan(&hasFunc)
+		if err != nil {
+			return nil, fmt.Errorf("look for spock.spock_gen_slot_name on %s: %w", node.Name, err)
+		}
+		if hasFunc {
+			return conns[node.Name], nil
+		}
+	}
+	return nil, fmt.Errorf("spock.spock_gen_slot_name not found on any node; is the spock extension installed in database %q?", cfg.DBName)
+}
+
+// genSlotName asks Spock on conn for the slot name of a single
+// provider→subscriber pair. It is used for pairs outside the config, such as
+// subscriptions from a removed node.
+func genSlotName(ctx context.Context, conn *pgxpool.Pool, dbName, provider, subscriber string) (string, error) {
+	var name string
+	err := conn.QueryRow(ctx,
+		"SELECT spock.spock_gen_slot_name($1::name, $2::name, $3::name)::text",
+		dbName, provider, spockSubName(provider, subscriber),
+	).Scan(&name)
+	if err != nil {
+		return "", fmt.Errorf("get spock slot name for %s→%s: %w", provider, subscriber, err)
+	}
+	return name, nil
 }
 
 // spockSubName returns the canonical Spock subscription name for a

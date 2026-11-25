@@ -1,3 +1,3 @@
 kind: Fixed
-body: Fixed init-spock using the wrong replication slot names when node names are long, which made upgrades drop and recreate healthy subscriptions and left replication from existing nodes to a newly added node broken. init-spock now checks its slot names against Spock before making changes (#78)
+body: Fixed init-spock using the wrong replication slot names when node names are long, which made upgrades drop and recreate healthy subscriptions and left replication from existing nodes to a newly added node broken. init-spock now gets the slot names from Spock instead of working them out itself (#78)
 time: 2026-11-25T08:57:19.021511+05:00

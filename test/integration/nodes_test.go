@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -426,4 +427,111 @@ func TestNodesRemoveNode(t *testing.T) {
 			t.Error("replication between n1 and n2 broken after removing n3")
 		}
 	})
+}
+
+// TestLongNodeNames uses node names long enough that Spock shortens the
+// replication slot names. Every slot must have the name Spock gives it, a
+// no-change upgrade must recreate nothing, and an added node must replicate
+// with every peer.
+func TestLongNodeNames(t *testing.T) {
+	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, "long-node-names-values.yaml")
+
+	pods := []string{"pgedge-node-a-1", "pgedge-node-b-1"}
+	for _, name := range []string{"pgedge-node-a", "pgedge-node-b"} {
+		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
+			t.Fatalf("cluster %s not healthy: %v", name, err)
+		}
+	}
+	if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+		logs, _ := testKube.Logs("job/pgedge-init-spock")
+		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
+	}
+
+	t.Run("slot_names_match_spock", func(t *testing.T) {
+		verifySpockSlotNames(t, pods)
+	})
+
+	_, err := testKube.ExecSQL(pods[0], "CREATE TABLE test_long_names (id int PRIMARY KEY, val text);")
+	if err != nil {
+		t.Fatalf("failed to create test table: %v", err)
+	}
+	t.Run("mesh_replication", func(t *testing.T) {
+		verifyMeshReplication(t, "test_long_names", pods, 1)
+	})
+
+	// Spock derives a subscription's ID from its name and a recreated slot
+	// keeps its name, so look for changes in the job's log instead.
+	t.Run("no_change_upgrade_changes_nothing", func(t *testing.T) {
+		upgradeChart(t, "long-node-names-values.yaml")
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock re-run failed: %v\nlogs:\n%s", err, logs)
+		}
+		logs, err := testKube.Logs("job/pgedge-init-spock")
+		if err != nil {
+			t.Fatalf("failed to read init-spock logs: %v", err)
+		}
+		for _, line := range strings.Split(logs, "\n") {
+			for _, msg := range []string{"creating resource", "updating resource", "deleting resource",
+				"discovered orphan", "subscription missing provider slot"} {
+				if strings.Contains(line, msg) {
+					t.Errorf("no-change upgrade made a change: %s", line)
+				}
+			}
+		}
+	})
+
+	upgradeChart(t, "long-node-names-add-node-c-values.yaml")
+	pods = append(pods, "pgedge-node-c-1")
+	if err := wait.ForClusterHealthy(testKube, "pgedge-node-c", timeout); err != nil {
+		t.Fatalf("cluster pgedge-node-c not healthy: %v", err)
+	}
+	if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+		logs, _ := testKube.Logs("job/pgedge-init-spock")
+		t.Fatalf("init-spock job failed after adding node-c: %v\nlogs:\n%s", err, logs)
+	}
+
+	t.Run("slot_names_match_spock_after_add", func(t *testing.T) {
+		verifySpockSlotNames(t, pods)
+	})
+	t.Run("mesh_replication_after_add", func(t *testing.T) {
+		verifyMeshReplication(t, "test_long_names", pods, 10)
+	})
+}
+
+// verifySpockSlotNames checks that each pod has exactly one Spock slot per
+// peer, named the way Spock names it, and that the names were shortened.
+func verifySpockSlotNames(t *testing.T, pods []string) {
+	t.Helper()
+	for _, pod := range pods {
+		provider := podToNode(pod)
+		var want []string
+		for _, peer := range pods {
+			if peer == pod {
+				continue
+			}
+			sub := strings.ReplaceAll("sub_"+provider+"_"+podToNode(peer), "-", "_")
+			out, err := testKube.ExecSQL(pod, fmt.Sprintf(
+				"SELECT spock.spock_gen_slot_name(current_database()::name, '%s', '%s')::text;", provider, sub))
+			if err != nil {
+				t.Fatalf("spock_gen_slot_name on %s: %v", pod, err)
+			}
+			name := strings.TrimSpace(out)
+			if long := strings.ReplaceAll("spk_app_"+provider+"_"+sub, "-", "_"); name == long {
+				t.Fatalf("expected Spock to shorten %s; use longer node names", long)
+			}
+			want = append(want, name)
+		}
+		slices.Sort(want)
+
+		out, err := testKube.ExecSQL(pod,
+			"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%' ORDER BY slot_name;")
+		if err != nil {
+			t.Fatalf("failed to list slots on %s: %v", pod, err)
+		}
+		if got := strings.Fields(out); !slices.Equal(got, want) {
+			t.Errorf("%s: slots %v, want %v", pod, got, want)
+		}
+	}
 }

@@ -20,6 +20,7 @@ func RefreshActual(
 	ctx context.Context,
 	cfg *config.Config,
 	conns map[string]*pgxpool.Pool,
+	names SlotNames,
 	desired map[resource.Identifier]resource.Resource,
 ) (map[resource.Identifier]resource.Resource, error) {
 	actual := make(map[resource.Identifier]resource.Resource)
@@ -33,7 +34,7 @@ func RefreshActual(
 		}
 	}
 
-	discoverOrphans(ctx, cfg, conns, actual)
+	discoverOrphans(ctx, cfg, conns, names, actual)
 	checkSlotHealth(actual)
 
 	return actual, nil
@@ -70,6 +71,7 @@ func discoverOrphans(
 	ctx context.Context,
 	cfg *config.Config,
 	conns map[string]*pgxpool.Pool,
+	names SlotNames,
 	actual map[resource.Identifier]resource.Resource,
 ) {
 	configNames := make([]string, len(cfg.Nodes))
@@ -77,16 +79,10 @@ func discoverOrphans(
 		configNames[i] = n.Name
 	}
 
-	// Compute expected slot names for orphan slot detection.
-	expectedSlots := make(map[string]bool)
-	for _, src := range cfg.Nodes {
-		for _, dst := range cfg.Nodes {
-			if src.Name == dst.Name {
-				continue
-			}
-			slot := NewReplicationSlot(src.Name, dst.Name, cfg.DBName, nil)
-			expectedSlots[slot.slotName()] = true
-		}
+	// Expected slot names for orphan slot detection.
+	expectedSlots := make(map[string]bool, len(names))
+	for _, name := range names {
+		expectedSlots[name] = true
 	}
 
 	for _, node := range cfg.Nodes {
@@ -112,13 +108,20 @@ func discoverOrphanNodes(
 		slog.Warn("query orphan nodes", "survivor", survivor.Name, "error", err)
 		return
 	}
-
+	var orphanNames []string
 	for rows.Next() {
 		var orphanName string
 		if err := rows.Scan(&orphanName); err != nil {
 			continue
 		}
+		orphanNames = append(orphanNames, orphanName)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		slog.Warn("incomplete orphan node scan", "survivor", survivor.Name, "error", err)
+	}
 
+	for _, orphanName := range orphanNames {
 		orphanCfg := config.Node{Name: orphanName}
 
 		// Create one SpockNode per (orphan, survivor) pair so node_drop
@@ -136,14 +139,15 @@ func discoverOrphanNodes(
 		// Infer one orphan subscription per surviving connection.
 		// The topology is fully meshed, so each surviving node had a subscription
 		// from the orphan. sub_drop($1, true) is safe if it no longer exists.
-		sub := NewSubscription(orphanCfg, survivor, cfg.DBName, cfg.PgEdgeUser, false, conn)
+		slotName, err := genSlotName(ctx, conn, cfg.DBName, orphanName, survivor.Name)
+		if err != nil {
+			slog.Warn("skip orphan subscription", "orphan", orphanName, "survivor", survivor.Name, "error", err)
+			continue
+		}
+		sub := NewSubscription(orphanCfg, survivor, cfg.DBName, cfg.PgEdgeUser, slotName, false, conn)
 		sub.status = resource.Status{Exists: true}
 		actual[sub.Identifier()] = sub
 		slog.Info("discovered orphan subscription", "sub", sub.subName(), "survivor", survivor.Name)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		slog.Warn("incomplete orphan node scan", "survivor", survivor.Name, "error", err)
 	}
 }
 
@@ -176,8 +180,7 @@ func discoverOrphanSlots(
 		if _, exists := actual[slotID]; !exists {
 			orphan := &ReplicationSlot{
 				providerName: survivor.Name,
-				dbName:       cfg.DBName,
-				nameOverride: slotName,
+				name:         slotName,
 				conn:         conn,
 			}
 			orphan.status = resource.Status{Exists: true}

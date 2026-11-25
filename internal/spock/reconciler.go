@@ -17,17 +17,19 @@ var _ resource.Reconciler = (*SpockReconciler)(nil)
 type SpockReconciler struct {
 	cfg   *config.Config
 	conns map[string]*pgxpool.Pool
+	names SlotNames
 }
 
-// NewReconciler creates a SpockReconciler from config and database connections.
-func NewReconciler(cfg *config.Config, conns map[string]*pgxpool.Pool) *SpockReconciler {
-	return &SpockReconciler{cfg: cfg, conns: conns}
+// NewReconciler creates a SpockReconciler from config, database connections
+// and the slot names loaded from Spock with LoadSlotNames.
+func NewReconciler(cfg *config.Config, conns map[string]*pgxpool.Pool, names SlotNames) *SpockReconciler {
+	return &SpockReconciler{cfg: cfg, conns: conns, names: names}
 }
 
 func (r *SpockReconciler) ComputeDesired() map[resource.Identifier]resource.Resource {
-	return ComputeDesired(r.cfg, r.conns)
+	return ComputeDesired(r.cfg, r.conns, r.names)
 }
 
 func (r *SpockReconciler) RefreshActual(ctx context.Context, desired map[resource.Identifier]resource.Resource) (map[resource.Identifier]resource.Resource, error) {
-	return RefreshActual(ctx, r.cfg, r.conns, desired)
+	return RefreshActual(ctx, r.cfg, r.conns, r.names, desired)
 }

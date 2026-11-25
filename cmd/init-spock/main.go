@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -80,16 +79,8 @@ func run(ctx context.Context) error {
 		conns[node.Name] = pool
 	}
 
-	// Step 3: Reset Spock state where needed. A full reset drops Spock state
-	// on every node, so check our slot names against Spock first. Nodes
-	// restored by CloudNativePG are reset straight away: they carry the source
-	// node's Spock state, and its copied subscriptions compete for the source
-	// node's replication slots until the node is reset.
-	verified := false
+	// Step 3: Reset Spock state where needed
 	if cfg.ResetSpock {
-		if verified, err = spock.VerifySlotNames(ctx, cfg, conns); err != nil {
-			return err
-		}
 		slog.Info("resetSpock enabled — dropping and recreating spock on all nodes")
 		if err := spock.ResetSpock(ctx, cfg, conns); err != nil {
 			return err
@@ -100,17 +91,13 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Make sure our slot names match what Spock generates before
-	// reconciling, if that was not already checked before a full reset.
-	if !verified {
-		if verified, err = spock.VerifySlotNames(ctx, cfg, conns); err != nil {
-			return err
-		}
-		if !verified {
-			return errors.New("spock.spock_gen_slot_name not found on any node")
-		}
+	// Step 4: Ask Spock for the replication slot name of every subscription.
+	// Spock shortens long names, so they cannot be rebuilt from node names.
+	slotNames, err := spock.LoadSlotNames(ctx, cfg, conns)
+	if err != nil {
+		return err
 	}
 
 	// Step 5: Reconcile Spock resources
-	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
+	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns, slotNames))
 }
