@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -775,6 +776,15 @@ func TestInvalidatedSlotRecovery(t *testing.T) {
 	const slotStatus = "SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'spk_app_n1_sub_n1_n2'), 'missing');"
 	const subStatus = "SELECT status FROM spock.sub_show_status('sub_n1_n2');"
 
+	// idle_replication_slot_timeout exists from Postgres 18, the chart default.
+	// Image tags start with the major version, e.g. "17-spock5-standard".
+	if postgresImg != "" {
+		tag := postgresImg[strings.LastIndex(postgresImg, ":")+1:]
+		if major, _ := strconv.Atoi(strings.SplitN(tag, "-", 2)[0]); major < 18 {
+			t.Skipf("needs Postgres 18 or later for idle_replication_slot_timeout, POSTGRES_IMAGE is %s", postgresImg)
+		}
+	}
+
 	t.Cleanup(func() { uninstallChart(t) })
 	installChart(t, values)
 
@@ -817,6 +827,11 @@ func TestInvalidatedSlotRecovery(t *testing.T) {
 	// Stop the subscriber long enough for Postgres to invalidate the idle
 	// provider slot, then start it again: it can no longer read the slot.
 	t.Run("invalidate_slot", func(t *testing.T) {
+		// The table's DDL must reach n2 before its apply worker stops.
+		if out, err := waitForSQL("pgedge-n2-1",
+			"SELECT to_regclass('test_invalidated_slot') IS NOT NULL;", "t", 60*time.Second); err != nil {
+			t.Fatalf("test table did not reach n2, got %q", out)
+		}
 		if _, err := testKube.ExecSQL("pgedge-n2-1",
 			"SELECT spock.sub_disable('sub_n1_n2', true);"); err != nil {
 			t.Fatalf("failed to disable subscription: %v", err)
