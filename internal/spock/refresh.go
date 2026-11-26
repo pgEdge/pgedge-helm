@@ -41,8 +41,10 @@ func RefreshActual(
 }
 
 // checkSlotHealth marks subscriptions as NeedsRecreate when their provider-side
-// replication slot is missing. This detects broken replication after PG upgrades
-// or database restores where slots are lost but subscriptions remain.
+// replication slot is missing or invalidated. This detects broken replication
+// after PG upgrades or database restores where slots are lost but subscriptions
+// remain, and after Postgres invalidates a slot (max_slot_wal_keep_size,
+// idle_replication_slot_timeout), which leaves the subscription down for good.
 func checkSlotHealth(actual map[resource.Identifier]resource.Resource) {
 	for id, r := range actual {
 		if id.Type != ResourceTypeSubscription {
@@ -53,15 +55,20 @@ func checkSlotHealth(actual map[resource.Identifier]resource.Resource) {
 			continue
 		}
 		slotID := resource.Identifier{Type: ResourceTypeReplicationSlot, ID: sub.replicationSlotName()}
-		if _, slotExists := actual[slotID]; !slotExists {
-			sub.status = resource.Status{
-				Exists:        true,
-				NeedsRecreate: true,
-				Reason:        "provider-side replication slot missing",
+		reason := "provider-side replication slot missing"
+		if slot, slotExists := actual[slotID]; slotExists {
+			if !slot.Status().NeedsRecreate {
+				continue
 			}
-			slog.Warn("subscription missing provider slot",
-				"sub", sub.subName(), "slot", sub.replicationSlotName())
+			reason = "provider-side replication slot invalidated"
 		}
+		sub.status = resource.Status{
+			Exists:        true,
+			NeedsRecreate: true,
+			Reason:        reason,
+		}
+		slog.Warn("subscription missing provider slot",
+			"sub", sub.subName(), "slot", sub.replicationSlotName(), "reason", reason)
 	}
 }
 

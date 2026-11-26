@@ -1,0 +1,3 @@
+kind: Fixed
+body: Fixed init-spock leaving a subscription down when Postgres has invalidated its provider replication slot, for example after max_slot_wal_keep_size or idle_replication_slot_timeout. It now recreates the subscription and its slot, as it already did for a missing slot (#79)
+time: 2026-11-26T12:00:00.000000+05:00

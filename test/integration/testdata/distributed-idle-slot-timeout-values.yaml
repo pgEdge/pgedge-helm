@@ -1,0 +1,14 @@
+pgEdge:
+  appName: pgedge
+  nodes:
+    - name: n1
+      hostname: pgedge-n1-rw
+    - name: n2
+      hostname: pgedge-n2-rw
+  clusterSpec:
+    storage:
+      size: 1Gi
+    postgresql:
+      parameters:
+        # Lets the test invalidate a slot by leaving it idle (Postgres 18+).
+        idle_replication_slot_timeout: "30s"

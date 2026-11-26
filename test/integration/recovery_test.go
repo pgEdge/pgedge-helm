@@ -765,3 +765,115 @@ func TestIdempotentReconciliation(t *testing.T) {
 		}
 	})
 }
+
+// TestInvalidatedSlotRecovery covers a provider slot that Postgres has
+// invalidated (wal_status 'lost'). The slot stays in pg_replication_slots, but
+// the subscription is down for good. Re-running init-spock should recreate the
+// subscription and its slot.
+func TestInvalidatedSlotRecovery(t *testing.T) {
+	const values = "distributed-idle-slot-timeout-values.yaml"
+	const slotStatus = "SELECT coalesce((SELECT wal_status FROM pg_replication_slots WHERE slot_name = 'spk_app_n1_sub_n1_n2'), 'missing');"
+	const subStatus = "SELECT status FROM spock.sub_show_status('sub_n1_n2');"
+
+	t.Cleanup(func() { uninstallChart(t) })
+	installChart(t, values)
+
+	clusterNames := []string{"pgedge-n1", "pgedge-n2"}
+	for _, name := range clusterNames {
+		if err := wait.ForClusterHealthy(testKube, name, timeout); err != nil {
+			t.Fatalf("cluster %s not healthy: %v", name, err)
+		}
+	}
+	if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+		logs, _ := testKube.Logs("job/pgedge-init-spock")
+		t.Fatalf("init-spock job failed: %v\nlogs:\n%s", err, logs)
+	}
+
+	if _, err := testKube.ExecSQL("pgedge-n1-1",
+		"CREATE TABLE test_invalidated_slot (id int PRIMARY KEY, val text);"); err != nil {
+		t.Fatalf("failed to create test table: %v", err)
+	}
+	waitForRow := func(pod string, id int) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		return wait.Until(ctx, 2*time.Second, func() (bool, error) {
+			out, err := testKube.ExecSQL(pod,
+				fmt.Sprintf("SELECT count(*) FROM test_invalidated_slot WHERE id = %d;", id))
+			return err == nil && strings.TrimSpace(out) == "1", nil
+		})
+	}
+	waitForSQL := func(pod, sql, want string, d time.Duration) (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), d)
+		defer cancel()
+		var out string
+		err := wait.Until(ctx, 3*time.Second, func() (bool, error) {
+			o, err := testKube.ExecSQL(pod, sql)
+			out = strings.TrimSpace(o)
+			return err == nil && out == want, nil
+		})
+		return out, err
+	}
+
+	// Stop the subscriber long enough for Postgres to invalidate the idle
+	// provider slot, then start it again: it can no longer read the slot.
+	t.Run("invalidate_slot", func(t *testing.T) {
+		if _, err := testKube.ExecSQL("pgedge-n2-1",
+			"SELECT spock.sub_disable('sub_n1_n2', true);"); err != nil {
+			t.Fatalf("failed to disable subscription: %v", err)
+		}
+		// Invalidation happens at a checkpoint once the slot has been idle
+		// longer than idle_replication_slot_timeout.
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		var out string
+		err := wait.Until(ctx, 3*time.Second, func() (bool, error) {
+			if _, err := testKube.ExecSQL("pgedge-n1-1", "CHECKPOINT;"); err != nil {
+				return false, nil
+			}
+			o, err := testKube.ExecSQL("pgedge-n1-1", slotStatus)
+			out = strings.TrimSpace(o)
+			return err == nil && out == "lost", nil
+		})
+		if err != nil {
+			t.Fatalf("slot not invalidated: wal_status %q", out)
+		}
+		if _, err := testKube.ExecSQL("pgedge-n2-1",
+			"SELECT spock.sub_enable('sub_n1_n2', true);"); err != nil {
+			t.Fatalf("failed to enable subscription: %v", err)
+		}
+		if out, err := waitForSQL("pgedge-n2-1", subStatus, "down", 60*time.Second); err != nil {
+			t.Fatalf("subscription should be down on an invalidated slot, got %q", out)
+		}
+	})
+
+	t.Run("recovery_via_upgrade", func(t *testing.T) {
+		upgradeChart(t, values)
+		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
+			logs, _ := testKube.Logs("job/pgedge-init-spock")
+			t.Fatalf("init-spock job failed during recovery: %v\nlogs:\n%s", err, logs)
+		}
+		if out, err := waitForSQL("pgedge-n1-1", slotStatus, "reserved", 60*time.Second); err != nil {
+			t.Errorf("slot not recreated: wal_status %q", out)
+		}
+		if out, err := waitForSQL("pgedge-n2-1", subStatus, "replicating", 60*time.Second); err != nil {
+			t.Errorf("subscription not replicating after recovery, got %q", out)
+		}
+	})
+
+	t.Run("replication_works_after_recovery", func(t *testing.T) {
+		if _, err := testKube.ExecSQL("pgedge-n1-1",
+			"INSERT INTO test_invalidated_slot VALUES (1, 'n1-after-recovery');"); err != nil {
+			t.Fatalf("failed to insert on n1: %v", err)
+		}
+		if err := waitForRow("pgedge-n2-1", 1); err != nil {
+			t.Error("n1 -> n2 replication broken after recovery")
+		}
+		if _, err := testKube.ExecSQL("pgedge-n2-1",
+			"INSERT INTO test_invalidated_slot VALUES (2, 'n2-after-recovery');"); err != nil {
+			t.Fatalf("failed to insert on n2: %v", err)
+		}
+		if err := waitForRow("pgedge-n1-1", 2); err != nil {
+			t.Error("n2 -> n1 replication broken after recovery")
+		}
+	})
+}

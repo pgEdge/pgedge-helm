@@ -43,13 +43,19 @@ func (r *ReplicationSlot) Dependencies() []resource.Identifier {
 }
 
 func (r *ReplicationSlot) Refresh(ctx context.Context) error {
-	var exists bool
+	// An invalidated slot (wal_status 'lost') stays in pg_replication_slots,
+	// but can never be read from again, so its subscription stays down.
+	var exists, lost bool
 	err := r.conn.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name = $1)",
+		"SELECT count(*) > 0, coalesce(bool_or(wal_status = 'lost'), false) FROM pg_replication_slots WHERE slot_name = $1",
 		r.slotName(),
-	).Scan(&exists)
+	).Scan(&exists, &lost)
 	if err != nil {
 		return fmt.Errorf("check replication slot %s: %w", r.slotName(), err)
+	}
+	if lost {
+		r.status = resource.Status{Exists: true, NeedsRecreate: true, Reason: "replication slot is invalidated"}
+		return nil
 	}
 	r.status = resource.Status{Exists: exists}
 	return nil
