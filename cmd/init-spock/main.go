@@ -91,6 +91,13 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	// Step 4: Reconcile Spock resources
-	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns))
+	// Step 4: Ask Spock for the replication slot name of every subscription.
+	// Spock shortens long names, so they cannot be rebuilt from node names.
+	slotNames, err := spock.LoadSlotNames(ctx, cfg, conns)
+	if err != nil {
+		return err
+	}
+
+	// Step 5: Reconcile Spock resources
+	return resource.Reconcile(ctx, spock.NewReconciler(cfg, conns, slotNames))
 }

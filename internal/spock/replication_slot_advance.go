@@ -25,7 +25,7 @@ import (
 type ReplicationSlotAdvanceFromCTS struct {
 	providerName   string // peer node (slot lives here)
 	subscriberName string // new node
-	dbName         string
+	name           string
 	lagTracker     *LagTrackerCommitTimestamp
 	conn           *pgxpool.Pool // peer's connection
 	status         resource.Status
@@ -37,18 +37,18 @@ type ReplicationSlotAdvanceFromCTS struct {
 	AdvancedToLSN string
 }
 
-func NewReplicationSlotAdvanceFromCTS(providerName, subscriberName, dbName string, lagTracker *LagTrackerCommitTimestamp, conn *pgxpool.Pool) *ReplicationSlotAdvanceFromCTS {
+func NewReplicationSlotAdvanceFromCTS(providerName, subscriberName, slotName string, lagTracker *LagTrackerCommitTimestamp, conn *pgxpool.Pool) *ReplicationSlotAdvanceFromCTS {
 	return &ReplicationSlotAdvanceFromCTS{
 		providerName:   providerName,
 		subscriberName: subscriberName,
-		dbName:         dbName,
+		name:           slotName,
 		lagTracker:     lagTracker,
 		conn:           conn,
 	}
 }
 
 func (r *ReplicationSlotAdvanceFromCTS) slotName() string {
-	return spockSlotName(r.dbName, r.providerName, r.subscriberName)
+	return r.name
 }
 
 func (r *ReplicationSlotAdvanceFromCTS) Identifier() resource.Identifier {

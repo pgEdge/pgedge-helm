@@ -24,16 +24,18 @@ type DisabledSubscription struct {
 	dst        config.Node
 	dbName     string
 	pgedgeUser string
+	slotName   string        // provider-side slot name, as Spock generates it
 	conn       *pgxpool.Pool // dst node's connection
 	status     resource.Status
 }
 
-func NewDisabledSubscription(src, dst config.Node, dbName, pgedgeUser string, conn *pgxpool.Pool) *DisabledSubscription {
+func NewDisabledSubscription(src, dst config.Node, dbName, pgedgeUser, slotName string, conn *pgxpool.Pool) *DisabledSubscription {
 	return &DisabledSubscription{
 		src:        src,
 		dst:        dst,
 		dbName:     dbName,
 		pgedgeUser: pgedgeUser,
+		slotName:   slotName,
 		conn:       conn,
 	}
 }
@@ -50,7 +52,7 @@ func (s *DisabledSubscription) Dependencies() []resource.Identifier {
 	return []resource.Identifier{
 		{Type: ResourceTypeNode, ID: s.src.Name},
 		{Type: ResourceTypeNode, ID: s.dst.Name},
-		{Type: ResourceTypeReplicationSlotCreate, ID: spockSlotName(s.dbName, s.src.Name, s.dst.Name)},
+		{Type: ResourceTypeReplicationSlotCreate, ID: s.slotName},
 	}
 }
 

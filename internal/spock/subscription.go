@@ -21,18 +21,20 @@ type Subscription struct {
 	dst        config.Node
 	dbName     string
 	pgedgeUser string
+	slotName   string // provider-side slot name, as Spock generates it
 	sync       bool
 	conn       *pgxpool.Pool // dst node's connection
 	status     resource.Status
 	extraDeps  []resource.Identifier
 }
 
-func NewSubscription(src, dst config.Node, dbName, pgedgeUser string, sync bool, conn *pgxpool.Pool, extraDeps ...resource.Identifier) *Subscription {
+func NewSubscription(src, dst config.Node, dbName, pgedgeUser, slotName string, sync bool, conn *pgxpool.Pool, extraDeps ...resource.Identifier) *Subscription {
 	return &Subscription{
 		src:        src,
 		dst:        dst,
 		dbName:     dbName,
 		pgedgeUser: pgedgeUser,
+		slotName:   slotName,
 		sync:       sync,
 		conn:       conn,
 		extraDeps:  extraDeps,
@@ -48,7 +50,7 @@ func (s *Subscription) Identifier() resource.Identifier {
 }
 
 func (s *Subscription) replicationSlotName() string {
-	return spockSlotName(s.dbName, s.src.Name, s.dst.Name)
+	return s.slotName
 }
 
 func (s *Subscription) Dependencies() []resource.Identifier {

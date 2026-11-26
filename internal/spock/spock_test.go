@@ -66,7 +66,7 @@ var _ resource.Resource = (*SpockNode)(nil)
 func TestSubscriptionIdentifier(t *testing.T) {
 	src := config.Node{Name: "n1", Hostname: "pgedge-n1-rw"}
 	dst := config.Node{Name: "n2", Hostname: "pgedge-n2-rw"}
-	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil)
 	id := s.Identifier()
 	if id.Type != ResourceTypeSubscription {
 		t.Errorf("type: got %q", id.Type)
@@ -79,7 +79,7 @@ func TestSubscriptionIdentifier(t *testing.T) {
 func TestSubscriptionIdentifierDashesReplaced(t *testing.T) {
 	src := config.Node{Name: "us-east-1", Hostname: "pgedge-us-east-1-rw"}
 	dst := config.Node{Name: "us-west-2", Hostname: "pgedge-us-west-2-rw"}
-	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil)
 	id := s.Identifier()
 	if id.ID != "sub_us_east_1_us_west_2" {
 		t.Errorf("id: got %q, want sub_us_east_1_us_west_2", id.ID)
@@ -89,7 +89,7 @@ func TestSubscriptionIdentifierDashesReplaced(t *testing.T) {
 func TestSubscriptionDependsOnNodesAndSlot(t *testing.T) {
 	src := config.Node{Name: "n1"}
 	dst := config.Node{Name: "n2"}
-	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil)
 	deps := s.Dependencies()
 	if len(deps) != 3 {
 		t.Fatalf("expected 3 deps, got %d", len(deps))
@@ -115,12 +115,12 @@ func TestSubscriptionSyncFlag(t *testing.T) {
 		Name:      "n2",
 		Bootstrap: config.NodeBootstrap{Mode: "spock", SourceNode: "n1"},
 	}
-	s := NewSubscription(src, dst, "app", "pgedge", true, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", true, nil)
 	if !s.sync {
 		t.Error("expected sync=true when dst bootstraps from src via spock")
 	}
 
-	s2 := NewSubscription(src, dst, "app", "pgedge", false, nil)
+	s2 := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil)
 	if s2.sync {
 		t.Error("expected sync=false when not bootstrapping from this src")
 	}
@@ -130,7 +130,7 @@ func TestSubscriptionExtraDeps(t *testing.T) {
 	src := config.Node{Name: "n1"}
 	dst := config.Node{Name: "n2"}
 	extra := resource.Identifier{Type: "spock.wait_for_sync_event", ID: "n1_n2"}
-	s := NewSubscription(src, dst, "app", "pgedge", false, nil, extra)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil, extra)
 	deps := s.Dependencies()
 	if len(deps) != 4 {
 		t.Fatalf("expected 4 deps (3 base + 1 extra), got %d", len(deps))
@@ -149,7 +149,7 @@ func TestSubscriptionExtraDeps(t *testing.T) {
 func TestSubscriptionNoExtraDeps(t *testing.T) {
 	src := config.Node{Name: "n1"}
 	dst := config.Node{Name: "n2"}
-	s := NewSubscription(src, dst, "app", "pgedge", false, nil)
+	s := NewSubscription(src, dst, "app", "pgedge", "spk_app_n1_sub_n1_n2", false, nil)
 	deps := s.Dependencies()
 	if len(deps) != 3 {
 		t.Fatalf("expected 3 deps (no extras), got %d", len(deps))
@@ -160,7 +160,7 @@ func TestSubscriptionNoExtraDeps(t *testing.T) {
 var _ resource.Resource = (*Subscription)(nil)
 
 func TestReplicationSlotIdentifier(t *testing.T) {
-	s := NewReplicationSlot("n1", "n2", "app", nil)
+	s := NewReplicationSlot("n1", "n2", "spk_app_n1_sub_n1_n2", nil)
 	id := s.Identifier()
 	if id.Type != ResourceTypeReplicationSlot {
 		t.Errorf("type: got %q", id.Type)
@@ -170,16 +170,18 @@ func TestReplicationSlotIdentifier(t *testing.T) {
 	}
 }
 
-func TestReplicationSlotIdentifierDashesReplaced(t *testing.T) {
-	s := NewReplicationSlot("us-east-1", "us-west-2", "my-db", nil)
+// The slot name comes from Spock and is used as given, including the
+// shortened form Spock uses for long names.
+func TestReplicationSlotIdentifierUsesSpockName(t *testing.T) {
+	s := NewReplicationSlot("us-east-1", "us-west-2", "spk_my_db_us_east_1_sub_us_ecd0c83f", nil)
 	id := s.Identifier()
-	if id.ID != "spk_my_db_us_east_1_sub_us_east_1_us_west_2" {
-		t.Errorf("id: got %q, want spk_my_db_us_east_1_sub_us_east_1_us_west_2", id.ID)
+	if id.ID != "spk_my_db_us_east_1_sub_us_ecd0c83f" {
+		t.Errorf("id: got %q, want spk_my_db_us_east_1_sub_us_ecd0c83f", id.ID)
 	}
 }
 
 func TestReplicationSlotDependsOnProviderNode(t *testing.T) {
-	s := NewReplicationSlot("n1", "n2", "app", nil)
+	s := NewReplicationSlot("n1", "n2", "spk_app_n1_sub_n1_n2", nil)
 	deps := s.Dependencies()
 	if len(deps) != 1 || deps[0].Type != ResourceTypeNode || deps[0].ID != "n1" {
 		t.Errorf("expected dep on spock.node/n1, got %v", deps)
@@ -187,7 +189,7 @@ func TestReplicationSlotDependsOnProviderNode(t *testing.T) {
 }
 
 func TestReplicationSlotInitialStatus(t *testing.T) {
-	s := NewReplicationSlot("n1", "n2", "app", nil)
+	s := NewReplicationSlot("n1", "n2", "spk_app_n1_sub_n1_n2", nil)
 	if s.Status().Exists {
 		t.Error("initial status should be Exists=false")
 	}
@@ -199,7 +201,7 @@ var _ resource.Resource = (*ReplicationSlot)(nil)
 // --- ReplicationSlotCreate tests ---
 
 func TestReplicationSlotCreateIdentifier(t *testing.T) {
-	r := NewReplicationSlotCreate("n1", "n3", "app", nil)
+	r := NewReplicationSlotCreate("n1", "n3", "spk_app_n1_sub_n1_n3", nil)
 	id := r.Identifier()
 	if id.Type != ResourceTypeReplicationSlotCreate {
 		t.Errorf("type: got %q, want %q", id.Type, ResourceTypeReplicationSlotCreate)
@@ -210,7 +212,7 @@ func TestReplicationSlotCreateIdentifier(t *testing.T) {
 }
 
 func TestReplicationSlotCreateDependsOnProviderNode(t *testing.T) {
-	r := NewReplicationSlotCreate("n1", "n3", "app", nil)
+	r := NewReplicationSlotCreate("n1", "n3", "spk_app_n1_sub_n1_n3", nil)
 	deps := r.Dependencies()
 	if len(deps) != 1 || deps[0].Type != ResourceTypeNode || deps[0].ID != "n1" {
 		t.Errorf("expected dep on spock.node/n1, got %v", deps)
@@ -218,7 +220,7 @@ func TestReplicationSlotCreateDependsOnProviderNode(t *testing.T) {
 }
 
 func TestReplicationSlotCreateEphemeral(t *testing.T) {
-	r := NewReplicationSlotCreate("n1", "n3", "app", nil)
+	r := NewReplicationSlotCreate("n1", "n3", "spk_app_n1_sub_n1_n3", nil)
 	if r.Status().Exists {
 		t.Error("ephemeral resource should not exist before refresh")
 	}
@@ -327,7 +329,7 @@ var _ resource.Resource = (*LagTrackerCommitTimestamp)(nil)
 // --- ReplicationSlotAdvanceFromCTS tests ---
 
 func TestReplicationSlotAdvanceIdentifier(t *testing.T) {
-	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "app", nil, nil)
+	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "spk_app_n2_sub_n2_n3", nil, nil)
 	id := r.Identifier()
 	if id.Type != ResourceTypeReplicationSlotAdvanceFromCTS {
 		t.Errorf("type: got %q, want %q", id.Type, ResourceTypeReplicationSlotAdvanceFromCTS)
@@ -339,7 +341,7 @@ func TestReplicationSlotAdvanceIdentifier(t *testing.T) {
 
 func TestReplicationSlotAdvanceDependsOnNodeAndLagTracker(t *testing.T) {
 	lagTracker := &LagTrackerCommitTimestamp{originName: "n2", receiverName: "n3"}
-	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "app", lagTracker, nil)
+	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "spk_app_n2_sub_n2_n3", lagTracker, nil)
 	deps := r.Dependencies()
 	if len(deps) != 2 {
 		t.Fatalf("expected 2 deps (node + lag tracker), got %d: %v", len(deps), deps)
@@ -353,7 +355,7 @@ func TestReplicationSlotAdvanceDependsOnNodeAndLagTracker(t *testing.T) {
 }
 
 func TestReplicationSlotAdvanceEphemeral(t *testing.T) {
-	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "app", nil, nil)
+	r := NewReplicationSlotAdvanceFromCTS("n2", "n3", "spk_app_n2_sub_n2_n3", nil, nil)
 	if r.Status().Exists {
 		t.Error("ephemeral resource should not exist")
 	}
@@ -368,7 +370,7 @@ func TestComputeDesiredSingleNode(t *testing.T) {
 		DBName: "app", AdminUser: "admin", PgEdgeUser: "pgedge",
 		Nodes: []config.Node{{Name: "n1", Hostname: "pgedge-n1-rw"}},
 	}
-	resources := ComputeDesired(cfg, map[string]*pgxpool.Pool{"n1": nil})
+	resources := ComputeDesired(cfg, map[string]*pgxpool.Pool{"n1": nil}, testSlotNames(cfg))
 
 	// 1 user + 1 node + 0 subscriptions
 	if len(resources) != 2 {
@@ -391,7 +393,7 @@ func TestComputeDesiredTwoNodes(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// 2 users + 2 nodes + 2 slots + 2 subscriptions = 8
 	if len(resources) != 8 {
@@ -415,7 +417,7 @@ func TestComputeDesiredThreeNodes(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// 3 users + 3 nodes + 6 slots + 6 subscriptions = 18
 	if len(resources) != 18 {
@@ -432,7 +434,7 @@ func TestComputeDesiredSyncFlag(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// sub from n1→n2 should have sync=true (populate sync subscription)
 	subN1N2 := mustSubscription(t, resources, "sub_n1_n2")
@@ -460,7 +462,7 @@ func TestComputeDesiredPopulateTwoNodeAdd(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// Should have populate resources: sync event, wait for sync event
 	assertResource(t, resources, ResourceTypeSyncEvent, "n1_n2")
@@ -502,7 +504,7 @@ func TestComputeDesiredPopulateThreeNodeAdd(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// Peer resources for n2
 	assertResource(t, resources, ResourceTypeReplicationSlotCreate, "spk_app_n2_sub_n2_n3")
@@ -558,7 +560,7 @@ func TestComputeDesiredNoNewNodesUnchanged(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// 2 users + 2 nodes + 2 slots + 2 subscriptions = 8 (unchanged)
 	if len(resources) != 8 {
@@ -616,7 +618,7 @@ func mustSubscription(t *testing.T, resources map[resource.Identifier]resource.R
 // --- ReplicationOriginAdvance tests ---
 
 func TestReplicationOriginAdvanceIdentifier(t *testing.T) {
-	r := NewReplicationOriginAdvance("n2", "n3", "app", nil, nil)
+	r := NewReplicationOriginAdvance("n2", "n3", "spk_app_n2_sub_n2_n3", nil, nil)
 	id := r.Identifier()
 	if id.Type != ResourceTypeReplicationOriginAdvance {
 		t.Errorf("type: got %q, want %q", id.Type, ResourceTypeReplicationOriginAdvance)
@@ -628,7 +630,7 @@ func TestReplicationOriginAdvanceIdentifier(t *testing.T) {
 
 func TestReplicationOriginAdvanceDependsOnSlotAdvance(t *testing.T) {
 	slotAdv := &ReplicationSlotAdvanceFromCTS{providerName: "n2", subscriberName: "n3"}
-	r := NewReplicationOriginAdvance("n2", "n3", "app", slotAdv, nil)
+	r := NewReplicationOriginAdvance("n2", "n3", "spk_app_n2_sub_n2_n3", slotAdv, nil)
 	deps := r.Dependencies()
 	if len(deps) != 1 {
 		t.Fatalf("expected 1 dep, got %d: %v", len(deps), deps)
@@ -639,7 +641,7 @@ func TestReplicationOriginAdvanceDependsOnSlotAdvance(t *testing.T) {
 }
 
 func TestReplicationOriginAdvanceEphemeral(t *testing.T) {
-	r := NewReplicationOriginAdvance("n2", "n3", "app", nil, nil)
+	r := NewReplicationOriginAdvance("n2", "n3", "spk_app_n2_sub_n2_n3", nil, nil)
 	if r.Status().Exists {
 		t.Error("ephemeral resource should not exist")
 	}
@@ -694,7 +696,7 @@ func TestComputeDesiredPopulateIncludesPeerCatchup(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// PeerCatchup(peer=n2, source=n1) — id is "n2_n1".
 	assertResource(t, resources, ResourceTypePeerCatchup, "n2_n1")
@@ -710,7 +712,7 @@ func TestComputeDesiredPopulateIncludesOriginAdvance(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// One OriginAdvance per (peer, new) pair. Only peer is n2 here.
 	assertResource(t, resources, ResourceTypeReplicationOriginAdvance, "n2_n3")
@@ -726,7 +728,7 @@ func TestComputeDesiredSourceSubscriptionWaitsOnPeerCatchup(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// Source→new subscription (sub_n1_n3) must depend on PeerCatchup(n2_n1)
 	// AND on WaitForSyncEvent(n2_n1). The first proves apply-progress
@@ -759,7 +761,7 @@ func TestComputeDesiredPeerSubscriptionWaitsOnOriginAdvance(t *testing.T) {
 		},
 	}
 	conns := map[string]*pgxpool.Pool{"n1": nil, "n2": nil, "n3": nil}
-	resources := ComputeDesired(cfg, conns)
+	resources := ComputeDesired(cfg, conns, testSlotNames(cfg))
 
 	// Peer→new end-state subscription (sub_n2_n3) should now depend on
 	// ReplicationOriginAdvance (which itself depends on slot advance,
