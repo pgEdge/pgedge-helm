@@ -106,7 +106,9 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	// databases on this server has its own. Ours are named after the slots of
 	// this database's subscriptions on this node: the ones in the catalog that
 	// was just dropped, and the ones the reconcile creates again, whose names
-	// Spock generates.
+	// Spock generates. Table sync workers use the slot name plus "_%08x", and
+	// can leave that origin behind if they stop mid-copy. Slot names only
+	// contain [a-z0-9_], so they are safe in a regular expression.
 	var peers, subNames []string
 	for _, peer := range cfg.Nodes {
 		if peer.Name != node.Name {
@@ -114,15 +116,30 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 			subNames = append(subNames, spockSubName(peer.Name, node.Name))
 		}
 	}
-	_, err = conn.Exec(ctx, `
-		SELECT pg_replication_origin_drop(roname)
+	rows, err := conn.Query(ctx, `
+		WITH ours AS (
+			SELECT unnest($1::text[]) AS slot
+			UNION
+			SELECT spock.spock_gen_slot_name(current_database()::name, p::name, s::name)::text
+			  FROM unnest($2::text[], $3::text[]) AS t(p, s))
+		SELECT roname
 		  FROM pg_replication_origin
-		 WHERE roname = ANY($1)
-		    OR roname IN (SELECT spock.spock_gen_slot_name(current_database()::name, p::name, s::name)::text
-		                    FROM unnest($2::text[], $3::text[]) AS t(p, s))`,
+		 WHERE EXISTS (SELECT 1 FROM ours
+		                WHERE roname = slot OR roname ~ ('^' || slot || '_[0-9a-f]{8}$'))`,
 		subSlots, peers, subNames)
+	var origins []string
+	if err == nil {
+		origins, err = pgx.CollectRows(rows, pgx.RowTo[string])
+	}
 	if err != nil {
-		slog.Warn("drop replication origins failed (continuing)", "node", node.Name, "error", err)
+		slog.Warn("list replication origins failed (continuing)", "node", node.Name, "error", err)
+	}
+	// Drop them one at a time: an apply worker that has not exited yet still
+	// holds its origin, and that must not stop the others from being dropped.
+	for _, origin := range origins {
+		if _, err := conn.Exec(ctx, "SELECT pg_replication_origin_drop($1)", origin); err != nil {
+			slog.Warn("drop replication origin failed (continuing)", "node", node.Name, "origin", origin, "error", err)
+		}
 	}
 
 	dsn := fmt.Sprintf("host=%s dbname=%s user=%s %s port=5432",
