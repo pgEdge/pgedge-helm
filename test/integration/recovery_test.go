@@ -424,6 +424,32 @@ func TestResetSpock(t *testing.T) {
 
 	// Upgrade with resetSpock: true.
 	t.Run("reset_via_upgrade", func(t *testing.T) {
+		// Hold n2's origin for a while, like an apply worker that has not
+		// exited yet. The reset must wait for it instead of leaving it behind.
+		if _, err := testKube.ExecSQL("pgedge-n2-1", "SELECT spock.sub_disable('sub_n1_n2', true);"); err != nil {
+			t.Fatalf("failed to disable sub_n1_n2 on n2: %v", err)
+		}
+		// The apply worker may not have exited yet, so retry while it still
+		// holds the origin.
+		held := make(chan error, 1)
+		go func() {
+			_, err := testKube.ExecSQL("pgedge-n2-1", `
+				DO $$
+				BEGIN
+					FOR i IN 1..50 LOOP
+						BEGIN
+							PERFORM pg_replication_origin_session_setup('spk_app_n1_sub_n1_n2');
+							RETURN;
+						EXCEPTION WHEN object_in_use THEN
+							PERFORM pg_sleep(0.2);
+						END;
+					END LOOP;
+					RAISE EXCEPTION 'origin spk_app_n1_sub_n1_n2 still in use';
+				END $$;
+				SELECT pg_sleep(20);`)
+			held <- err
+		}()
+
 		upgradeChart(t, "distributed-reset-spock-values.yaml")
 
 		for _, name := range clusterNames {
@@ -431,9 +457,16 @@ func TestResetSpock(t *testing.T) {
 				t.Fatalf("cluster %s not healthy after reset: %v", name, err)
 			}
 		}
-		if err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout); err != nil {
-			logs, _ := testKube.Logs("job/pgedge-init-spock")
+		err := wait.ForJobComplete(testKube, "pgedge-init-spock", timeout)
+		logs, _ := testKube.Logs("job/pgedge-init-spock")
+		if err != nil {
 			t.Fatalf("init-spock job failed after reset: %v\nlogs:\n%s", err, logs)
+		}
+		if err := <-held; err != nil {
+			t.Fatalf("failed to hold origin on n2: %v", err)
+		}
+		if strings.Contains(logs, "drop replication origin failed") {
+			t.Errorf("reset left a replication origin behind:\n%s", logs)
 		}
 	})
 

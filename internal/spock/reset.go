@@ -3,10 +3,13 @@ package spock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/pgEdge/pgedge-helm/internal/config"
@@ -136,8 +139,11 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	}
 	// Drop them one at a time: an apply worker that has not exited yet still
 	// holds its origin, and that must not stop the others from being dropped.
+	// Wait for such a worker to let go, because a disabled subscription (used
+	// to add a node) cannot be created while its origin is still there.
+	deadline := time.Now().Add(originDropWait)
 	for _, origin := range origins {
-		if _, err := conn.Exec(ctx, "SELECT pg_replication_origin_drop($1)", origin); err != nil {
+		if err := dropOrigin(ctx, conn, origin, deadline); err != nil {
 			slog.Warn("drop replication origin failed (continuing)", "node", node.Name, "origin", origin, "error", err)
 		}
 	}
@@ -155,4 +161,25 @@ func resetNode(ctx context.Context, conn *pgxpool.Pool, node config.Node, cfg *c
 	}
 
 	return nil
+}
+
+// originDropWait is how long resetNode waits for workers to release their
+// replication origins after Spock is dropped.
+const originDropWait = 30 * time.Second
+
+// dropOrigin drops a replication origin, retrying while a worker still holds
+// it (SQLSTATE 55006, object in use) until the deadline.
+func dropOrigin(ctx context.Context, conn *pgxpool.Pool, origin string, deadline time.Time) error {
+	for {
+		_, err := conn.Exec(ctx, "SELECT pg_replication_origin_drop($1)", origin)
+		var pgErr *pgconn.PgError
+		if err == nil || !errors.As(err, &pgErr) || pgErr.Code != "55006" || time.Now().After(deadline) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
 }
