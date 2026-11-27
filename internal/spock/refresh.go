@@ -152,6 +152,8 @@ func discoverOrphanNodes(
 }
 
 // discoverOrphanSlots finds logical replication slots not matching any configured subscription.
+// Only slots in the connected database are considered: Spock may also run in
+// other databases on the same server, and their slots are not ours to drop.
 func discoverOrphanSlots(
 	ctx context.Context,
 	cfg *config.Config,
@@ -160,8 +162,10 @@ func discoverOrphanSlots(
 	expectedSlots map[string]bool,
 	actual map[resource.Identifier]resource.Resource,
 ) {
-	rows, err := conn.Query(ctx,
-		"SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%'")
+	rows, err := conn.Query(ctx, `
+		SELECT slot_name FROM pg_replication_slots
+		 WHERE slot_type = 'logical' AND slot_name LIKE 'spk_%'
+		   AND database = current_database()`)
 	if err != nil {
 		slog.Warn("query replication slots", "survivor", survivor.Name, "error", err)
 		return

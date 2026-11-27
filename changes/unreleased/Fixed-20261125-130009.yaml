@@ -1,0 +1,3 @@
+kind: Fixed
+body: Fixed init-spock dropping Spock replication slots and origins that belong to other databases on the same server during upgrades and resets. It now only touches slots and origins of the database it manages (#77)
+time: 2026-11-25T13:00:09.422926+05:00
