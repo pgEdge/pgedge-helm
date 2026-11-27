@@ -74,6 +74,35 @@ Plugins status
 No plugins found
 ```
 
+## Recovering Lost Replication Slots
+
+Postgres can invalidate a Spock replication slot, for example when a subscriber falls further behind than `max_slot_wal_keep_size` allows, or when the slot stays unused longer than `idle_replication_slot_timeout` (Postgres 18). An invalidated slot stays in place but can no longer be read from, so the subscription that uses it stops replicating.
+
+To spot one, look for `lost` in the "Wal Status" column of the "Unmanaged Replication Slot Status" section shown by `kubectl cnpg status`, or query the provider node directly:
+
+```sql
+SELECT slot_name, wal_status FROM pg_replication_slots WHERE slot_name LIKE 'spk_%';
+```
+
+On the subscriber node, the subscription shows as `down`:
+
+```sql
+SELECT subscription_name, status FROM spock.sub_show_status();
+```
+
+To recover, run a `helm upgrade` with your current values. The `init-spock` job drops and recreates only the subscriptions whose slots are lost or missing, along with their slots, and leaves the others untouched:
+
+```shell
+helm upgrade \
+    --values <your values file> \
+    --wait \
+    pgedge ./
+```
+
+!!! warning
+
+    Rows written on the provider between the slot being invalidated and the upgrade are not copied to the subscriber. See [Data written while a replication slot is lost](../limitations.md#data-written-while-a-replication-slot-is-lost).
+
 ## Viewing Logs
 
 You can view Postgres logs for a specific node using the `kubectl cnpg` plugin. Replace `pgedge-n1` with the name of your node to display and format the logs for easier reading:
