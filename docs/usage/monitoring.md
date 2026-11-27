@@ -101,7 +101,7 @@ helm upgrade \
 
 !!! warning
 
-    Rows written on the provider between the slot being invalidated and the upgrade are not copied to the subscriber. See [Data written while a replication slot is lost](../limitations.md#data-written-while-a-replication-slot-is-lost).
+    Changes on the provider that the subscriber had not applied before the new subscription starts are not copied to it. This includes the backlog the subscriber had already fallen behind on before the slot was invalidated, not only rows written afterwards. See [Data written while a replication slot is lost](../limitations.md#data-written-while-a-replication-slot-is-lost).
 
 ## Viewing Logs
 
