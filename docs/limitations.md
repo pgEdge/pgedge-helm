@@ -12,6 +12,20 @@ You may manage server certificates yourself using cert-manager and CloudNativePG
 
 When the init-spock job resets a node, it snapshots the replication set configuration into memory, drops the Spock extension with `CASCADE`, recreates it, and then restores the snapshot. If the job crashes or is OOM-killed between the drop and restore steps, the repset configuration is lost and must be manually recreated. The failure window is narrow (a few SQL statements), but operators should be aware of it when troubleshooting failed reset runs.
 
+## Data written while a replication slot is lost
+
+When Postgres invalidates a Spock replication slot, the `init-spock` job recreates the affected subscription and its slot on the next `helm upgrade` (see [Recovering Lost Replication Slots](usage/monitoring.md#recovering-lost-replication-slots)). The new subscription starts from the current position and does not copy existing data, so every change on the provider that the subscriber had not applied before then never reaches it. That covers the backlog the subscriber had fallen behind on before the slot was invalidated (the WAL Postgres removed), as well as rows written between the invalidation and the upgrade. You must reconcile them yourself, for example by comparing the tables on both nodes.
+
+With the default settings, `max_slot_wal_keep_size` is `-1` and `idle_replication_slot_timeout` is `0`, so Postgres does not invalidate slots; the trade-off is that WAL is kept without limit while a subscriber is down, and the volume can fill. If you set `max_slot_wal_keep_size` to bound that, make it large enough to hold the WAL for the longest subscriber outage you expect, and make sure the volume has room for it:
+
+```yaml
+pgEdge:
+  clusterSpec:
+    postgresql:
+      parameters:
+        max_slot_wal_keep_size: "10GB"
+```
+
 ## Installing multiple times into the same namespace
 
 Installing the chart multiple times into the same Kubernetes namespace is not recommended. Each release expects to manage its own set of resources, and resource name conflicts or unexpected behavior may occur if multiple releases are installed in the same namespace.

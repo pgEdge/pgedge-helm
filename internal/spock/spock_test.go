@@ -785,3 +785,42 @@ func TestComputeDesiredPeerSubscriptionWaitsOnOriginAdvance(t *testing.T) {
 		t.Error("sub_n2_n3 should NOT directly depend on replication_slot_advance_from_cts (gated via OriginAdvance instead)")
 	}
 }
+
+// slotStatus stands in for a provider slot; checkSlotHealth only reads its status.
+type slotStatus struct {
+	resource.Resource
+	status resource.Status
+}
+
+func (s slotStatus) Status() resource.Status { return s.status }
+
+func TestCheckSlotHealth(t *testing.T) {
+	cases := []struct {
+		name         string
+		slot         *resource.Status // nil: slot not in actual
+		wantRecreate bool
+	}{
+		{"healthy slot", &resource.Status{Exists: true}, false},
+		{"missing slot", nil, true},
+		{"invalidated slot", &resource.Status{Exists: true, NeedsRecreate: true}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub := &Subscription{
+				src:    config.Node{Name: "n1"},
+				dst:    config.Node{Name: "n2"},
+				dbName: "app",
+				status: resource.Status{Exists: true},
+			}
+			actual := map[resource.Identifier]resource.Resource{sub.Identifier(): sub}
+			if tc.slot != nil {
+				slotID := resource.Identifier{Type: ResourceTypeReplicationSlot, ID: sub.replicationSlotName()}
+				actual[slotID] = slotStatus{status: *tc.slot}
+			}
+			checkSlotHealth(actual)
+			if got := sub.Status().NeedsRecreate; got != tc.wantRecreate {
+				t.Errorf("NeedsRecreate = %v, want %v", got, tc.wantRecreate)
+			}
+		})
+	}
+}
